@@ -104,9 +104,9 @@ export default function StepTwo({ onNext }) {
     setScore(score);
     setShowScore(true);
 
-    // Do not auto-navigate. Save mindmap (or null) and let user click Next.
+    // Save mindmap (or null) and let user click Next.
     if (wrongQs.length === 0) {
-      // perfect score — mark explicitly so StepThree can show the perfect UI
+      // perfect score so StepThree can show the perfect UI
       setMindmapData({ _perfect: true });
       return;
     }
@@ -134,7 +134,7 @@ export default function StepTwo({ onNext }) {
 
   if (loading) return <div>Loading Quiz...</div>;
   if (!questions.length) return <div>No questions found.</div>;
-
+  //Shows quiz questions
   return (
     <div>
       <h1>Quiz</h1>
@@ -155,7 +155,7 @@ export default function StepTwo({ onNext }) {
           ))}
         </div>
       ))}
-
+   {/* Show score when finished */}
       {showScore && (
         <div style={{margin: '10px 0', padding: '8px', background: 'oklch(0.7162 0.1597 290.3962)', borderRadius: 4}}>
           You scored {score} / {questions.length}
@@ -166,7 +166,7 @@ export default function StepTwo({ onNext }) {
         <button onClick={handleFinish} disabled={fetchingMindmap} style={{padding: '10px 20px', background: '#3b82f6', color:'white', borderRadius: 15}}>
           {fetchingMindmap ? 'Checking...' : 'Finish Quiz'}
         </button>
-
+      {/* Button to go to the mindmap */}
         {mindmapData !== undefined && (
           <button onClick={() => onNext(mindmapData)} style={{padding: '10px 20px', background: '#10b981', color:'white', borderRadius: 4}}>
             Next
