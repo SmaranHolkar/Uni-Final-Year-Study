@@ -1,0 +1,566 @@
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #302e2e;
+}
+
+.navbar {
+  width: 70%;
+  margin: 5px auto 0 auto;
+  border-radius: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background-color: var(--primary);
+  /* Will be light by default */
+  color: var(--card);
+  font-family: var(--font-sans);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-logo {
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.nav-links {
+  display: flex;
+  gap: 20px;
+}
+
+.nav-links a {
+  color: var(--shadow-2xs);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+  padding: 0.4rem 1.0rem;
+}
+
+.nav-links a:hover {
+  color: var(--foreground);
+}
+
+.logout-btn {
+  background-color: var(--destructive);
+  color: var(--destructive-foreground);
+  border: none;
+  padding: 0.4rem 1.0rem;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.logout-btn:hover {
+  opacity: 0.9;
+}
+
+/* Hamburger (hidden on desktop) */
+.hamburger {
+  display: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+/* ✅ Responsive behaviour */
+@media (max-width: 768px) {
+  .nav-links {
+    position: absolute;
+    top: 60px;
+    right: 0;
+    background-color: var(--card-foreground);
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    padding: 15px;
+    gap: 10px;
+    display: none;
+    border-radius: 16px;
+  }
+
+  .nav-links.open {
+    display: flex;
+  }
+
+  .hamburger {
+    display: block;
+    border-radius: 14;
+  }
+
+  .navbar {
+    width: 70%;
+    padding: 10px 15px;
+  }
+}
+
+.navbar {
+  width: 70%;
+  margin: 5px auto 0 auto;
+  border-radius: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background-color: var(--primary);
+  /* Will be light by default */
+  color: var(--card);
+  font-family: var(--font-sans);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-logo {
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.nav-links {
+  display: flex;
+  gap: 20px;
+}
+
+.nav-links a {
+  color: var(--shadow-2xs);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+  padding: 0.4rem 1.0rem;
+}
+
+.nav-links a:hover {
+  color: var(--foreground);
+}
+
+/* Hamburger (hidden on desktop) */
+.hamburger {
+  display: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+/* ✅ Responsive behaviour */
+@media (max-width: 768px) {
+  .nav-links {
+    position: absolute;
+    top: 60px;
+    right: 0;
+    background-color: var(--card-foreground);
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    padding: 15px;
+    gap: 10px;
+    display: none;
+    border-radius: 16px;
+  }
+
+  .nav-links.open {
+    display: flex;
+  }
+
+  .hamburger {
+    display: block;
+    border-radius: 14;
+  }
+
+  .sidebar {
+    width: 70%;
+    padding: 10px 15px;
+  }
+}
+
+.shadow__btn {
+  color: var(--shadow-2xs);
+  border: none;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  box-shadow: var(--);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.shadow__btn {
+  background-color: var(--destructive);
+  box-shadow: var(--shadow-md);
+}
+
+.signup-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.signup-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 2rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-md);
+}
+
+/* Typography */
+.signup-card h1 {
+  text-align: center;
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.subtitle {
+  text-align: center;
+  color: var(--muted-foreground);
+  margin-bottom: 1.5rem;
+}
+
+/* Form */
+.signup-card label {
+  display: block;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.signup-card input,
+.signup-card select {
+  width: 90%;
+  padding: 0.75rem;
+  margin-top: 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--input);
+  color: var(--foreground);
+  outline: none;
+}
+
+.row {
+  display: flex;
+  gap: 1rem;
+}
+
+.row>div {
+  flex: 1;
+}
+
+/* Icons in inputs */
+.input-wrapper {
+  position: relative;
+  margin-top: 0.4rem;
+}
+
+.input-wrapper .icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+}
+
+.input-wrapper input,
+.input-wrapper select {
+  padding-left: 2.4rem;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted-foreground);
+}
+
+/* Terms */
+.terms {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.link {
+  color: var(--primary);
+  cursor: pointer;
+}
+
+/* Button */
+.submit-btn {
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 0.9rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.submit-btn:hover {
+  opacity: 0.9;
+}
+
+/* Sidebar responsive styles */
+.sidebar {
+  position: fixed;
+  left: 0;
+  top: 80px;
+  bottom: 20px;
+  width: 240px;
+  background: var(--card);
+  color: var(--card-foreground);
+  padding: 1rem;
+  border-right: 1px solid var(--border);
+  border-radius: 0 12px 12px 0;
+  box-shadow: var(--shadow-md);
+  transform: translateX(0);
+  transition: transform 200ms ease;
+  z-index: 900;
+}
+
+.sidebar-toggle {
+  display: none;
+}
+
+.sidebar .sidebar-content {
+  margin-top: 0.5rem;
+}
+
+.sidebar-link {
+  display: block;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  color: var(--card-foreground);
+  text-decoration: none;
+  margin-bottom: 0.4rem;
+}
+
+.sidebar-link.logout {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  border: none;
+  cursor: pointer;
+}
+
+.sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Center hero vertically while preserving existing spacing/look */
+.hero-section {
+  min-height: calc(100vh - 80px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: transparent;
+}
+
+/* Container that holds hero content */
+.hero-container {
+  width: 100%;
+  max-width: 1100px;
+  padding: 2rem;
+  margin: 0 1rem;
+  text-align: center;
+  color: var(--foreground);
+}
+
+.hero-title {
+  font-size: 2.5rem;
+  line-height: 1.05;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+  color: var(--foreground);
+}
+
+.hero-subtitle {
+  font-size: 1.125rem;
+  color: var(--muted-foreground);
+  max-width: 720px;
+  margin: 0 auto 1.5rem auto;
+}
+
+.hero-cta {
+  display: inline-block;
+}
+
+/* Decorative blurred circles previously implemented with Tailwind classes */
+.hero-bg-decor {
+  position: absolute;
+  width: 384px;
+  height: 384px;
+  border-radius: 50%;
+  opacity: 0.28;
+  filter: blur(40px);
+  z-index: 0;
+}
+
+.hero-decor-left {
+  background: #c4b5fd;
+  top: -120px;
+  left: -120px;
+}
+
+.hero-decor-right {
+  background: #93c5fd;
+  bottom: -120px;
+  right: -120px;
+}
+
+/* Keep space for navbar on small screens and ensure readable spacing */
+@media (max-width: 768px) {
+  .hero-section {
+    min-height: auto;
+    padding: 5.5rem 1rem;
+  }
+
+  .hero-title {
+    font-size: 1.9rem;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+  }
+
+  .hero-bg-decor {
+    display: none;
+  }
+}
+
+/* Main content area that sits to the right of the fixed sidebar */
+.main-content {
+  margin-left: 260px;
+  padding: 2rem;
+  /* Use calc to subtract the sidebar width from the total width */
+  width: calc(100% - 260px);
+  min-height: calc(100vh - 90px);
+  box-sizing: border-box;
+  /* Ensures padding doesn't add to width */
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 900px) {
+  .main-content {
+    margin-left: 0;
+    width: 100%;
+    padding: 1.5rem;
+  }
+}
+
+/* Primary action style for sidebar (aligns with app color scheme) */
+.sidebar-primary {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+
+.sidebar-primary:hover {
+  transform: translateY(-2px);
+  opacity: 0.95;
+}
+
+/* Smaller secondary text style */
+.sidebar-meta {
+  font-size: 0.85rem;
+  color: var(--muted-foreground);
+}
+
+/* Mobile: hide sidebar off-canvas and show toggle */
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 60px;
+    bottom: 0;
+    width: 80%;
+    max-width: 320px;
+    transform: translateX(-110%);
+    border-radius: 0 12px 12px 0;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-toggle {
+    display: block;
+    position: fixed;
+    left: 12px;
+    top: 18px;
+    z-index: 1001;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    border: none;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+}
+
+.main-learning-container {
+  margin-left: 150px;
+  /* Width of the sidebar + some spacing */
+  padding: 1%;
+  background-color: #302e2e;
+}

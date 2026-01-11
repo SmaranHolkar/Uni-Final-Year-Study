@@ -1,0 +1,37 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon --watch src --exec node src/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "@supabase/supabase-js": "^2.87.1",
+    "ajv": "^8.17.1",
+    "cors": "^2.8.5",
+    "dagre": "^0.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "groq-sdk": "^0.37.0",
+    "mongodb": "^7.0.0",
+    "mongoose": "^8.19.3",
+    "node-fetch": "^3.3.2",
+    "pg": "^8.16.3",
+    "postgres": "^3.4.7",
+    "react-hooks": "^1.0.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.23",
+    "nodemon": "^3.1.10",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18"
+  }
+}
