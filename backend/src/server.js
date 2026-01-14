@@ -92,6 +92,7 @@ Rules:
       "prompt": "...",
       "choices": ["A", "B", "C", "D"],
       "answer": "A"
+      "resource": "Optional URL for further reading"
     }
   ]
 }
@@ -197,7 +198,7 @@ app.post('/api/generate-mindmap', async (req, res) => {
   }
 });
 
-/* ================= START ================= */
+/* START/RUN SERVER */
 
 app.listen(PORT, () =>
   console.log(`🚀 Server running on http://localhost:${PORT}`)
