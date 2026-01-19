@@ -20,7 +20,7 @@ const GROQ_KEY = process.env.GROQ_API;
 const DATABASE_URL = process.env.SUPABASE_URL;
 
 if (!DATABASE_URL) {
-  throw new Error('❌ SUPABASE_URL missing (must be pooler :6543)');
+  throw new Error(' SUPABASE_URL missing (must be pooler :6543)');
 }
 
 /* DB */
@@ -37,12 +37,12 @@ let embedder;
 
 async function getEmbedding(text) {
   if (!embedder) {
-    console.log('🧠 Loading embedding model...');
+    console.log(' Loading embedding model...');
     embedder = await pipeline(
       'feature-extraction',
       'Xenova/all-MiniLM-L6-v2'
     );
-    console.log('✅ Embedding model loaded');
+    console.log(' Embedding model loaded');
   }
 
   const output = await embedder(text, {
@@ -146,7 +146,7 @@ app.post('/api/generate-questions', async (req, res) => {
 
     res.json({ questions });
   } catch (err) {
-    console.error('🔥 BACKEND ERROR:', err);
+    console.error('BACKEND ERROR:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -201,5 +201,5 @@ app.post('/api/generate-mindmap', async (req, res) => {
 /* START/RUN SERVER */
 
 app.listen(PORT, () =>
-  console.log(`🚀 Server running on http://localhost:${PORT}`)
+  console.log(`Server running on http://localhost:${PORT}`)
 );
