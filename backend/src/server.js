@@ -10,8 +10,8 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 /*  MIDDLEWARE */
-
-app.use(cors({ origin: 'http://localhost:5173' })); // Allow all origins for testing
+// { origin: 'http://localhost:5173' }
+app.use(cors()); // Allow all origins for testing
 app.use(express.json());
 /* ENV */
 
@@ -19,7 +19,7 @@ const GROQ_KEY = process.env.GROQ_API;
 const DATABASE_URL = process.env.SUPABASE_URL;
 
 if (!DATABASE_URL) {
-  throw new Error('❌ SUPABASE_URL missing (must be pooler :6543)');
+  throw new Error(' SUPABASE_URL missing (must be pooler :6543)');
 }
 
 /* DB */
@@ -40,13 +40,13 @@ let embedder;
 async function getEmbedding(text) {
 
   if (!embedder) {
-    console.log('🧠 Loading embedding model...');
+    console.log('Loading embedding model...');
     embedder = await pipeline(
       'feature-extraction',
       'Xenova/all-MiniLM-L6-v2',
       { quantized: true }
     );
-    console.log('✅ Embedding model loaded');
+    console.log('Embedding model loaded');
   }
 
   const output = await embedder(text, {
@@ -59,7 +59,7 @@ async function getEmbedding(text) {
 
 /* VECTOR SEARCH */
 
-async function getTopChunks(embedding, k = 8) {
+async function getTopChunks(embedding, k = 10) {
   const vec = `[${embedding.join(',')}]`;
   const client = await pool.connect();
 
@@ -187,7 +187,7 @@ ${context}
 
 app.post('/api/generate-questions', async (req, res) => {
   try {
-    const { queryText, count = 10 } = req.body;
+    const { queryText, count = 8 } = req.body;
     console.log('Query:', queryText);
 
     const embedding = await getEmbedding(queryText);
