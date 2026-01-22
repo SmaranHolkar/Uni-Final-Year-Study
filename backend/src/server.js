@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 /*  MIDDLEWARE */
-// { origin: 'http://localhost:5173' }
+
 app.use(cors({ origin: 'http://localhost:5173' })); // Allow all origins for testing
 app.use(express.json());
 /* ENV */
@@ -40,13 +40,13 @@ let embedder;
 async function getEmbedding(text) {
 
   if (!embedder) {
-    console.log('Loading embedding model...');
+    console.log('🧠 Loading embedding model...');
     embedder = await pipeline(
       'feature-extraction',
       'Xenova/all-MiniLM-L6-v2',
       { quantized: true }
     );
-    console.log('Embedding model loaded');
+    console.log('✅ Embedding model loaded');
   }
 
   const output = await embedder(text, {
@@ -95,7 +95,7 @@ Rules:
       "id": "q1",
       "prompt": "...",
       "choices": ["A", "B", "C", "D"],
-      "answer": "A"
+      "answer": "A",
       "resource": "Optional URL for further reading"
     }
   ]
