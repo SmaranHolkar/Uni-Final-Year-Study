@@ -24,23 +24,35 @@ export default function StepTwo({ onNext }) {
   };
 
   const fetchQuestions = async () => {
-    setLoading(true);
-    try {
-      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const resp = await fetch(`${API_BASE}/api/generate-questions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ queryText: "Generate questions", topK: 5, count: 8 })
-      });
-      const data = await resp.json();
-      setQuestions(data.questions || []);
-      setAnswers(Array((data.questions || []).length).fill(null));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+  setLoading(true);
+  try {
+    const API_BASE =
+      import.meta.env.VITE_API_URL ??
+      "https://uni-final-year-study-backend.onrender.com";
+
+    const resp = await fetch(`${API_BASE}/api/generate-questions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        queryText: "Generate questions",
+        count: 8
+      })
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`Backend error ${resp.status}: ${text}`);
     }
-  };
+
+    const data = await resp.json();
+    setQuestions(data.questions || []);
+    setAnswers(Array((data.questions || []).length).fill(null));
+  } catch (e) {
+    console.error("❌ Failed to fetch questions:", e);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchQuestions();
