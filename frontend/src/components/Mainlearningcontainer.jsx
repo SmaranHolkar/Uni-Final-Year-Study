@@ -18,10 +18,12 @@ export default function MultiStepForm() {
       
       
       {step === 3 && (
+      <div className="h-screen w-full">  
         <StepThree 
           data={mindmapData} 
           onRetake={() => setStep(2)} 
         />
+        </div>
       )}
     </div>
   );

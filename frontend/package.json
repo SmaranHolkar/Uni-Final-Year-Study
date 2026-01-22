@@ -38,19 +38,7 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.19",
     "vite": "^7.2.2"
-  },
-  "vite": {
-    "server": {
-      "proxy": {
-        "/api": {
-          "target": "http://localhost:5000",
-          "changeOrigin": true,
-          "rewrite": {
-            "^/api": ""
-          }
-        }
-      }
-    }
   }
+
 }
 

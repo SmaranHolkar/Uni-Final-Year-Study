@@ -38,7 +38,8 @@ export default function StepThree({ data, onRetake }) {
         data: { 
           label: n.label,
           description: n.description || "Review this concept to improve your understanding.",
-          category: n.category || "Review Topic"
+          category: n.category || "Review Topic",
+          sourceLink: n.sourceLink || ""
         },
         position: {
           x: i * 250,
@@ -131,10 +132,11 @@ export default function StepThree({ data, onRetake }) {
       </div>
     );
   }
+const [printMode, setPrintMode] = useState(false);
 
   //Main Mindmap with ReactFlow
   return (
-    <div className="h-[600px] flex flex-col bg-slate-50 rounded-xl overflow-hidden border border-slate-200 shadow-xl relative">
+    <div className="h-full w-full flex flex-col bg-slate-50 rounded-xl border border-slate-200 shadow-xl relative overflow-visible">
       
       {/* Header Bar */}
       <div className="p-4 bg-white border-b flex items-center justify-between z-10 shadow-sm">
@@ -146,16 +148,21 @@ export default function StepThree({ data, onRetake }) {
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
+          
           <div>
             <h1 className="text-lg font-bold text-slate-800">Your Review Map</h1>
             <p className="text-xs text-slate-500">Click nodes to see details</p>
           </div>
+          <div>
+            
+          </div>
+
         </div>
       </div>
 
       <div className="flex-1 flex relative">
         <div className="flex-1 relative bg-slate-50">
-          <div className="w-full h-full" style={{ height: '520px' }}>
+          <div className="w-full h-full" style={{ height: '1000px' }}>
             <ReactFlow
               className="w-full h-full"
               nodes={nodes}
@@ -202,7 +209,7 @@ export default function StepThree({ data, onRetake }) {
                 </button>
               </div>
 
-              <div>
+              <div className="h-full w-full">
                 <h2 className="text-xl font-bold text-slate-800 mb-2">{selectedNode.data.label}</h2>
                 <p className="text-sm text-slate-600 leading-relaxed">
                   {selectedNode.data.description}
@@ -213,12 +220,24 @@ export default function StepThree({ data, onRetake }) {
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3">
                   Recommended Action
                 </h3>
-                <button 
-                  className="w-full flex items-center justify-center gap-2 p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors text-sm font-medium group"
-                >
-                  <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  Search Resources
-                </button>
+
+                {selectedNode.data.sourceLink && (
+                  <a
+                    href={selectedNode.data.sourceLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg 
+                              bg-slate-100 hover:bg-slate-200 text-slate-700 
+                              transition-all text-sm font-medium group
+                              hover:shadow-sm active:scale-[0.98]"
+                  >
+                    <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                    <span className="truncate max-w-[200px]">
+                      Open Learning Resource
+                    </span>
+                  </a>
+                )}
+
               </div>
             </div>
           </div>
@@ -227,3 +246,15 @@ export default function StepThree({ data, onRetake }) {
     </div>
   );
 }
+
+//                 {selectedNode.data.sourceLink && (
+//   <a
+//     href={selectedNode.data.sourceLink}
+//     target="_blank"
+//     rel="noopener noreferrer"
+//     className="w-full flex items-center justify-center gap-2 p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors text-sm font-medium group"
+//   >
+//     <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
+//     Open Learning Resource
+//   </a>
+// )}

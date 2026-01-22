@@ -75,6 +75,7 @@ export default function Login() {
             </label>
             <div className="relative">
               <input
+                minLength={6}
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

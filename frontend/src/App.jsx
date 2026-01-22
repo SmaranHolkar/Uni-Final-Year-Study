@@ -1,30 +1,40 @@
-import { useState } from 'react'
-import './App.css'
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { AuthProvider } from './AuthContext'
-import Navbar from './components/navbar.jsx'
-import HeroSection from './components/Hero.jsx'
+import { useAuth } from "./AuthContext";
+
+import Navbar from "./components/navbar.jsx";
+import Sidebar from "./components/sidebar.jsx";
+
+import HeroSection from "./components/Hero.jsx";
 import Signup from "./pages/Signup";
-import Login from "./pages/Login";
+import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/dashbaord";
 import Learn from "./pages/Learningpage";
-// import InteractiveMindMap from './components/slides/InteractiveMindMap.jsx';
 
 function App() {
+  const { user, loading } = useAuth();
+
+  if (loading) return null; // prevent flicker
+
   return (
     <Router>
-      <AuthProvider>
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<HeroSection />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/learningpage" element={<Learn />} />
-        </Routes>
-      </AuthProvider>
+      {/* ✅ Navbar ONLY when logged out */}
+      {!user && <Navbar />}
+
+      {/* ✅ Sidebar ONLY when logged in */}
+      {user && <Sidebar />}
+
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<HeroSection />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
+
+        {/* App routes (sidebar navigation) */}
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/learningpage" element={<Learn />} />
+      </Routes>
     </Router>
-  )
+  );
 }
 
-export default App
+export default App;

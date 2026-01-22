@@ -21,17 +21,24 @@ const Navbar = () => {
       <Link className="nav-logo" to="/" onClick={() => setIsOpen(false)}>HydrusLearn</Link>
 
       <div className={`nav-links ${isOpen ? "open" : ""}`}>
-        <Link className="nav-link" to="/learningpage" onClick={() => setIsOpen(false)}>Learn</Link>
-        <Link className="nav-link" to="/Dashboard" onClick={() => setIsOpen(false)}>Dashboard</Link>
-        <Link className="nav-link" to="/profile" onClick={() => setIsOpen(false)}>Profile</Link>
+
         {user ? (
+          <div>        
+          <Link className="nav-link" to="/learningpage" onClick={() => setIsOpen(false)}>Learn</Link>
+          <Link className="nav-link" to="/profile" onClick={() => setIsOpen(false)}>Profile</Link>
           <button className="logout-btn" onClick={handleLogout}>
             Logout
           </button>
+          </div>
         ) : (
+          <div>
+                  <Link className="nav-link" to="/" onClick={() => setIsOpen(false)}>Features</Link>
+        <Link className="nav-link" to="/" onClick={() => setIsOpen(false)}>Why</Link>
+        <Link className="nav-link" to="/" onClick={() => setIsOpen(false)}>Help</Link>
           <Link className="shadow__btn" to="/login" onClick={() => setIsOpen(false)}>
             Login
           </Link>
+          </div>
         )}
       </div>
 

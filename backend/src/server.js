@@ -11,24 +11,26 @@ const PORT = process.env.PORT || 5000;
 
 /*  MIDDLEWARE */
 
-app.use(cors({ origin: 'http://localhost:5173' }));
+app.use(cors({ origin: 'http://localhost:5173' })); // Allow all origins for testing
 app.use(express.json());
-
 /* ENV */
 
 const GROQ_KEY = process.env.GROQ_API;
 const DATABASE_URL = process.env.SUPABASE_URL;
 
 if (!DATABASE_URL) {
-  throw new Error(' SUPABASE_URL missing (must be pooler :6543)');
+  throw new Error('❌ SUPABASE_URL missing (must be pooler :6543)');
 }
 
 /* DB */
 
 const pool = new Pool({
   connectionString: DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-  max: 5,
+  ssl:{ rejectUnauthorized: false },
+  max:5,
+  connectionTimeoutMillis: 20000,     // 20 seconds to establish connection
+  idleTimeoutMillis: 30000,           // 60 seconds before timing out idle clients
+  query_timeout: 120000,              // 120 seconds for queries to complete
 });
 
 /* EMBEDDINGS (LOCAL) */
@@ -36,13 +38,15 @@ const pool = new Pool({
 let embedder;
 
 async function getEmbedding(text) {
+
   if (!embedder) {
-    console.log(' Loading embedding model...');
+    console.log('🧠 Loading embedding model...');
     embedder = await pipeline(
       'feature-extraction',
-      'Xenova/all-MiniLM-L6-v2'
+      'Xenova/all-MiniLM-L6-v2',
+      { quantized: true }
     );
-    console.log(' Embedding model loaded');
+    console.log('✅ Embedding model loaded');
   }
 
   const output = await embedder(text, {
@@ -55,7 +59,7 @@ async function getEmbedding(text) {
 
 /* VECTOR SEARCH */
 
-async function getTopChunks(embedding, k = 10) {
+async function getTopChunks(embedding, k = 8) {
   const vec = `[${embedding.join(',')}]`;
   const client = await pool.connect();
 
@@ -113,7 +117,7 @@ ${context}
         model: 'llama-3.1-8b-instant',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.2,
-        max_tokens: 900,
+        max_tokens: 1000,
       }),
     }
   );
@@ -127,11 +131,63 @@ ${context}
   return JSON.parse(data.choices[0].message.content).questions;
 }
 
+async function aiMindmapNode({ question, correctAnswer, context, sourceLink = '' }) {
+  const prompt = `
+You are generating a study mindmap node to help a student fix a misunderstanding. Provide a source link for more reading DO NOT USE WIKIPEDIA.
+
+The student got this question wrong:
+"${question}"
+
+Correct answer:
+"${correctAnswer}"
+
+Using the reference material below, explain:
+1) The core concept they misunderstood
+2) Why the wrong reasoning fails
+3) What is correct and why and how it is correct.
+
+Rules:
+- Max 8 short lines
+- Each line max 18 words
+- Plain text only
+- No bullets, no filler
+- Focus ONLY on what fixes the mistake
+
+Source material: <a href=${sourceLink}></a>
+
+Reference material:
+${context}
+`;
+
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${GROQ_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'llama-3.1-8b-instant',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+      max_tokens: 140,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err);
+  }
+
+  const data = await res.json();
+  return data.choices[0].message.content.trim();
+}
+
+
 /* ROUTE */
 
 app.post('/api/generate-questions', async (req, res) => {
   try {
-    const { queryText, count = 5 } = req.body;
+    const { queryText, count = 10 } = req.body;
     console.log('Query:', queryText);
 
     const embedding = await getEmbedding(queryText);
@@ -146,10 +202,12 @@ app.post('/api/generate-questions', async (req, res) => {
 
     res.json({ questions });
   } catch (err) {
-    console.error('BACKEND ERROR:', err);
+    console.error('🔥 BACKEND ERROR:', err);
     res.status(500).json({ error: err.message });
   }
 });
+
+
 
 // Minimal mindmap generator (returns a simple nodes/edges structure)
 app.post('/api/generate-mindmap', async (req, res) => {
@@ -161,7 +219,7 @@ app.post('/api/generate-mindmap', async (req, res) => {
     }
 
     // Build mindmap: root node + one node per wrong question
-    const nodes = [ { id: 'root', label: 'Review Topics', description: 'Topics to review based on your incorrect answers' } ];
+    const nodes = [ { id: 'root', label: 'Review Topics', description: 'Topics to review based on your incorrect answers', sourceLink:'Source link' } ];
     const edges = [];
 
     // For each wrong question, fetch top related chunks from the vector DB
@@ -172,21 +230,26 @@ app.post('/api/generate-mindmap', async (req, res) => {
 
       // Try to get embedding for the question prompt and then fetch top matching chunks
       let description = '';
+
       try {
         const text = (q.prompt && String(q.prompt)) || '';
         if (text.trim()) {
           const emb = await getEmbedding(text);
           const chunks = await getTopChunks(emb, 3);
           if (Array.isArray(chunks) && chunks.length) {
-            // concatenate top chunks as the node description
-            description = chunks.map(r => r.chunk_text).join('\n\n');
+            // Use AI to condense the first chunk as the node description
+            description = await aiMindmapNode({
+            question: q.prompt,
+            correctAnswer: q.answer, // or q.correctAnswer if that’s your field
+            context: chunks[0].chunk_text
+          });
           }
         }
       } catch (err) {
         console.error('Error fetching chunks for question:', err);
       }
 
-      nodes.push({ id, label, description: description || 'Review this topic', category: 'Suggested Review' });
+      nodes.push({ id, label, description: description || 'Review this topic', category: 'Suggested Review', sourceLink: q.resource || '' });
       edges.push({ from: 'root', to: id });
     }
 

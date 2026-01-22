@@ -5,11 +5,12 @@ import { supabase } from "../supabaseClient";
 import "../App.css";
 import "../index.css";
 
-
 const Sidebar = () => {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  if (!user) return null;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -26,19 +27,54 @@ const Sidebar = () => {
         {open ? "✕" : "☰"}
       </button>
 
-      <aside className={`sidebar ${open ? "open" : ""}`} aria-hidden={!open}>
-      <div className="sidebar-content">
-        <nav>
-          <Link to="MultiStepForm " className="sidebar-primary" onClick={() => setOpen(false)}>
+      <aside className={`sidebar ${open ? "open" : ""}`}>
+        <div className="sidebar-content">
+          {/* Logo */}
+          <Link
+            to="/dashboard"
+            className="sidebar-logo"
+            onClick={() => setOpen(false)}
+          >
+            HydrusLearn
+          </Link>
+
+          {/* Navigation Links */}
+          <nav className="sidebar-nav">
+            <Link
+              to="/profile"
+              className="sidebar-link"
+              onClick={() => setOpen(false)}
+            >
+              Profile
+            </Link>
+
+            <Link
+              to="/dashboard"
+              className="sidebar-link"
+              onClick={() => setOpen(false)}
+            >
+              Dashboard
+            </Link>
+          </nav>
+
+          {/* Primary Action */}
+          <Link
+            to="/learningpage"
+            className="sidebar-primary"
+            onClick={() => setOpen(false)}
+          >
             Start Study Session
           </Link>
 
-          
+          {/* History Section (only heading removed, no links) */}
+          <h4 className="sidebar-section">History</h4>
+          {/* "Past Sessions" link removed per request */}
 
-          <h1>History</h1>
-
-        </nav>
-      </div>
+          {/* Logout Button */}
+          <button className="sidebar-logout" onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
       </aside>
     </>
   );
