@@ -11,7 +11,14 @@ const PORT = process.env.PORT || 5000;
 
 /*  MIDDLEWARE */
 // { origin: 'http://localhost:5173' }
-app.use(cors()); // Allow all origins for testing
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://uni-final-year-study.onrender.com'
+  ],
+  methods: ['GET', 'POST'],
+  credentials: true
+})); // Allow all origins for testing
 app.use(express.json());
 /* ENV */
 
