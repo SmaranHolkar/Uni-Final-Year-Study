@@ -36,7 +36,7 @@ function Dashboard() {
   };
 
   return (
-    <div className="pt-24 md:pl-[50px]">
+    <div className="main-content">
       <header className="flex items-center justify-between shadow-md p-4">
         <h2 className="text-xl font-semibold">Dashboard</h2>
       </header>

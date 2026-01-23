@@ -1,3 +1,140 @@
+/* Sidebar Styles - Enhanced */
+.sidebar-toggle {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  background: var(--sidebar-primary, var(--primary));
+  color: var(--sidebar-primary-foreground, var(--primary-foreground));
+  border: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius, 12px);
+  font-size: 1.2rem;
+  cursor: pointer;
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar {
+  position: fixed;
+  left: -18rem;
+  width: 18rem;
+  height: 100vh;
+  background: var(--sidebar, var(--card));
+  color: var(--sidebar-foreground, var(--card-foreground));
+  transition: left 0.3s ease, transform 0.3s ease;
+  z-index: 99;
+  border-right: 1px solid var(--sidebar-border, var(--border));
+}
+
+.sidebar.open {
+  left: 0;
+}
+
+.sidebar-content {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 0.5rem;
+}
+
+.sidebar-logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--sidebar-primary, var(--primary));
+  text-decoration: none;
+  margin-bottom: 1.5rem;
+  display: block;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sidebar-link {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius, 12px);
+  text-decoration: none;
+  color: var(--sidebar-foreground, var(--card-foreground));
+  font-weight: 500;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar-link:hover {
+  background-color: var(--sidebar-accent, var(--primary));
+  color: var(--sidebar-accent-foreground, var(--primary-foreground));
+}
+
+.sidebar-primary {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--sidebar-primary, var(--primary));
+  color: var(--sidebar-primary-foreground, var(--primary-foreground));
+  text-align: center;
+  border-radius: var(--radius, 12px);
+  font-weight: 600;
+  text-decoration: none;
+  margin-top: 1rem;
+  transition: opacity 0.2s;
+}
+
+.sidebar-primary:hover {
+  opacity: 0.9;
+}
+
+.sidebar-section {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-logout {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  border: none;
+  border-radius: var(--radius, 12px);
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: auto;
+  transition: opacity 0.2s;
+}
+
+.sidebar-logout:hover {
+  opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .sidebar-toggle {
+    display: flex;
+  }
+  .sidebar {
+    left: -18rem;
+  }
+  .sidebar.open {
+    left: 0;
+  }
+}
+
+@media (min-width: 769px) {
+  .sidebar {
+    left: 0 !important;
+  }
+  .sidebar-toggle {
+    display: none;
+  }
+}
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -353,50 +490,7 @@
 }
 
 /* Sidebar responsive styles */
-.sidebar {
-  position: fixed;
-  left: 0;
-  top: 80px;
-  bottom: 20px;
-  width: 240px;
-  background: var(--card);
-  color: var(--card-foreground);
-  padding: 1rem;
-  border-right: 1px solid var(--border);
-  border-radius: 0 12px 12px 0;
-  box-shadow: var(--shadow-md);
-  transform: translateX(0);
-  transition: transform 200ms ease;
-  z-index: 900;
-}
 
-.sidebar-toggle {
-  display: none;
-}
-
-.sidebar .sidebar-content {
-  margin-top: 0.5rem;
-}
-
-.sidebar-link {
-  display: block;
-  padding: 0.6rem 0.75rem;
-  border-radius: 8px;
-  color: var(--card-foreground);
-  text-decoration: none;
-  margin-bottom: 0.4rem;
-}
-
-.sidebar-link.logout {
-  background: var(--destructive);
-  color: var(--destructive-foreground);
-  border: none;
-  cursor: pointer;
-}
-
-.sidebar-link:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
 
 /* Center hero vertically while preserving existing spacing/look */
 .hero-section {
@@ -502,29 +596,7 @@
 }
 
 /* Primary action style for sidebar (aligns with app color scheme) */
-.sidebar-primary {
-  display: inline-block;
-  width: 100%;
-  text-align: center;
-  padding: 0.6rem 0.75rem;
-  border-radius: 10px;
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-weight: 600;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
-  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
-}
 
-.sidebar-primary:hover {
-  transform: translateY(-2px);
-  opacity: 0.95;
-}
-
-/* Smaller secondary text style */
-.sidebar-meta {
-  font-size: 0.85rem;
-  color: var(--muted-foreground);
-}
 
 /* Mobile: hide sidebar off-canvas and show toggle */
 @media (max-width: 900px) {
@@ -559,7 +631,7 @@
 }
 
 .main-learning-container {
-  margin-left: 150px;
+    margin-left: 18rem; /* or 240px, matching your sidebar width */
   /* Width of the sidebar + some spacing */
   padding: 1%;
   background-color: #302e2e;

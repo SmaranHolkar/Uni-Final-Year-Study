@@ -30,7 +30,7 @@ export default function StepTwo({ onNext }) {
       const resp = await fetch(`${API_BASE}/api/generate-questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ queryText: "Generate questions", topK: 5, count: 5 })
+        body: JSON.stringify({ queryText: "Generate questions", count: 8 })
       });
       const data = await resp.json();
       setQuestions(data.questions || []);

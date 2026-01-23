@@ -5,7 +5,6 @@ import { supabase } from "../supabaseClient";
 import "../App.css";
 import "../index.css";
 
-
 const Sidebar = () => {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
@@ -14,6 +13,7 @@ const Sidebar = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
+    setOpen(false); // Close sidebar after logout
   };
 
   return (
@@ -27,18 +27,54 @@ const Sidebar = () => {
       </button>
 
       <aside className={`sidebar ${open ? "open" : ""}`} aria-hidden={!open}>
-      <div className="sidebar-content">
-        <nav>
-          <Link to="MultiStepForm " className="sidebar-primary" onClick={() => setOpen(false)}>
-            Start Study Session
+        <div className="sidebar-content">
+          {/* Logo/Header */}
+          <Link to="/dashboard" className="sidebar-logo" onClick={() => setOpen(false)}>
+            HydrusLearn
           </Link>
 
-          
+          {/* Profile */}
+          {user && (
+            <Link to="/profile" className="sidebar-link" onClick={() => setOpen(false)}>
+              Profile
+            </Link>
+          )}
 
-          <h1>History</h1>
+          {/* Dashboard */}
+          {user && (
+            <Link to="/dashboard" className="sidebar-link" onClick={() => setOpen(false)}>
+              Dashboard
+            </Link>
+          )}
 
-        </nav>
-      </div>
+          {/* Start Study Session */}
+          {user && (
+            <Link to="/Learningpage" className="sidebar-primary" onClick={() => setOpen(false)}>
+              Start Study Session
+            </Link>
+          )}
+
+          {/* History */}
+          {user && (
+            <Link to="/history" className="sidebar-link" onClick={() => setOpen(false)}>
+              History
+            </Link>
+          )}
+
+          {/* Logout at bottom */}
+          {user && (
+            <button className="sidebar-logout" onClick={handleLogout}>
+              Logout
+            </button>
+          )}
+
+          {/* Login link for guests */}
+          {!user && (
+            <Link to="/login" className="sidebar-link" onClick={() => setOpen(false)}>
+              Login
+            </Link>
+          )}
+        </div>
       </aside>
     </>
   );
