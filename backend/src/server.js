@@ -11,7 +11,19 @@ const PORT = process.env.PORT || 5000;
 
 /*  MIDDLEWARE */
 
-app.use(cors({ origin: 'http://localhost:5173' })); // Allow all origins for testing
+const allowedOrigins = [
+  'https://uni-final-year-study.onrender.com',
+  'http://localhost:5173'
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
 app.use(express.json());
 /* ENV */
 
@@ -152,6 +164,7 @@ Rules:
 - Plain text only
 - No bullets, no filler
 - Focus ONLY on what fixes the mistake
+- Make sure to use simple vocabulary .
 
 Source material: <a href=${sourceLink}></a>
 
@@ -209,7 +222,7 @@ app.post('/api/generate-questions', async (req, res) => {
 
 
 
-// Minimal mindmap generator (returns a simple nodes/edges structure)
+// Minimal mindmap generator returns a simple nodes/edges structure
 app.post('/api/generate-mindmap', async (req, res) => {
   try {
     const { wrongQuestions } = req.body;
@@ -239,18 +252,25 @@ app.post('/api/generate-mindmap', async (req, res) => {
           if (Array.isArray(chunks) && chunks.length) {
             // Use AI to condense the first chunk as the node description
             description = await aiMindmapNode({
-            question: q.prompt,
-            correctAnswer: q.answer, // or q.correctAnswer if that’s your field
-            context: chunks[0].chunk_text
-          });
+              question: q.prompt,
+              correctAnswer: q.answer, // or q.correctAnswer if that’s your field
+              context: chunks[0].chunk_text,
+              sourceLink: q.sourceLink || ''
+            });
+            // Add delay to avoid rate limit
+            await new Promise(resolve => setTimeout(resolve, 3000));
           }
         }
       } catch (err) {
         console.error('Error fetching chunks for question:', err);
       }
 
-      nodes.push({ id, label, description: description || 'Review this topic', category: 'Suggested Review', sourceLink: q.resource || '' });
-      edges.push({ from: 'root', to: id });
+      if (description && description.trim().length > 0) {
+        nodes.push({ id, label, description, category: 'Suggested Review', sourceLink: q.resource || '' });
+        edges.push({ from: 'root', to: id });
+      } else {
+        console.warn(`AI did not return description for node ${id} (${label})`);
+      }
     }
 
     // Return expected shape for the frontend (nodes[], edges[])
@@ -260,6 +280,21 @@ app.post('/api/generate-mindmap', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// async function saveQuizSession() {
+
+
+//     INSERT INTO public.quizzes_mindmaps (user_id, title, quiz, mindmap, embedding)
+//     VALUES (
+//       '00000000-0000-0000-0000-000000000000'::uuid, -- replace with actual user_id (auth.uid() on server)
+//       'My Quiz Title',
+//       '{"questions":[{"id":1,"text":"Q1","choices":["a","b"]}]}'::jsonb,
+//       '{"nodes":[], "edges":[]}'::jsonb,
+//       NULL  -- or an array literal for vector if available
+//     )
+//     RETURNING *;
+
+// }
 
 /* START/RUN SERVER */
 
