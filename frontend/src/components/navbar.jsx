@@ -21,9 +21,9 @@ const Navbar = () => {
       <Link className="nav-logo" to="/" onClick={() => setIsOpen(false)}>HydrusLearn</Link>
 
       <div className={`nav-links ${isOpen ? "open" : ""}`}>
-        <Link className="nav-link" to="/learningpage" onClick={() => setIsOpen(false)}>Learn</Link>
-        <Link className="nav-link" to="/Dashboard" onClick={() => setIsOpen(false)}>Dashboard</Link>
-        <Link className="nav-link" to="/profile" onClick={() => setIsOpen(false)}>Profile</Link>
+        <Link className="nav-link" to="/" onClick={() => setIsOpen(false)}>Features</Link>
+        <Link className="nav-link" to="/" onClick={() => setIsOpen(false)}>Pricing</Link>
+        <Link className="nav-link" to="/" onClick={() => setIsOpen(false)}>About</Link>
         {user ? (
           <button className="logout-btn" onClick={handleLogout}>
             Logout
