@@ -30,10 +30,14 @@ app.use(express.json());
 
 // ROUTES
 app.use('/api', questionRoutes);
-app.use(express.static('frontend/dist'));
+
+// Use absolute path for static files
+const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+app.use(express.static(frontendDistPath));
+
 
 app.get('*', (req, res) => {
-  res.sendFile(path.resolve(__dirname, 'frontend', 'dist', 'index.html'));
+  res.sendFile(path.join(frontendDistPath, 'index.html'));
 });
 
 app.listen(PORT, '0.0.0.0', () =>
