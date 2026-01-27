@@ -9,8 +9,9 @@ import HeroSection from './components/Hero.jsx';
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import Dashboard from "./pages/dashbaord";
+import PrivateRoute from "./components/PrivateRoute.jsx";
 import Learn from "./pages/Learningpage";
-
+import NotFound from "./pages/NotFound/NotFound";
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -22,8 +23,9 @@ function AppContent() {
         <Route path="/" element={<HeroSection />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/learningpage" element={<Learn />} />
+        <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+        <Route path="/learningpage" element={<PrivateRoute><Learn /></PrivateRoute>} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );

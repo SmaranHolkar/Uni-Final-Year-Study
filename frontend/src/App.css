@@ -580,7 +580,7 @@
   padding: 2rem;
   /* Use calc to subtract the sidebar width from the total width */
   width: calc(100% - 260px);
-  min-height: calc(100vh - 90px);
+  min-height: 100vh ;
   box-sizing: border-box;
   /* Ensures padding doesn't add to width */
   display: flex;
