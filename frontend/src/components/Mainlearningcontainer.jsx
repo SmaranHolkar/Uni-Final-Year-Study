@@ -1,10 +1,16 @@
 import React, { useState } from "react";
+import StepOne from "./slides/StepOne.jsx";
 import StepTwo from "./slides/Steptwo.jsx";
 import StepThree from "./slides/StepThree.jsx"; // We'll create this next
 
 export default function MultiStepForm() {
-  const [step, setStep] = useState(2);
+  const [step, setStep] = useState(1);
   const [mindmapData, setMindmapData] = useState(null);
+
+  // This function gets called when Step 1 finishes (document upload)
+  const handleDocumentUpload = () => {
+    setStep(2); // Move to quiz
+  };
 
   // This function gets called when Step 2 finishes
   const handleQuizFinish = (data) => {
@@ -14,6 +20,8 @@ export default function MultiStepForm() {
 
   return (
     <div style={styles.container}>
+      {step === 1 && <StepOne onNext={handleDocumentUpload} />}
+      
       {step === 2 && <StepTwo onNext={handleQuizFinish} />}
       
       

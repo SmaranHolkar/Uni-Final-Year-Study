@@ -1,8 +1,8 @@
 import pkg from 'pg';
 const { Pool } = pkg;
-const DATABASE_URL = process.env.SUPABASE_URL;
+const DATABASE_URL = process.env.SUPABASE_DB_URL || process.env.SUPABASE_URL;
 if (!DATABASE_URL) {
-  throw new Error(' SUPABASE_URL missing (must be pooler :6543)');
+  throw new Error('SUPABASE_DB_URL or SUPABASE_URL missing (must be pooler :6543)');
 }
 const pool = new Pool({
   connectionString: DATABASE_URL,

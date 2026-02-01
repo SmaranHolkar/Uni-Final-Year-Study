@@ -3,11 +3,11 @@ import { getEmbedding, getTopChunks, generateMCQs, aiMindmapNode } from '../util
 // Generate Questions
 export async function generateQuestions(req, res) {
   try {
-    const { queryText, count = 8 } = req.body;
-    console.log('Query:', queryText);
+    const { queryText, count = 8, documentId = null } = req.body;
+    console.log('Query:', queryText, 'DocumentId:', documentId);
 
     const embedding = await getEmbedding(queryText);
-    const chunks = await getTopChunks(embedding, 5);
+    const chunks = await getTopChunks(embedding, 5, null, documentId);
 
     if (!chunks.length) {
       return res.status(404).json({ error: 'No matching content' });

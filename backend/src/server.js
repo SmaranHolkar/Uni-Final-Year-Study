@@ -3,6 +3,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import questionRoutes from './routes/questionRoutes.js';
+import documentRoutes from './routes/documentRoutes.js';
+import authRoutes from './routes/auth.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -30,6 +32,9 @@ app.use(express.json());
 
 // ROUTES
 app.use('/api', questionRoutes);
+app.use('/api', documentRoutes);
+app.use('/api/auth', authRoutes);
+
 
 
 app.listen(PORT, '0.0.0.0', () =>

@@ -7,6 +7,9 @@ const router = express.Router();
 // Verifies Bearer token and returns user/session info
 router.get('/me', async (req, res) => {
   try {
+    if (!supabase) {
+      return res.status(500).json({ error: 'Supabase client not configured' });
+    }
     const auth = req.headers.authorization || '';
     if (!auth.startsWith('Bearer ')) return res.status(401).json({ error: 'Unauthorized' });
     const token = auth.split(' ')[1];

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { useAuth } from "../../AuthContext";
 
 export default function StepTwo({ onNext }) {
+  const { currentDocumentId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState([]);
@@ -30,7 +32,11 @@ export default function StepTwo({ onNext }) {
       const resp = await fetch(`${API_BASE}/api/generate-questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ queryText: "Generate questions", count: 8 })
+        body: JSON.stringify({ 
+          queryText: "Generate questions", 
+          count: 8,
+          documentId: currentDocumentId
+        })
       });
       const data = await resp.json();
       setQuestions(data.questions || []);

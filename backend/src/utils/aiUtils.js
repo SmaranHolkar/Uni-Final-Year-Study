@@ -5,7 +5,7 @@ import pool from './dbPool.js';
 const GROQ_KEY = process.env.GROQ_API;
 // Ensure GROQ_KEY is set
 
-// Embedding model instance gets embeddings.
+// Embedding model gets embeddings.
 let embedder;
 export async function getEmbedding(text) {
   if (!embedder) {
@@ -25,14 +25,32 @@ export async function getEmbedding(text) {
 }
 
 // Retrieve top K similar text chunks from DB using vector similarity search
-export async function getTopChunks(embedding, k = 10) {
+export async function getTopChunks(embedding, k = 10, userId = null, documentId = null) {
   const vec = `[${embedding.join(',')}]`;
   const client = await pool.connect();
   try {
-    const { rows } = await client.query(
-      `SELECT chunk_text FROM public.w_embeddings ORDER BY embedding <-> $1::vector LIMIT $2`,
-      [vec, k]
-    );
+    let query, params;
+    
+    if (documentId) {
+      // Filter by specific document using the document's title
+      query = `SELECT id, chunk_text, title FROM public.w_embeddings 
+               WHERE title = (SELECT title FROM public.w_embeddings WHERE id = $3)
+               ORDER BY embedding <-> $1::vector LIMIT $2`;
+      params = [vec, k, documentId];
+    } else if (userId) {
+      // Filter by user_id if provided
+      query = `SELECT id, chunk_text, title FROM public.w_embeddings 
+               WHERE user_id = $3
+               ORDER BY embedding <-> $1::vector LIMIT $2`;
+      params = [vec, k, userId];
+    } else {
+      // Get all chunks if no user filter
+      query = `SELECT id, chunk_text, title FROM public.w_embeddings 
+               ORDER BY embedding <-> $1::vector LIMIT $2`;
+      params = [vec, k];
+    }
+    
+    const { rows } = await client.query(query, params);
     return rows;
   } finally {
     client.release();

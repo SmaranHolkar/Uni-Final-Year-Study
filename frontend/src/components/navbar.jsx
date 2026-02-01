@@ -29,9 +29,14 @@ const Navbar = () => {
             Logout
           </button>
         ) : (
+          <div>
           <Link className="shadow__btn" to="/login" onClick={() => setIsOpen(false)}>
             Login
           </Link>
+          <Link to="/signup" className="shadow__btn"  onClick={() => setIsOpen(false)}>
+            Sign up
+          </Link>
+          </div>
         )}
       </div>
 
