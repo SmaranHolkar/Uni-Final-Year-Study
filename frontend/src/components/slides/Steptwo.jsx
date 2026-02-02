@@ -164,7 +164,7 @@ export default function StepTwo({ onNext }) {
 
       <div style={{display: 'flex', gap: 10, marginTop: 8}}>
         <button onClick={handleFinish} disabled={fetchingMindmap} style={{padding: '10px 20px', background: '#3b82f6', color:'white', borderRadius: 15}}>
-          {fetchingMindmap ? 'Checking...' : 'Finish Quiz'}
+          {fetchingMindmap ? 'checking and Creating mindmap please wait' : 'Finish Quiz'}
         </button>
       {/* Button to go to the mindmap */}
         {mindmapData !== undefined && (
