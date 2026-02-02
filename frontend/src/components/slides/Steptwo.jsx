@@ -175,7 +175,7 @@ export default function StepTwo({ onNext }) {
       {/* Button to go to the mindmap */}
         {mindmapData !== undefined && (
           <button onClick={() => onNext(mindmapData)} style={{padding: '10px 20px', background: '#10b981', color:'white', borderRadius: 4}}>
-            Next
+            Mindmap created. Press here to go view mindmap.
           </button>
         )}
       </div>
