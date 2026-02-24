@@ -5,21 +5,61 @@ import pool from './dbPool.js';
 const GROQ_KEY = process.env.GROQ_API;
 
 let embedder;
+let modelLastUsed = Date.now();
+const MODEL_UNLOAD_TIMEOUT = 5 * 60 * 1000; // Unload after 5 minutes of inactivity
+
+// Simple LRU cache for embeddings
+const embeddingCache = new Map();
+const MAX_CACHE_SIZE = 100;
+
+// Periodically cleanup old model if not used
+setInterval(() => {
+  if (embedder && Date.now() - modelLastUsed > MODEL_UNLOAD_TIMEOUT) {
+    console.log('Unloading embedding model due to inactivity');
+    embedder = null;
+    embeddingCache.clear();
+    if (global.gc) global.gc();
+  }
+}, 60000); // Check every minute
+
 export async function getEmbedding(text) {
+  // Check cache first
+  const cacheKey = text.substring(0, 200); // Use first 200 chars as key
+  if (embeddingCache.has(cacheKey)) {
+    modelLastUsed = Date.now();
+    return embeddingCache.get(cacheKey);
+  }
+
   if (!embedder) {
-    console.log('Loading embedding model');
+    console.log('Loading embedding model (optimized)');
     embedder = await pipeline(
       'feature-extraction',
       'Xenova/all-MiniLM-L6-v2',
-      { quantized: true }
+      { 
+        quantized: true,
+        progress_callback: null, // Reduce memory overhead
+      }
     );
     console.log('Embedding model loaded');
   }
+  
+  modelLastUsed = Date.now();
+  
   const output = await embedder(text, {
     pooling: 'mean',
     normalize: true,
   });
-  return Array.from(output.data);
+  
+  const embedding = Array.from(output.data);
+  
+  // Add to cache
+  if (embeddingCache.size >= MAX_CACHE_SIZE) {
+    const firstKey = embeddingCache.keys().next().value;
+    embeddingCache.delete(firstKey);
+  }
+  embeddingCache.set(cacheKey, embedding);
+  
+  return embedding;
 }
 
 

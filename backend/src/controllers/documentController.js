@@ -26,6 +26,8 @@ async function extractTextFromFile(filePath, mimetype) {
       pdfParser.on("pdfParser_dataReady", (pdfData) => {
          // pdf2json provides a method to get raw text content
          const text = pdfParser.getRawTextContent();
+         // Clear parser to free memory
+         pdfParser.destroy();
          resolve(text);
       });
 
@@ -116,7 +118,7 @@ export async function processAndStoreDocument(req, res) {
 
     /*  CHUNKING  */
 
-    const MAX_CHUNKS = 200;
+    const MAX_CHUNKS = 100; // Reduced from 200 for memory optimization
     const chunks = chunkText(text, 500, 50).slice(0, MAX_CHUNKS);
 
     if (!chunks.length) {
@@ -157,7 +159,11 @@ export async function processAndStoreDocument(req, res) {
 
         storedChunks++;
 
-        if ((i + 1) % 10 === 0) {
+        // Memory optimization: Force GC every 20 chunks
+        if ((i + 1) % 20 === 0) {
+          console.log(` ${title}: ${i + 1}/${chunks.length}`);
+          if (global.gc) global.gc();
+        } else if ((i + 1) % 10 === 0) {
           console.log(` ${title}: ${i + 1}/${chunks.length}`);
         }
 
