@@ -119,7 +119,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
       
       await retryWithBackoff(async () => {
         return await axios.post(
-          `${API_BASE}/api/save-quiz-mindmap`,
+          `${API_BASE}/api/save-quiz-mindmap?token=${encodeURIComponent(accessToken)}`,
           {
             userId: user.id,
             title: currentDocumentTitle || `Quiz - ${new Date().toLocaleDateString()}`,
@@ -132,7 +132,8 @@ export default function StepThree({ data, onRetake, quizResults }) {
           {
             headers: {
               Authorization: `Bearer ${accessToken}`,
-            }
+            },
+            withCredentials: true
           }
         );
       });

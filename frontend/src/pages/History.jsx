@@ -22,12 +22,13 @@ function History() {
       try {
         const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000"
         
-        const response = await fetch(`${API_BASE}/api/quiz-history`, {
+        const response = await fetch(`${API_BASE}/api/quiz-history?token=${encodeURIComponent(session.access_token)}`, {
           method: "GET",
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${session.access_token}`
-          }
+          },
+          credentials: 'include'
         })
 
         if (!response.ok) {

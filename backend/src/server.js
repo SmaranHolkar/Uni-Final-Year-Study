@@ -5,6 +5,7 @@ import cors from 'cors';
 import questionRoutes from './routes/questionRoutes.js';
 import documentRoutes from './routes/documentRoutes.js';
 import authRoutes from './routes/auth.js';
+import requireAuth from './middleware/requireAuth.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -26,7 +27,10 @@ app.use(cors({
     } else {
       callback(new Error('Not allowed by CORS'));
     }
-  }
+  },
+  credentials: true,
+  exposedHeaders: ['Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Memory optimization: Limit request body size
@@ -48,6 +52,18 @@ app.get('/api/health', (req, res) => {
       rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
       heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`,
       heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`
+    }
+  });
+});
+
+// Test endpoint to verify auth is working
+app.get('/api/test-auth', requireAuth, (req, res) => {
+  res.json({
+    success: true,
+    message: 'Authentication working!',
+    user: {
+      id: req.user.id,
+      email: req.user.email
     }
   });
 });

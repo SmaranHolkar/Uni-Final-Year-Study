@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useAuth } from "../../AuthContext";
+import { supabase } from "../../supabaseClient";
 
 export default function StepTwo({ onNext }) {
   const { currentDocumentId } = useAuth();
@@ -39,10 +40,23 @@ export default function StepTwo({ onNext }) {
     setLoading(true);
     setErrorMessage('');
     try {
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setErrorMessage('Your session has expired. Please refresh the page and log in again.');
+        setLoading(false);
+        fetchInProgressRef.current = false;
+        return;
+      }
+
       const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const resp = await fetch(`${API_BASE}/api/generate-questions`, {
+      const resp = await fetch(`${API_BASE}/api/generate-questions?token=${encodeURIComponent(session.access_token)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        credentials: 'include',
         body: JSON.stringify({ 
           queryText: "Generate questions", 
           count: 8,
@@ -150,10 +164,23 @@ export default function StepTwo({ onNext }) {
 
     setFetchingMindmap(true);
     try {
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.error('No auth token for mindmap generation');
+        setMindmapData({ _failed: true });
+        setFetchingMindmap(false);
+        return;
+      }
+
       const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const res = await fetch(`${API_BASE}/api/generate-mindmap`, {
+      const res = await fetch(`${API_BASE}/api/generate-mindmap?token=${encodeURIComponent(session.access_token)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        credentials: 'include',
         body: JSON.stringify({ wrongQuestions: wrongQs })
       });
 

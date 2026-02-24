@@ -3,7 +3,7 @@ import { useAuth } from "../../AuthContext";
 import { supabase } from "../../supabaseClient";
 
 export default function StepOne({ onNext }) {
-  const { setCurrentDocumentId, setCurrentDocumentTitle } = useAuth();
+  const { session, setCurrentDocumentId, setCurrentDocumentTitle } = useAuth();
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -78,28 +78,42 @@ export default function StepOne({ onNext }) {
     setError("");
 
     try {
+      // Get fresh session to ensure token is valid
+      const { data: { session: freshSession } } = await supabase.auth.getSession();
+      
+      if (!freshSession?.access_token) {
+        setError("Your session has expired. Please refresh the page and log in again.");
+        setUploading(false);
+        return;
+      }
+
+      console.log('🔑 Auth token available:', freshSession.access_token.substring(0, 20) + '...');
+
       const formData = new FormData();
       formData.append("document", file);
       formData.append("title", title.trim());
 
-      // Get auth token from Supabase session
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      
       const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const response = await fetch(`${API_BASE}/api/upload-document`, {
+      // Use query parameter as fallback if headers don't work
+      const uploadUrl = `${API_BASE}/api/upload-document?token=${encodeURIComponent(freshSession.access_token)}`;
+      console.log('📤 Uploading to:', API_BASE + '/api/upload-document');
+      
+      const response = await fetch(uploadUrl, {
         method: "POST",
         headers: {
-          'Authorization': token ? `Bearer ${token}` : ''
+          'Authorization': `Bearer ${freshSession.access_token}`
         },
+        credentials: 'include',
         body: formData
       });
 
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
-
+      console.log('📥 Response status:', response.status);
       const data = await response.json();
+      console.log('📥 Response data:', data);
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Upload failed");
+      }
       
       // Store document ID and title in context for use in StepTwo/StepThree
       if (data.document?.id) {
@@ -111,7 +125,7 @@ export default function StepOne({ onNext }) {
       onNext(data);
     } catch (err) {
       console.error("Upload error:", err);
-      setError("Failed to upload document. Please try again.");
+      setError(err.message || "Failed to upload document. Please try again.");
     } finally {
       setUploading(false);
     }
