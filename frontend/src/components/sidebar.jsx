@@ -35,7 +35,7 @@ const Sidebar = () => {
 
           {/* Profile */}
           {user && (
-            <Link to="/profile" className="sidebar-link" onClick={() => setOpen(false)}>
+            <Link to="/Profile" className="sidebar-link" onClick={() => setOpen(false)}>
               Profile
             </Link>
           )}

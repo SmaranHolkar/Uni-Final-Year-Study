@@ -1,13 +1,14 @@
 import React, { useMemo, useState } from "react";
-import ReactFlow, {
+import {
+  ReactFlow,
   useNodesState,
   useEdgesState,
   Controls,
   Background,
   BackgroundVariant,
   MiniMap,
-} from "reactflow";
-import "reactflow/dist/style.css";
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 
 export default function InteractiveMindMap({ mindmap }) {
   const [selectedNode, setSelectedNode] = useState(null);

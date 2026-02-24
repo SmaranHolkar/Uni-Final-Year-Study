@@ -3,7 +3,7 @@ import { useAuth } from "../../AuthContext";
 import { supabase } from "../../supabaseClient";
 
 export default function StepOne({ onNext }) {
-  const { setCurrentDocumentId } = useAuth();
+  const { setCurrentDocumentId, setCurrentDocumentTitle } = useAuth();
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -101,9 +101,10 @@ export default function StepOne({ onNext }) {
 
       const data = await response.json();
       
-      // Store document ID in context for use in StepTwo
+      // Store document ID and title in context for use in StepTwo/StepThree
       if (data.document?.id) {
         setCurrentDocumentId(data.document.id);
+        setCurrentDocumentTitle(title.trim());
       }
       
       // Pass uploaded document info

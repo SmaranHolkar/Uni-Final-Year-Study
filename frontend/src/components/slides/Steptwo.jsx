@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useAuth } from "../../AuthContext";
 
 export default function StepTwo({ onNext }) {
@@ -6,10 +6,13 @@ export default function StepTwo({ onNext }) {
   const [loading, setLoading] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState([]);
+  const [errorMessage, setErrorMessage] = useState('');
   const [fetchingMindmap, setFetchingMindmap] = useState(false);
   const [score, setScore] = useState(null);
   const [showScore, setShowScore] = useState(false);
   const [mindmapData, setMindmapData] = useState(undefined);
+  const [quizResults, setQuizResults] = useState([]);
+  const fetchInProgressRef = useRef(false); // Prevent duplicate requests
 
   // ✅ helpers go HERE
   const normalize = (v) =>
@@ -26,7 +29,15 @@ export default function StepTwo({ onNext }) {
   };
 
   const fetchQuestions = async () => {
+    // Prevent duplicate requests
+    if (fetchInProgressRef.current) {
+      console.log('Request already in progress, skipping duplicate');
+      return;
+    }
+
+    fetchInProgressRef.current = true;
     setLoading(true);
+    setErrorMessage('');
     try {
       const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
       const resp = await fetch(`${API_BASE}/api/generate-questions`, {
@@ -39,12 +50,21 @@ export default function StepTwo({ onNext }) {
         })
       });
       const data = await resp.json();
+      if (!resp.ok) {
+        const message = data?.error || data?.message || 'Failed to generate questions.';
+        setErrorMessage(message);
+        setQuestions([]);
+        setAnswers([]);
+        return;
+      }
       setQuestions(data.questions || []);
       setAnswers(Array((data.questions || []).length).fill(null));
     } catch (e) {
       console.error(e);
+      setErrorMessage('Network error while loading the quiz.');
     } finally {
       setLoading(false);
+      fetchInProgressRef.current = false;
     }
   };
 
@@ -106,9 +126,20 @@ export default function StepTwo({ onNext }) {
         return normalize(selected) !== normalize(correct);
     });
 
+    // Construct quiz results object
+    const quizResults = questions.map((q, i) => ({
+      id: i,
+      prompt: q.prompt,
+      choices: q.choices,
+      userAnswer: answers[i],
+      correctAnswer: getCorrectAnswer(q),
+      isCorrect: !wrongQs.find(wq => wq === q)
+    }));
+
     const score = questions.length - wrongQs.length;
     setScore(score);
     setShowScore(true);
+    setQuizResults(quizResults);
 
     // Save mindmap (or null) and let user click Next.
     if (wrongQs.length === 0) {
@@ -128,6 +159,7 @@ export default function StepTwo({ onNext }) {
 
       const data = await res.json();
       setMindmapData(data.mindmap);
+      
     } catch (err) {
       console.error("Mindmap failed", err);
       // mark failure so StepThree can show an error instead of an empty "perfect" screen
@@ -139,7 +171,9 @@ export default function StepTwo({ onNext }) {
 
 
   if (loading) return <div>Loading Quiz...</div>;
-  if (!questions.length) return <div>No questions found.</div>;
+  if (!questions.length) {
+    return <div>{errorMessage || 'No questions found.'}</div>;
+  }
   //Shows quiz questions
   return (
     <div>
@@ -163,19 +197,46 @@ export default function StepTwo({ onNext }) {
       ))}
    {/* Show score when finished */}
       {showScore && (
-        <div style={{margin: '10px 0', padding: '8px', background: 'oklch(0.7162 0.1597 290.3962)', borderRadius: 4}}>
-          You scored {score} / {questions.length}
+        <div style={{ margin: '10px 0', padding: '12px', background: 'var(--muted)', borderRadius: 6 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>
+            You scored {score} / {questions.length}
+          </div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {quizResults.map((result, idx) => (
+              <div
+                key={result.id ?? idx}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  padding: 10,
+                  background: 'var(--card)'
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                  Q{idx + 1}. {result.prompt}
+                </div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 14 }}>
+                  <span style={{ color: result.isCorrect ? 'var(--chart-2)' : 'var(--destructive)' }}>
+                    Your Answer: {result.userAnswer ?? 'No answer'}
+                  </span>
+                  <span style={{ color: 'var(--primary)' }}>
+                    Correct Answer: {result.correctAnswer ?? 'Not available'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       <div style={{display: 'flex', gap: 10, marginTop: 8}}>
         <button onClick={handleFinish} disabled={fetchingMindmap} style={{padding: '10px 20px', background: '#3b82f6', color:'white', borderRadius: 15}}>
-          {fetchingMindmap ? 'Checking...' : 'Finish Quiz'}
+          {fetchingMindmap ? 'Creating Mindmap please wait...' : 'Finish Quiz'}
         </button>
       {/* Button to go to the mindmap */}
         {mindmapData !== undefined && (
-          <button onClick={() => onNext(mindmapData)} style={{padding: '10px 20px', background: '#10b981', color:'white', borderRadius: 4}}>
-            Next
+          <button onClick={() => onNext(mindmapData, quizResults)} style={{padding: '10px 20px', background: '#10b981', color:'white', borderRadius: 4}}>
+            Mindmap created press here to view.
           </button>
         )}
       </div>

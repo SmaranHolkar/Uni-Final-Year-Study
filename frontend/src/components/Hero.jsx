@@ -1,141 +1,431 @@
-
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import Card from "./cards.jsx";
+import { 
+  Brain, 
+  Network, 
+  Zap, 
+  ArrowRight, 
+  CheckCircle2, 
+  Sparkles,
+  BookOpen,
+  BarChart3,
+  Users
+} from "lucide-react";
 
-export default function Hero() {
+// --- Components ---
+
+/**
+ * StarBackground: A canvas-based starfield animation
+ * Pure canvas API - no external libraries
+ */
+const StarBackground = () => {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    canvas.width = width;
+    canvas.height = height;
+
+    const stars = [];
+    const numStars = 150;
+
+    for (let i = 0; i < numStars; i++) {
+      stars.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        radius: Math.random() * 1.5,
+        vx: (Math.random() - 0.5) * 0.2,
+        vy: (Math.random() - 0.5) * 0.2,
+        alpha: Math.random(),
+        twinkleSpeed: Math.random() * 0.02 + 0.005,
+      });
+    }
+
+    let animationFrameId;
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+      
+      stars.forEach((star) => {
+        star.x += star.vx;
+        star.y += star.vy;
+
+        if (star.x < 0) star.x = width;
+        if (star.x > width) star.x = 0;
+        if (star.y < 0) star.y = height;
+        if (star.y > height) star.y = 0;
+
+        star.alpha += star.twinkleSpeed;
+        if (star.alpha > 1 || star.alpha < 0.2) {
+          star.twinkleSpeed = -star.twinkleSpeed;
+        }
+
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
+        ctx.fill();
+      });
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    const handleResize = () => {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
   return (
-    <main style={{ background: "var(--background)", minHeight: "100vh" }}>
-      <section className="hero-section" style={{ position: 'relative' }}>
-        <div className="hero-container" style={{ position: 'relative', zIndex: 2, marginTop: '5.5rem' }}>
-          <h1 className="hero-title" style={{ fontSize: '3rem', fontWeight: 800, marginBottom: '1.2rem', letterSpacing: '-1px' }}>
-            Unlock Your Potential<br />
-            <span style={{ color: '#6366f1' }}>with AI-Powered Learning</span>
-          </h1>
-          <p className="hero-subtitle" style={{ fontSize: '1.25rem', marginBottom: '2.2rem', color: '#64748b' }}>
-            Visualize, interact, and master your subjects with mind maps, adaptive quizzes, and real-time insights.<br />
-            <span style={{ color: '#6366f1', fontWeight: 600 }}>Study smarter, not harder.</span>
-          </p>
-          <Link to="/signup" className="shadow__btn hero-cta" style={{ fontSize: '1.15rem', padding: '1rem 2.5rem', background: 'linear-gradient(90deg,#6366f1,#60a5fa)', color: '#fff', borderRadius: '2rem', fontWeight: 700, boxShadow: '0 4px 24px #6366f133', marginBottom: '2.5rem' }}>
-            Get Started Free
-          </Link>
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        zIndex: 0,
+        pointerEvents: "none",
+        opacity: 0.6,
+      }}
+    />
+  );
+};
 
-          <div className="hero-features" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '2.5rem', marginTop: '2.5rem' }}>
-            <FeatureCard
-              icon={<svg width="36" height="36" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#6366f1" opacity="0.15"/><path d="M12 7v5l3 3" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+/**
+ * GlassCard: A reusable card component with glassmorphism
+ */
+const GlassCard = ({ children, className = "", delay = 0 }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setTimeout(() => setIsVisible(true), delay * 1000);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [delay]);
+
+  return (
+    <div
+      ref={cardRef}
+      className={`backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-6 shadow-xl hover:bg-white/10 transition-all duration-500 ${className}`}
+      style={{
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
+      }}
+    >
+      {children}
+    </div>
+  );
+};
+
+/**
+ * FeatureItem: Individual feature display
+ */
+const FeatureItem = ({ icon: Icon, title, description, delay }) => (
+  <GlassCard delay={delay} className="flex flex-col items-start text-left h-full group">
+    <div className="p-3 rounded-xl bg-indigo-500/20 mb-4 text-indigo-300 transition-transform duration-300 group-hover:scale-110">
+      <Icon size={24} />
+    </div>
+    <h3 className="text-xl font-bold mb-2 text-[var(--foreground)]">{title}</h3>
+    <p className="text-[var(--muted-foreground)] leading-relaxed">{description}</p>
+  </GlassCard>
+);
+
+/**
+ * Main Hero Component
+ */
+export default function Hero() {
+  const [heroVisible, setHeroVisible] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+
+  useEffect(() => {
+    setHeroVisible(true);
+    
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const parallaxOffset = scrollY * 0.3;
+
+  return (
+    <main className="relative min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)] selection:bg-indigo-500/30">
+      <StarBackground />
+
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6">
+        <div className="max-w-7xl mx-auto text-center relative z-10">
+          
+          <div
+            style={{
+              opacity: heroVisible ? 1 : 0,
+              transform: heroVisible ? 'scale(1)' : 'scale(0.9)',
+              transition: 'all 0.8s ease-out',
+            }}
+          >
+            <span className="inline-block py-1 px-3 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm font-medium mb-6 animate-pulse">
+              ✨ AI-Powered Education Platform
+            </span>
+            
+            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
+              Unlock Your Potential <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 animate-gradient">
+                with AI Learning
+              </span>
+            </h1>
+            
+            <p className="text-lg md:text-xl text-[var(--muted-foreground)] max-w-2xl mx-auto mb-10 leading-relaxed">
+              Visualize, interact, and master your subjects with mind maps, adaptive quizzes, and real-time insights. 
+              <span className="text-indigo-300 block mt-2">Study smarter, not harder.</span>
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link 
+                to="/signup" 
+                className="group relative px-8 py-4 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-lg transition-all shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] hover:shadow-[0_0_60px_-15px_rgba(99,102,241,0.6)] flex items-center gap-2 hover:scale-105"
+              >
+                Start Learning Free
+                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+              </Link>
+              <Link 
+                to="#" 
+                className="px-8 py-4 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-lg transition-all backdrop-blur-sm hover:scale-105"
+              >
+                View Demo
+              </Link>
+            </div>
+          </div>
+
+          {/* Abstract Visual Representation with Parallax */}
+          <div 
+            className="mt-20 relative max-w-4xl mx-auto transition-transform duration-100 ease-out"
+            style={{ transform: `translateY(${parallaxOffset}px)` }}
+          >
+             <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-[var(--card)] hover:border-indigo-500/30 transition-colors duration-500">
+                {/* Mock UI Header */}
+                <div className="h-8 bg-[var(--muted)] flex items-center px-4 gap-2 border-b border-white/5">
+                  <div className="w-3 h-3 rounded-full bg-red-500/50" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
+                  <div className="w-3 h-3 rounded-full bg-green-500/50" />
+                </div>
+                {/* Mock UI Body */}
+                <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8 opacity-80">
+                   <div className="space-y-4">
+                      <div className="h-32 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center hover:bg-indigo-500/30 transition-colors">
+                        <Network className="text-indigo-400 w-12 h-12" />
+                      </div>
+                      <div className="h-4 w-3/4 rounded bg-white/10 animate-pulse" />
+                      <div className="h-4 w-1/2 rounded bg-white/10" />
+                   </div>
+                   <div className="space-y-4 pt-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400"><CheckCircle2 size={16}/></div>
+                        <div className="h-3 w-32 rounded bg-white/10" />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400"><CheckCircle2 size={16}/></div>
+                        <div className="h-3 w-40 rounded bg-white/10" />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400"><Zap size={16}/></div>
+                        <div className="h-3 w-24 rounded bg-white/10" />
+                      </div>
+                   </div>
+                </div>
+             </div>
+             {/* Decorative blurred blobs */}
+             <div className="absolute -top-20 -left-20 w-72 h-72 bg-indigo-600/30 rounded-full blur-[100px] -z-10 animate-pulse" />
+             <div className="absolute -bottom-20 -right-20 w-72 h-72 bg-purple-600/20 rounded-full blur-[100px] -z-10" />
+          </div>
+        </div>
+      </section>
+
+      {/* Features Bento Grid */}
+      <section className="py-24 px-6 relative z-10">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Everything you need to excel</h2>
+            <p className="text-[var(--muted-foreground)] max-w-2xl mx-auto">
+              A comprehensive suite of tools designed to adapt to your unique learning style.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <FeatureItem 
+              icon={Network}
               title="Interactive Mind Maps"
-              desc="See connections, not just facts. Build and explore visual topic maps."
+              description="See connections, not just facts. Build and explore visual topic maps that mimic how your brain actually works."
+              delay={0.1}
             />
-            <FeatureCard
-              icon={<svg width="36" height="36" fill="none" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="5" fill="#60a5fa" opacity="0.15"/><path d="M7 12h10" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round"/></svg>}
+            <FeatureItem 
+              icon={Brain}
               title="Adaptive Quizzes"
-              desc="Test your knowledge with quizzes that adapt to your strengths and weaknesses."
+              description="Test your knowledge with quizzes that adapt in real-time to your strengths and weaknesses."
+              delay={0.2}
             />
-            <FeatureCard
-              icon={<svg width="36" height="36" fill="none" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="8" fill="#6366f1" opacity="0.15"/><path d="M12 8v4l3 3" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+            <FeatureItem 
+              icon={BarChart3}
               title="Real-Time Insights"
-              desc="Track your progress and get instant feedback to stay motivated."
+              description="Track your progress with beautiful analytics and get instant feedback to stay motivated."
+              delay={0.3}
             />
           </div>
         </div>
       </section>
 
+      {/* How it Works / Info Cards */}
+      <section className="py-24 px-6 relative z-10 bg-gradient-to-b from-transparent to-[var(--card)]/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* Card 1 */}
+            <div 
+              className="p-8 rounded-3xl bg-[var(--card)] border border-white/5 shadow-xl hover:-translate-y-1 transition-transform duration-300 hover:border-white/10"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-400 mb-6">
+                <BookOpen size={24} />
+              </div>
+              <h3 className="text-2xl font-bold mb-4">How It Works</h3>
+              <p className="text-[var(--muted-foreground)] mb-6 leading-relaxed">
+                Start by signing up, drop in your PDFs from class, and let our AI generate a quiz and a personalized mind map to track your progress.
+              </p>
+              <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                <div className="h-full w-2/3 bg-blue-500/50 rounded-full animate-pulse" />
+              </div>
+            </div>
 
-      <section style={{ maxWidth: 1200, margin: "0 auto", padding: "3rem 1rem 2rem 1rem", display: "flex", flexWrap: "wrap", gap: "2.5rem", justifyContent: "center" }}>
-        <Card
-          title="How It Works"
-          description="Start by signing up, drop in your PDFs from class, and let our AI generate a quiz and a personalized mind map and track your progress."
-          image="/public/how-it-works.svg"
-        />
-        <Card
-          title="Why HydrusLearn?"
-          description="We combine adaptive quizzes, visual learning and real-time feedback to help you truly understand, not just memorize."
-          image="/public/why-us.svg"
-        />
-        <Card
-          title="Get Started"
-          description="Create your free account and unlock a smarter way to study."
-          image="/public/get-started.svg"
-        >
-          <Link to="/signup" className="shadow__btn" style={{ marginTop: 16, display: "inline-block" }}>Sign Up Free</Link>
-        </Card>
+            {/* Card 2 */}
+            <div 
+              className="p-8 rounded-3xl bg-[var(--card)] border border-white/5 shadow-xl hover:-translate-y-1 transition-transform duration-300 hover:border-white/10"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/20 flex items-center justify-center text-purple-400 mb-6">
+                <Sparkles size={24} />
+              </div>
+              <h3 className="text-2xl font-bold mb-4">Why HydrusLearn?</h3>
+              <p className="text-[var(--muted-foreground)] mb-6 leading-relaxed">
+                We combine adaptive quizzes, visual learning and real-time feedback to help you truly understand, not just memorize.
+              </p>
+              <ul className="space-y-2">
+                {['Visual Learning', 'AI Adaptation', 'Progress Tracking'].map((item, i) => (
+                  <li key={i} className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+                    <CheckCircle2 size={14} className="text-purple-400" /> {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Card 3 - CTA */}
+            <div 
+              className="p-8 rounded-3xl bg-gradient-to-br from-indigo-600 to-purple-700 border border-white/10 shadow-xl text-white relative overflow-hidden hover:-translate-y-1 transition-transform duration-300 group"
+            >
+              <div className="absolute top-0 right-0 p-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-white/20 transition-colors" />
+              <div className="relative z-10">
+                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white mb-6">
+                  <Users size={24} />
+                </div>
+                <h3 className="text-2xl font-bold mb-4">Get Started</h3>
+                <p className="text-indigo-100 mb-8 leading-relaxed">
+                  Create your free account and unlock a smarter way to study. Join thousands of students today.
+                </p>
+                <Link 
+                  to="/signup" 
+                  className="inline-flex items-center justify-center w-full py-3 rounded-xl bg-white text-indigo-600 font-bold hover:bg-indigo-50 transition-all hover:scale-105"
+                >
+                  Sign Up Free
+                </Link>
+              </div>
+            </div>
+
+          </div>
+        </div>
       </section>
 
-
-
-      <section style={{ background: "#6366f1", color: "#fff", padding: "3rem 1rem", textAlign: "center" }}>
-        <h2 style={{ fontSize: "2rem", fontWeight: 700, marginBottom: 12 }}>Ready to transform your learning?</h2>
-        <p style={{ fontSize: "1.15rem", marginBottom: 24 }}>Join students using HydrusLearn to master their subjects with confidence.</p>
-        <Link to="/signup" className="shadow__btn" style={{ background: "#fff", color: "#6366f1", fontWeight: 700, fontSize: "1.1rem", borderRadius: "2rem", padding: "0.9rem 2.2rem" }}>Get Started</Link>
+      {/* CTA Section */}
+      <section className="py-24 px-6 relative z-10">
+        <div className="max-w-5xl mx-auto rounded-[2.5rem] bg-gradient-to-r from-indigo-900/50 to-purple-900/50 border border-white/10 p-12 md:p-20 text-center relative overflow-hidden group hover:border-indigo-500/30 transition-colors duration-500">
+          {/* Background decoration */}
+          <div className="absolute inset-0 opacity-20">
+            <div className="absolute inset-0" style={{
+              backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)',
+              backgroundSize: '40px 40px'
+            }} />
+          </div>
+          
+          <div className="relative z-10">
+            <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to transform your learning?</h2>
+            <p className="text-lg text-indigo-200 mb-10 max-w-2xl mx-auto">
+              Join students using HydrusLearn to master their subjects with confidence. The future of education is here.
+            </p>
+            <Link 
+              to="/signup" 
+              className="inline-block px-10 py-4 rounded-full bg-white text-indigo-900 font-bold text-lg hover:scale-105 transition-transform shadow-lg hover:shadow-xl"
+            >
+              Get Started Now
+            </Link>
+          </div>
+        </div>
       </section>
 
-
-
-      <footer style={{ textAlign: "center", padding: "2rem 0 1rem 0", color: "#64748b", fontSize: "0.98rem" }}>
-        &copy; {new Date().getFullYear()} HydrusLearn. All rights reserved.
+      {/* Footer */}
+      <footer className="py-12 px-6 border-t border-white/5 relative z-10 bg-[var(--background)]">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2 font-bold text-xl">
+            <Sparkles className="text-indigo-400" />
+            <span>HydrusLearn</span>
+          </div>
+          <div className="text-[var(--muted-foreground)] text-sm">
+            &copy; {new Date().getFullYear()} HydrusLearn. All rights reserved.
+          </div>
+          <div className="flex gap-6">
+            {['Twitter', 'GitHub', 'Discord'].map((social) => (
+              <a key={social} href="#" className="text-[var(--muted-foreground)] hover:text-white transition-colors text-sm">
+                {social}
+              </a>
+            ))}
+          </div>
+        </div>
       </footer>
+
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes gradient {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
+        .animate-gradient {
+          background-size: 200% 200%;
+          animation: gradient 8s ease infinite;
+        }
+      `}</style>
     </main>
-  );
-}
-
-
-function FeatureCard({ icon, title, desc }) {
-  return (
-    <div style={{ background: '#fff', borderRadius: '1.2rem', boxShadow: '0 2px 16px #6366f122', padding: '1.5rem 1.7rem', minWidth: 220, maxWidth: 260, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.7rem' }}>
-      <div style={{ marginBottom: '0.5rem' }}>{icon}</div>
-      <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#1e293b' }}>{title}</div>
-      <div style={{ color: '#64748b', fontSize: '0.98rem' }}>{desc}</div>
-    </div>
-  );
-}
-
-function PricingTier({ name, price, features, highlight }) {
-  const lightBg = highlight
-    ? 'linear-gradient(100deg,#f1f5ff 60%,#e0e7ff 100%)'
-    : 'var(--card, #fff)';
-  const darkText = 'var(--foreground, #1e293b)';
-  return (
-    <div style={{
-      background: lightBg,
-      color: darkText,
-      borderRadius: '1.2rem',
-      boxShadow: highlight ? '0 4px 32px #6366f144' : '0 2px 16px #6366f122',
-      padding: '2.2rem 2rem',
-      minWidth: 240,
-      maxWidth: 320,
-      textAlign: 'center',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: '1.1rem',
-      border: highlight ? '2.5px solid #6366f1' : '1px solid var(--border, #e5e7eb)',
-      transform: highlight ? 'scale(1.05)' : 'none',
-      zIndex: highlight ? 1 : 0,
-      position: 'relative',
-    }}>
-      <div style={{ fontWeight: 700, fontSize: '1.3rem', marginBottom: 8 }}>{name}</div>
-      <div style={{ fontWeight: 800, fontSize: '2.1rem', marginBottom: 8 }}>{price}</div>
-      <ul style={{ listStyle: 'none', padding: 0, margin: 0, marginBottom: 16, textAlign: 'left', color: darkText }}>
-        {features.map((f, i) => (
-          <li key={i} style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: '#6366f1', fontWeight: 700 }}>•</span> {f}
-          </li>
-        ))}
-      </ul>
-      <button style={{
-        background: 'linear-gradient(90deg,#6366f1,#60a5fa)',
-        color: '#fff',
-        fontWeight: 700,
-        fontSize: '1.05rem',
-        borderRadius: '2rem',
-        padding: '0.7rem 2.2rem',
-        border: 'none',
-        boxShadow: highlight ? '0 2px 12px #6366f144' : '0 2px 8px #6366f122',
-        cursor: 'pointer',
-        marginTop: 8,
-        transition: 'background 0.2s, color 0.2s',
-      }}>Choose {name}</button>
-      {highlight && <span style={{ position: 'absolute', top: 18, right: 18, background: '#6366f1', color: '#fff', fontWeight: 700, fontSize: '0.85rem', borderRadius: '1rem', padding: '0.2rem 0.8rem', boxShadow: '0 1px 4px #6366f122' }}>Most Popular</span>}
-    </div>
   );
 }

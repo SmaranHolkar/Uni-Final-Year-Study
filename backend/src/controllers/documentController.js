@@ -46,9 +46,9 @@ async function extractTextFromFile(filePath, mimetype) {
   throw new Error(`Unsupported file type: ${mimetype}`);
 }
 
-/* -------------------------------------------------------------------------- */
-/*                               CHUNKING                                      */
-/* -------------------------------------------------------------------------- */
+
+/*         CHUNKING          */
+
 
 function chunkText(text, chunkSize = 500, overlap = 50) {
   const words = text.split(/\s+/);
@@ -63,7 +63,7 @@ function chunkText(text, chunkSize = 500, overlap = 50) {
 }
 
 
-/*                      PROCESS & STORE DOCUMENT                               */
+/*  PROCESS & STORE DOCUMENT   */
 
 
 export async function processAndStoreDocument(req, res) {
@@ -71,7 +71,7 @@ export async function processAndStoreDocument(req, res) {
   const uploadedFilePath = req.file?.path;
 
   try {
-    /* ---------------------------- VALIDATION -------------------------------- */
+    /*  VALIDATION  */
 
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -82,25 +82,14 @@ export async function processAndStoreDocument(req, res) {
       return res.status(400).json({ error: 'Document title is required' });
     }
 
-    /* ----------------------------- AUTH USER -------------------------------- */
+    /* ----------- AUTH USER ------ */
 
-    let userId = null;
-    const authHeader = req.headers.authorization;
-
-    if (authHeader?.startsWith('Bearer ')) {
-      try {
-        const token = authHeader.split(' ')[1];
-        const { supabase } = await import('../supabaseClient.js');
-        if (supabase) {
-          const { data } = await supabase.auth.getUser(token);
-          userId = data?.user?.id ?? null;
-        }
-      } catch {
-        // anonymous uploads allowed
-      }
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User authentication required' });
     }
 
-    /* ------------------------ CHECK FOR DUPLICATES -------------------------- */
+    /*  CHECK FOR DUPLICATES  */
 
     const duplicateCheck = await client.query(
       'SELECT COUNT(*) FROM public.w_embeddings WHERE title = $1 AND user_id = $2',
@@ -114,7 +103,7 @@ export async function processAndStoreDocument(req, res) {
       });
     }
 
-    /* -------------------------- EXTRACT TEXT -------------------------------- */
+    /*  EXTRACT TEXT  */
 
     const text = await extractTextFromFile(
       req.file.path,
@@ -125,7 +114,7 @@ export async function processAndStoreDocument(req, res) {
       throw new Error('Document contains insufficient readable text');
     }
 
-    /* ----------------------------- CHUNKING --------------------------------- */
+    /*  CHUNKING  */
 
     const MAX_CHUNKS = 200;
     const chunks = chunkText(text, 500, 50).slice(0, MAX_CHUNKS);
@@ -134,7 +123,7 @@ export async function processAndStoreDocument(req, res) {
       throw new Error('No valid chunks generated');
     }
 
-    /* --------------------------- DB INSERT ---------------------------------- */
+    /*  DB INSERT  */
 
     await client.query('BEGIN');
 
@@ -169,7 +158,7 @@ export async function processAndStoreDocument(req, res) {
         storedChunks++;
 
         if ((i + 1) % 10 === 0) {
-          console.log(`📄 ${title}: ${i + 1}/${chunks.length}`);
+          console.log(` ${title}: ${i + 1}/${chunks.length}`);
         }
 
       } catch (err) {
@@ -182,7 +171,7 @@ export async function processAndStoreDocument(req, res) {
 
     await client.query('COMMIT');
 
-    /* ----------------------------- RESPONSE --------------------------------- */
+    /*  RESPONSE  */
 
     // Get the ID of the first inserted embedding to return as documentId
     const idResult = await client.query(
@@ -211,7 +200,7 @@ export async function processAndStoreDocument(req, res) {
   } catch (error) {
     await client.query('ROLLBACK');
 
-    console.error('❌ Document processing failed:', error.message);
+    console.error(' Document processing failed:', error.message);
 
     res.status(500).json({
       error: 'Failed to process document',
@@ -228,18 +217,30 @@ export async function processAndStoreDocument(req, res) {
   }
 }
 
-/* -------------------------------------------------------------------------- */
-/*                     DELETE DOCUMENT EMBEDDINGS                              */
-/* -------------------------------------------------------------------------- */
+
+/*  DELETE DOCUMENT EMBEDDINGS       */
+
 
 export async function deleteDocumentEmbeddings(req, res) {
   try {
     const { title } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User authentication required' });
+    }
 
     const result = await pool.query(
-      'DELETE FROM public.w_embeddings WHERE title = $1',
-      [title]
+      'DELETE FROM public.w_embeddings WHERE title = $1 AND user_id = $2',
+      [title, userId]
     );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Document not found or you do not have permission to delete it'
+      });
+    }
 
     res.json({
       success: true,
@@ -247,7 +248,7 @@ export async function deleteDocumentEmbeddings(req, res) {
     });
 
   } catch (error) {
-    console.error('❌ Delete failed:', error.message);
+    console.error('Delete failed:', error.message);
 
     res.status(500).json({
       error: 'Failed to delete embeddings'

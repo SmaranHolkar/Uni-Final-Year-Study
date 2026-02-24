@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentDocumentId, setCurrentDocumentId] = useState(null);
+  const [currentDocumentTitle, setCurrentDocumentTitle] = useState(null);
 
   useEffect(() => {
     // Get initial session
@@ -28,7 +29,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, currentDocumentId, setCurrentDocumentId }}>
+    <AuthContext.Provider value={{ session, user, loading, currentDocumentId, setCurrentDocumentId, currentDocumentTitle, setCurrentDocumentTitle }}>
       {children}
     </AuthContext.Provider>
   );

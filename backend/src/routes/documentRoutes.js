@@ -3,7 +3,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { processAndStoreDocument } from '../controllers/documentController.js';
+import { processAndStoreDocument, deleteDocumentEmbeddings } from '../controllers/documentController.js';
+import requireAuth from '../middleware/requireAuth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = express.Router();
@@ -40,42 +41,15 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 50 * 1024 * 1024 // 50MB limit
   }
 });
 
 // Upload endpoint - extracts text, chunks it, generates embeddings, and stores in w_embeddings
-router.post('/upload-document', upload.single('document'), processAndStoreDocument);
+router.post('/upload-document', requireAuth, upload.single('document'), processAndStoreDocument);
 
-// Optional: Delete uploaded document embeddings
-router.delete('/document/:filename', async (req, res) => {
-  try {
-    const { filename } = req.params;
-    const filePath = path.join(uploadsDir, filename);
 
-    // Delete file if it exists
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-
-    // Delete embeddings from database by title or user
-    // Since source_file column doesn't exist, you'll need to delete by title
-    // For now, just delete the file
-    const result = { rowCount: 0 };
-    
-    res.json({ 
-      success: true, 
-      message: 'Document and embeddings deleted successfully',
-      deletedEmbeddings: result.rowCount
-    });
-  } catch (error) {
-    console.error('Delete error:', error);
-    res.status(500).json({ 
-      error: 'Failed to delete document',
-      details: error.message 
-    });
-  }
-});
+router.delete('/document/:title', requireAuth, deleteDocumentEmbeddings);
 
 
 

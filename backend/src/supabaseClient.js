@@ -1,16 +1,31 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Backend should read env vars from process.env (do NOT hard-code keys)
+/* ----------------------- SUPABASE CLIENT SETUP ----------------------- */
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
 function deriveRestUrlFromAnonKey(anonKey) {
   try {
-    const payload = anonKey?.split('.')?.[1];
+    // Ensure we have a JWT-like token: three dot-separated parts.
+    if (typeof anonKey !== 'string') return null;
+    const parts = anonKey.split('.');
+    if (parts.length !== 3) return null;
+
+    const payload = parts[1];
     if (!payload) return null;
-    const decoded = Buffer.from(payload, 'base64').toString('utf8');
+
+    // Basic validation for base64url characters to avoid malformed input.
+    if (!/^[A-Za-z0-9\-_]+$/.test(payload)) {
+      return null;
+    }
+
+    // Normalize from base64url to base64 and add required padding.
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4 || 4)) % 4);
+
+    const decoded = Buffer.from(padded, 'base64').toString('utf8');
     const data = JSON.parse(decoded);
-    if (data?.ref) {
+    if (data && typeof data.ref === 'string' && data.ref.length > 0) {
       return `https://${data.ref}.supabase.co`;
     }
   } catch {

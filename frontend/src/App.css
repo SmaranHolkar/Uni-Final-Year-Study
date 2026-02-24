@@ -577,7 +577,7 @@
 /* Main content area that sits to the right of the fixed sidebar */
 .main-content {
   margin-left: 260px;
-  padding: 2rem;
+  padding: 0;
   /* Use calc to subtract the sidebar width from the total width */
   width: calc(100% - 260px);
   min-height: 100vh ;
@@ -585,6 +585,59 @@
   /* Ensures padding doesn't add to width */
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+}
+
+.surface-card {
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.surface-muted {
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.border-default {
+  border-color: var(--border);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.text-primary {
+  color: var(--primary);
+}
+
+.text-success {
+  color: var(--chart-2);
+}
+
+.text-danger {
+  color: var(--destructive);
+}
+
+.button-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.button-primary:hover {
+  opacity: 0.92;
+}
+
+.surface-hover:hover {
+  background: var(--muted);
+}
+
+.alert-error {
+  background: var(--card);
+  color: var(--destructive);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--destructive);
 }
 
 @media (max-width: 900px) {
@@ -635,4 +688,10 @@
   /* Width of the sidebar + some spacing */
   padding: 1%;
   background-color: #302e2e;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

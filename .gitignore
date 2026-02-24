@@ -1,0 +1,8 @@
+# Documentation files (keep README.md)
+CONFIDENCE_RATING_IMPLEMENTATION.md
+DOCUMENT_UPLOAD_GUIDE.md
+temp_server.txt
+
+# Diagram files
+*.drawio
+*.drawio.bkp

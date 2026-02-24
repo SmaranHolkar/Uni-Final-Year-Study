@@ -41,7 +41,7 @@ export default function Auth() {
     setMsg('Signed out');
   }
 
-  // Example: call backend with Bearer token
+  // call backend with Bearer token
   async function callProtected() {
     const { data } = await supabase.auth.getSession();
     const token = data?.session?.access_token;
