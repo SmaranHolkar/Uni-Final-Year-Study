@@ -251,10 +251,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
               style={{ background: 'var(--accent)', borderColor: 'var(--border)' }}
               onClick={() => setNotifications(0)}
             >
-              <span className="text-lg">🔔</span>
-              {notifications > 0 && (
-                <span className="absolute top-0 right-0 w-3 h-3 rounded-full" style={{ background: 'var(--destructive)' }}></span>
-              )}
+              
             </button>
             <div 
               className="h-10 w-10 rounded-full flex items-center justify-center font-bold text-lg border-2 transition-all cursor-pointer"

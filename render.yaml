@@ -1,4 +1,19 @@
 services:
+  # Frontend Static Site Service
+  - type: web
+    name: uni-final-year-study-frontend
+    runtime: static
+    region: oregon
+    plan: free
+    buildCommand: cd frontend && npm install && VITE_API_URL=$BACKEND_URL npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: BACKEND_URL
+        value: https://uni-final-year-study-backend.onrender.com
+    routes:
+      - path: /*
+        destination: /index.html
+
   # Backend API Service
   - type: web
     name: uni-final-year-study-backend

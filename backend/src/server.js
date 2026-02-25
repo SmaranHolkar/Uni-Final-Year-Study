@@ -17,8 +17,9 @@ const PORT = process.env.PORT || 5000;
 
 
 const allowedOrigins = [
-  'https://uni-final-year-study.onrender.com',
-  'http://localhost:5173'
+  'https://uni-final-year-study-frontend.onrender.com',  // Production frontend
+  'http://localhost:5173',  // Local Vite dev server
+  'http://localhost:3000'   // Alternative dev port
 ];
 app.use(cors({
   origin: (origin, callback) => {
