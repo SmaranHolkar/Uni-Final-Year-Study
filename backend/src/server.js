@@ -17,7 +17,8 @@ const PORT = process.env.PORT || 5000;
 
 
 const allowedOrigins = [
-  'https://uni-final-year-study-frontend.onrender.com',  // Production frontend
+  'https://uni-final-year-study.onrender.com',           // Current/existing frontend
+  'https://uni-final-year-study-frontend.onrender.com',  // New production frontend
   'http://localhost:5173',  // Local Vite dev server
   'http://localhost:3000'   // Alternative dev port
 ];
