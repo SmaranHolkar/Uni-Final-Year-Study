@@ -12,7 +12,10 @@ import {
   Position,
 } from "@xyflow/react"
 import '@xyflow/react/dist/style.css';
-import { ArrowLeft, ChevronDown, X } from 'lucide-react'
+import { ArrowLeft, X, ExternalLink, Share2 } from 'lucide-react'
+import axios from 'axios'
+import { useAuth } from '../AuthContext'
+import { supabase } from '../supabaseClient'
 import '../App.css'
 import MetacognitiveAnalysis from '../components/MetacognitiveAnalysis'
 
@@ -40,11 +43,19 @@ const categoryColors = [
 function QuizDetail() {
   const { quizId } = useParams()
   const navigate = useNavigate()
+  const { session } = useAuth()
   const [activeTab, setActiveTab] = useState('metacognitive') // Default to Learning Insights
   const [quizData, setQuizData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedNodeId, setSelectedNodeId] = useState(null)
+  const [nodeActionLoading, setNodeActionLoading] = useState(false)
+  const [mcq, setMcq] = useState(null)
+  const [selectedAnswer, setSelectedAnswer] = useState(null)
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareEmail, setShareEmail] = useState('')
+  const [shareStatus, setShareStatus] = useState('idle')
+  const [shareError, setShareError] = useState('')
 
   // Fetch quiz details
   useEffect(() => {
@@ -59,7 +70,7 @@ function QuizDetail() {
         setLoading(false)
       } catch (err) {
         console.error("Error loading quiz:", err)
-        setError(err.message)
+        setError("Unable to load quiz. Please try again")
         setLoading(false)
       }
     }
@@ -169,6 +180,145 @@ function QuizDetail() {
     setNodes(initialNodes)
     setEdges(initialEdges)
   }, [initialNodes, initialEdges, setNodes, setEdges])
+
+  const handleNodeClick = (_, node) => {
+    setSelectedNodeId(node.id)
+  }
+
+  const handleAddSimilarTopic = async () => {
+    const selectedNode = nodes.find(n => n.id === selectedNodeId)
+    if (!selectedNode) return
+
+    setNodeActionLoading(true)
+    try {
+      const { data: { session: freshSession } } = await supabase.auth.getSession()
+      const accessToken = freshSession?.access_token || session?.access_token
+      if (!accessToken) {
+        alert('Session expired. Please refresh and log in again.')
+        setNodeActionLoading(false)
+        return
+      }
+
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await axios.post(
+        `${API_BASE}/api/generate-similar-topic?token=${encodeURIComponent(accessToken)}`,
+        {
+          topic: selectedNode.data.label,
+          description: selectedNode.data.description,
+        },
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          withCredentials: true,
+        }
+      )
+
+      const newId = `node-${Date.now()}`
+      const newNode = {
+        id: newId,
+        data: {
+          label: res.data.label,
+          description: res.data.description,
+          category: res.data.category || 'Related Topic',
+        },
+        position: {
+          x: selectedNode.position.x + 220,
+          y: selectedNode.position.y + 80,
+        },
+        type: 'default',
+        style: {
+          background: categoryColors[Math.floor(Math.random() * categoryColors.length)],
+          color: 'white',
+          borderRadius: '12px',
+          padding: '12px 20px',
+          fontWeight: 600,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          minWidth: '150px',
+          textAlign: 'center',
+        },
+      }
+
+      const newEdge = {
+        id: `e-${selectedNode.id}-${newId}`,
+        source: selectedNode.id,
+        target: newId,
+        animated: true,
+        style: { stroke: 'hsl(195, 85%, 55%)', strokeWidth: 2 },
+      }
+
+      setNodes(nds => [...nds, newNode])
+      setEdges(eds => [...eds, newEdge])
+    } catch (err) {
+      console.error('Failed to generate similar topic:', err)
+      alert('Failed to generate similar topic')
+    } finally {
+      setNodeActionLoading(false)
+    }
+  }
+
+  // Handle sharing mindmap via email
+  const handleShare = async () => {
+    if (!shareEmail.trim()) return
+    setShareStatus('loading')
+    setShareError('')
+    try {
+      const { data: { session: freshSession } } = await supabase.auth.getSession()
+      const accessToken = freshSession?.access_token || session?.access_token
+      if (!accessToken) {
+        setShareError('Session expired. Please refresh and log in again.')
+        setShareStatus('error')
+        return
+      }
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await axios.post(
+        `${API_BASE}/api/share-mindmap?token=${encodeURIComponent(accessToken)}`,
+        { quizMindmapId: quizId, recipientEmail: shareEmail },
+        { headers: { Authorization: `Bearer ${accessToken}` }, withCredentials: true }
+      )
+      if (res.data.success) setShareStatus('success')
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to share. Please try again.'
+      setShareError(msg)
+      setShareStatus('error')
+    }
+  }
+
+  // Handle generating MCQ for topics
+  const handleGenerateMCQ = async () => {
+    const selectedNode = nodes.find(n => n.id === selectedNodeId)
+    if (!selectedNode) return
+
+    setNodeActionLoading(true)
+    try {
+      const { data: { session: freshSession } } = await supabase.auth.getSession()
+      const accessToken = freshSession?.access_token || session?.access_token
+      if (!accessToken) {
+        alert('Session expired. Please refresh and log in again.')
+        setNodeActionLoading(false)
+        return
+      }
+
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await axios.post(
+        `${API_BASE}/api/generate-mcq-for-topic?token=${encodeURIComponent(accessToken)}`,
+        {
+          topic: selectedNode.data.label,
+          description: selectedNode.data.description,
+        },
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          withCredentials: true,
+        }
+      )
+
+      setMcq(res.data)
+      setSelectedAnswer(null)
+    } catch (err) {
+      console.error('Failed to generate MCQ:', err)
+      alert('Failed to generate MCQ')
+    } finally {
+      setNodeActionLoading(false)
+    }
+  }
 
   if (loading) return <div className="p-6 text-center">Loading quiz details...</div>
   if (error) return <div className="p-6 text-center text-red-600">Error: {error}</div>
@@ -316,6 +466,17 @@ function QuizDetail() {
 
         {activeTab === 'mindmap' && (
           <div className="bg-[var(--card)] rounded shadow overflow-hidden h-[600px] relative">
+            {/* Share button */}
+            <div className="absolute top-4 left-4 z-10">
+              <button
+                onClick={() => { setShareModalOpen(true); setShareStatus('idle'); setShareEmail(''); setShareError('') }}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium shadow hover:bg-blue-700 transition"
+              >
+                <Share2 className="w-4 h-4" />
+                Share
+              </button>
+            </div>
+
             <ReactFlow
               nodes={nodes.map(node => ({
                 ...node,
@@ -324,7 +485,8 @@ function QuizDetail() {
               edges={edges}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
-              onNodeClick={(_, node) => setSelectedNodeId(node.id)}
+              onNodeClick={handleNodeClick}
+              onPaneClick={() => setSelectedNodeId(null)}
               fitView
             >
               <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
@@ -334,25 +496,146 @@ function QuizDetail() {
 
             {/* Node Details Panel */}
             {selectedNodeId && nodes.find(n => n.id === selectedNodeId) && (
-              <div className="absolute top-4 right-4 w-80 bg-white rounded-xl shadow-xl p-6 z-20">
-                <div className="flex justify-between mb-2">
+              <div className="absolute top-4 right-4 w-[480px] max-h-[85vh] bg-white rounded-xl shadow-2xl p-8 z-20 overflow-y-auto flex flex-col">
+                <div className="flex justify-between mb-3 flex-shrink-0">
                   <span
-                    className="text-xs text-white px-2 py-1 rounded"
+                    className="text-xs text-white px-3 py-1.5 rounded font-semibold"
                     style={{ background: nodes.find(n => n.id === selectedNodeId)?.style?.background }}
                   >
                     {nodes.find(n => n.id === selectedNodeId)?.data?.category}
                   </span>
-                  <button onClick={() => setSelectedNodeId(null)}>
+                  <button onClick={() => setSelectedNodeId(null)} className="hover:bg-gray-100 p-1 rounded">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
 
-                <h2 className="font-bold text-lg mb-2">
+                <h2 className="font-bold text-xl mb-4 text-slate-900">
                   {nodes.find(n => n.id === selectedNodeId)?.data?.label}
                 </h2>
-                <p className="text-sm text-slate-600 mb-4">
+                <p className="text-base text-slate-700 mb-6 leading-relaxed flex-grow">
                   {nodes.find(n => n.id === selectedNodeId)?.data?.description}
                 </p>
+
+                <button
+                  className="w-full mb-2 p-2 bg-blue-600 text-white rounded"
+                  onClick={handleAddSimilarTopic}
+                  disabled={nodeActionLoading}
+                >
+                  Add Similar Topic
+                </button>
+
+                <button
+                  className="w-full p-2 bg-purple-600 text-white rounded"
+                  onClick={handleGenerateMCQ}
+                  disabled={nodeActionLoading}
+                >
+                  Generate MCQ
+                </button>
+
+                <button
+                  className="w-full mt-3 p-2 bg-slate-100 rounded flex justify-center gap-2"
+                  onClick={() => {
+                    const selectedNode = nodes.find(n => n.id === selectedNodeId)
+                    const q = encodeURIComponent(selectedNode?.data?.label || '')
+                    window.open(`https://www.google.com/search?q=${q}`, "_blank")
+                  }}
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Search Resources
+                </button>
+              </div>
+            )}
+
+            {/* Share modal */}
+            {shareModalOpen && (
+              <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+                <div className="bg-white rounded-xl shadow-2xl p-6 w-[380px]">
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="font-bold text-lg text-slate-900">Share Mindmap</h2>
+                    <button onClick={() => setShareModalOpen(false)} className="hover:bg-gray-100 p-1 rounded">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {shareStatus === 'success' ? (
+                    <div className="text-center py-4">
+                      <p className="text-green-600 font-semibold text-lg">Sent!</p>
+                      <p className="text-slate-500 text-sm mt-1">They'll see it instantly in their History.</p>
+                      <button className="mt-4 w-full bg-slate-700 text-white p-2 rounded" onClick={() => setShareModalOpen(false)}>Close</button>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-slate-500 mb-4">Enter the email of a registered user to share this mindmap with them.</p>
+                      <input
+                        type="email"
+                        value={shareEmail}
+                        onChange={e => setShareEmail(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleShare()}
+                        placeholder="friend@example.com"
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      {shareStatus === 'error' && <p className="text-red-600 text-sm mb-3">{shareError}</p>}
+                      <button
+                        onClick={handleShare}
+                        disabled={shareStatus === 'loading' || !shareEmail.trim()}
+                        className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition"
+                      >
+                        {shareStatus === 'loading' ? 'Sending...' : 'Send'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {mcq && (
+              <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+                <div className="bg-white p-6 rounded-xl w-[420px]">
+                  <h2 className="font-bold mb-4">{mcq.question}</h2>
+
+                  <div className="space-y-2">
+                    {mcq.choices.map((c, i) => {
+                      const letterMap = ['A', 'B', 'C', 'D']
+                      const letter = letterMap[i]
+                      const isSelected = selectedAnswer === letter
+                      const isCorrect = mcq.answer === letter
+                      let btnClass = 'w-full p-2 border rounded text-left transition-colors '
+                      if (selectedAnswer) {
+                        if (isCorrect) btnClass += 'bg-green-100 border-green-500 text-green-800 font-semibold'
+                        else if (isSelected) btnClass += 'bg-red-100 border-red-400 text-red-700'
+                        else btnClass += 'bg-white text-slate-500'
+                      } else {
+                        btnClass += 'hover:bg-slate-100'
+                      }
+                      return (
+                        <button
+                          key={i}
+                          className={btnClass}
+                          disabled={!!selectedAnswer}
+                          onClick={() => setSelectedAnswer(letter)}
+                        >
+                          <span className="font-medium mr-2">{letter}.</span>{c}
+                          {selectedAnswer && isCorrect && <span className="ml-2">✓</span>}
+                          {selectedAnswer && isSelected && !isCorrect && <span className="ml-2">✗</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {selectedAnswer && (
+                    <p className={`mt-3 text-sm font-medium ${selectedAnswer === mcq.answer ? 'text-green-700' : 'text-red-600'}`}>
+                      {selectedAnswer === mcq.answer
+                        ? '🎉 Correct!'
+                        : `Incorrect. The correct answer is ${mcq.answer}.`}
+                    </p>
+                  )}
+
+                  <button
+                    className="mt-4 w-full bg-slate-700 text-white p-2 rounded"
+                    onClick={() => { setMcq(null); setSelectedAnswer(null) }}
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             )}
           </div>

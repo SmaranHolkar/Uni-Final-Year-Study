@@ -13,6 +13,9 @@ export default function StepTwo({ onNext }) {
   const [showScore, setShowScore] = useState(false);
   const [mindmapData, setMindmapData] = useState(undefined);
   const [quizResults, setQuizResults] = useState([]);
+  const quizStartTime = useRef(Date.now());
+  const answerTimestamps = useRef({}); // i → timestamp of first answer
+  const answerChangeCounts = useRef({}); // i → how many times answer was changed
   const fetchInProgressRef = useRef(false); // Prevent duplicate requests
 
   // ✅ helpers go HERE
@@ -59,14 +62,14 @@ export default function StepTwo({ onNext }) {
         credentials: 'include',
         body: JSON.stringify({ 
           queryText: "Generate questions", 
-          count: 8,
+          count: 15,
           documentId: currentDocumentId
         })
       });
       const data = await resp.json();
       if (!resp.ok) {
-        const message = data?.error || data?.message || 'Failed to generate questions.';
-        setErrorMessage(message);
+        console.error("Question generation error:", data);
+        setErrorMessage('Failed to generate questions. Please try again');
         setQuestions([]);
         setAnswers([]);
         return;
@@ -74,8 +77,8 @@ export default function StepTwo({ onNext }) {
       setQuestions(data.questions || []);
       setAnswers(Array((data.questions || []).length).fill(null));
     } catch (e) {
-      console.error(e);
-      setErrorMessage('Network error while loading the quiz.');
+      console.error("Quiz loading error:", e);
+      setErrorMessage('Unable to load quiz. Please try again');
     } finally {
       setLoading(false);
       fetchInProgressRef.current = false;
@@ -88,6 +91,12 @@ export default function StepTwo({ onNext }) {
 
   const selectAnswer = (i, c) => {
     const copy = [...answers];
+    // Track first-answer timestamp and change count
+    if (answerTimestamps.current[i] === undefined) {
+      answerTimestamps.current[i] = Date.now();
+    } else {
+      answerChangeCounts.current[i] = (answerChangeCounts.current[i] || 0) + 1;
+    }
     copy[i] = c;
     setAnswers(copy);
   };
@@ -141,14 +150,44 @@ export default function StepTwo({ onNext }) {
     });
 
     // Construct quiz results object
-    const quizResults = questions.map((q, i) => ({
-      id: i,
-      prompt: q.prompt,
-      choices: q.choices,
-      userAnswer: answers[i],
-      correctAnswer: getCorrectAnswer(q),
-      isCorrect: !wrongQs.find(wq => wq === q)
-    }));
+    const finishTime = Date.now();
+    const totalElapsed = (finishTime - quizStartTime.current) / 1000; // seconds
+    const avgTimePerQ = totalElapsed / questions.length;
+
+    const quizResults = questions.map((q, i) => {
+      // Time from quiz start to first answer (seconds)
+      const firstAnswerTime = answerTimestamps.current[i]
+        ? (answerTimestamps.current[i] - quizStartTime.current) / 1000
+        : totalElapsed; // answered at the very end (or not at all)
+      const changes = answerChangeCounts.current[i] || 0;
+
+      // Confidence on 1–5 scale:
+      // fast + no changes → 5, slow + changed → 1
+      let confidence;
+      if (changes >= 2) {
+        confidence = 1; // very uncertain — changed mind multiple times
+      } else if (changes === 1) {
+        confidence = 2; // uncertain — changed once
+      } else if (firstAnswerTime <= avgTimePerQ * 0.5) {
+        confidence = 5; // very fast, no changes → very confident
+      } else if (firstAnswerTime <= avgTimePerQ) {
+        confidence = 4; // reasonably fast → confident
+      } else if (firstAnswerTime <= avgTimePerQ * 1.75) {
+        confidence = 3; // average pace → neutral
+      } else {
+        confidence = 2; // slow → uncertain
+      }
+
+      return {
+        id: i,
+        prompt: q.prompt,
+        choices: q.choices,
+        userAnswer: answers[i],
+        correctAnswer: getCorrectAnswer(q),
+        isCorrect: !wrongQs.find(wq => wq === q),
+        confidence,
+      };
+    });
 
     const score = questions.length - wrongQs.length;
     setScore(score);

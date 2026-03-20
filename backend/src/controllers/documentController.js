@@ -1,68 +1,8 @@
 import fs from 'fs';
 import pool from '../utils/dbPool.js';
 import { getEmbedding } from '../utils/aiUtils.js';
-import PDFParser from 'pdf2json';
+import { extractTextFromFile, chunkText } from '../services/documentService.js';
 
-
-/*              TEXT EXTRACTION       */
-
-async function extractTextFromFile(filePath, mimetype) {
-  if (mimetype === 'text/plain') {
-    return fs.readFileSync(filePath, 'utf-8');
-  }
-
-  if (mimetype === 'application/pdf') {
-    return new Promise((resolve, reject) => {
-      // Create parser instance (1 = raw text mode)
-      const pdfParser = new PDFParser(this, 1);
-
-      // Handle errors
-      pdfParser.on("pdfParser_dataError", (errData) => {
-         console.error('PDF Parser Error:', errData.parserError);
-         reject(new Error(errData.parserError));
-      });
-
-      // Handle success
-      pdfParser.on("pdfParser_dataReady", (pdfData) => {
-         // pdf2json provides a method to get raw text content
-         const text = pdfParser.getRawTextContent();
-         // Clear parser to free memory
-         pdfParser.destroy();
-         resolve(text);
-      });
-
-      // Load the file buffer and parse
-      try {
-        const buffer = fs.readFileSync(filePath);
-        pdfParser.parseBuffer(buffer);
-      } catch (err) {
-        reject(err);
-      }
-    });
-  }
-  
-  if (mimetype === 'application/msword') {
-    throw new Error('DOC files are not supported. Please upload DOCX instead.');
-  }
-
-  throw new Error(`Unsupported file type: ${mimetype}`);
-}
-
-
-/*         CHUNKING          */
-
-
-function chunkText(text, chunkSize = 500, overlap = 50) {
-  const words = text.split(/\s+/);
-  const chunks = [];
-
-  for (let i = 0; i < words.length; i += chunkSize - overlap) {
-    const chunk = words.slice(i, i + chunkSize).join(' ').trim();
-    if (chunk) chunks.push(chunk);
-  }
-
-  return chunks;
-}
 
 
 /*  PROCESS & STORE DOCUMENT   */
@@ -84,7 +24,7 @@ export async function processAndStoreDocument(req, res) {
       return res.status(400).json({ error: 'Document title is required' });
     }
 
-    /* ----------- AUTH USER ------ */
+    /* AUTH USER */
 
     const userId = req.user?.id;
     if (!userId) {
@@ -118,8 +58,8 @@ export async function processAndStoreDocument(req, res) {
 
     /*  CHUNKING  */
 
-    const MAX_CHUNKS = 100; // Reduced from 200 for memory optimization
-    const chunks = chunkText(text, 500, 50).slice(0, MAX_CHUNKS);
+    const MAX_CHUNKS = 500;
+    const chunks = chunkText(text, 1000, 100).slice(0, MAX_CHUNKS);
 
     if (!chunks.length) {
       throw new Error('No valid chunks generated');
@@ -159,26 +99,17 @@ export async function processAndStoreDocument(req, res) {
 
         storedChunks++;
 
-        // Memory optimization: Force GC every 20 chunks
-        if ((i + 1) % 20 === 0) {
-          console.log(` ${title}: ${i + 1}/${chunks.length}`);
-          if (global.gc) global.gc();
-        } else if ((i + 1) % 10 === 0) {
-          console.log(` ${title}: ${i + 1}/${chunks.length}`);
+        } catch (err) {
+          failedChunks.push({
+            index: i,
+            error: err.message
+          });
         }
-
-      } catch (err) {
-        failedChunks.push({
-          index: i,
-          error: err.message
-        });
-      }
     }
 
     await client.query('COMMIT');
 
     /*  RESPONSE  */
-
     // Get the ID of the first inserted embedding to return as documentId
     const idResult = await client.query(
       'SELECT id FROM public.w_embeddings WHERE title = $1 AND user_id = $2 LIMIT 1',

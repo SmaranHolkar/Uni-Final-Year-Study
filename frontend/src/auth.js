@@ -22,15 +22,18 @@ export default function Auth() {
   async function signUp() {
     setMsg('Signing up...');
     const { error } = await supabase.auth.signUp({ email, password });
-    if (error) setMsg(error.message);
-    else setMsg('Check your email for confirmation .');
+    if (error) {
+      console.error('Signup error:', error);
+      setMsg('Unable to create account. Please try again');
+    } else setMsg('Check your email for confirmation .');
   }
 
   async function signIn() {
     setMsg('Signing in...');
     const { error, data } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      setMsg(error.message);
+      console.error('Signin error:', error);
+      setMsg('Invalid email or password');
       return;
     }
     setMsg(`Signed in as ${data.user.email}`);

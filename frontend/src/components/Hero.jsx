@@ -1,431 +1,400 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { 
-  Brain, 
-  Network, 
-  Zap, 
-  ArrowRight, 
-  CheckCircle2, 
+import {
+  ArrowRight,
   Sparkles,
-  BookOpen,
+  Upload,
+  Network,
+  Brain,
   BarChart3,
-  Users
+  BookOpen,
+  Zap,
+  ChevronDown,
+  FlaskConical,
+  Microscope,
+  ClipboardList,
 } from "lucide-react";
 
-// --- Components ---
+/* ═══════════════════════════════════════════
+   DOT GRID BACKGROUND — Nothing.tech style
+═══════════════════════════════════════════ */
+const DotGrid = () => (
+  <div style={{
+    position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+    zIndex: 0, pointerEvents: "none",
+    backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.35) 1px, transparent 1px)",
+    backgroundSize: "28px 28px",
+  }} />
+);
 
-/**
- * StarBackground: A canvas-based starfield animation
- * Pure canvas API - no external libraries
- */
-const StarBackground = () => {
-  const canvasRef = useRef(null);
-
+/* ═══════════════════════════════════════════
+   SCROLL REVEAL
+═══════════════════════════════════════════ */
+const useReveal = (threshold = 0.1) => {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    let width = window.innerWidth;
-    let height = window.innerHeight;
-    canvas.width = width;
-    canvas.height = height;
-
-    const stars = [];
-    const numStars = 150;
-
-    for (let i = 0; i < numStars; i++) {
-      stars.push({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        radius: Math.random() * 1.5,
-        vx: (Math.random() - 0.5) * 0.2,
-        vy: (Math.random() - 0.5) * 0.2,
-        alpha: Math.random(),
-        twinkleSpeed: Math.random() * 0.02 + 0.005,
-      });
-    }
-
-    let animationFrameId;
-
-    const render = () => {
-      ctx.clearRect(0, 0, width, height);
-      
-      stars.forEach((star) => {
-        star.x += star.vx;
-        star.y += star.vy;
-
-        if (star.x < 0) star.x = width;
-        if (star.x > width) star.x = 0;
-        if (star.y < 0) star.y = height;
-        if (star.y > height) star.y = 0;
-
-        star.alpha += star.twinkleSpeed;
-        if (star.alpha > 1 || star.alpha < 0.2) {
-          star.twinkleSpeed = -star.twinkleSpeed;
-        }
-
-        ctx.beginPath();
-        ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 255, ${star.alpha})`;
-        ctx.fill();
-      });
-
-      animationFrameId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    const handleResize = () => {
-      width = window.innerWidth;
-      height = window.innerHeight;
-      canvas.width = width;
-      canvas.height = height;
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, []);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100%",
-        height: "100%",
-        zIndex: 0,
-        pointerEvents: "none",
-        opacity: 0.6,
-      }}
-    />
-  );
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setVisible(true); obs.disconnect(); }
+    }, { threshold });
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return [ref, visible];
 };
 
-/**
- * GlassCard: A reusable card component with glassmorphism
- */
-const GlassCard = ({ children, className = "", delay = 0 }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const cardRef = useRef(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setTimeout(() => setIsVisible(true), delay * 1000);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, [delay]);
-
+const Reveal = ({ children, delay = 0, className = "" }) => {
+  const [ref, visible] = useReveal();
   return (
-    <div
-      ref={cardRef}
-      className={`backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-6 shadow-xl hover:bg-white/10 transition-all duration-500 ${className}`}
-      style={{
-        opacity: isVisible ? 1 : 0,
-        transform: isVisible ? 'translateY(0)' : 'translateY(20px)',
-      }}
-    >
+    <div ref={ref} className={className} style={{
+      opacity: visible ? 1 : 0,
+      transform: visible ? "translateY(0)" : "translateY(28px)",
+      transition: `opacity 0.75s cubic-bezier(.16,1,.3,1) ${delay}s, transform 0.75s cubic-bezier(.16,1,.3,1) ${delay}s`,
+    }}>
       {children}
     </div>
   );
 };
 
-/**
- * FeatureItem: Individual feature display
- */
-const FeatureItem = ({ icon: Icon, title, description, delay }) => (
-  <GlassCard delay={delay} className="flex flex-col items-start text-left h-full group">
-    <div className="p-3 rounded-xl bg-indigo-500/20 mb-4 text-indigo-300 transition-transform duration-300 group-hover:scale-110">
-      <Icon size={24} />
-    </div>
-    <h3 className="text-xl font-bold mb-2 text-[var(--foreground)]">{title}</h3>
-    <p className="text-[var(--muted-foreground)] leading-relaxed">{description}</p>
-  </GlassCard>
-);
+/* ═══════════════════════════════════════════
+   SHARED TOKENS
+═══════════════════════════════════════════ */
+const rule        = { borderTop: "1px solid var(--border)" };
+const muted       = { color: "var(--muted-foreground)" };
+const fg          = { color: "var(--foreground)" };
+const accent      = "var(--primary)";
+const accentDim   = "color-mix(in oklch, var(--primary) 12%, transparent)";
+const accentBorder = "color-mix(in oklch, var(--primary) 35%, transparent)";
 
-/**
- * Main Hero Component
- */
-export default function Hero() {
-  const [heroVisible, setHeroVisible] = useState(false);
-  const [scrollY, setScrollY] = useState(0);
-
-  useEffect(() => {
-    setHeroVisible(true);
-    
-    const handleScroll = () => {
-      setScrollY(window.scrollY);
-    };
-
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  const parallaxOffset = scrollY * 0.3;
+/* ═══════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════ */
+const Hero = () => {
+  const [on, setOn] = useState(false);
+  useEffect(() => { setTimeout(() => setOn(true), 100); }, []);
+  const anim = (d = 0) => ({
+    opacity: on ? 1 : 0,
+    transform: on ? "none" : "translateY(24px)",
+    transition: `opacity 0.9s cubic-bezier(.16,1,.3,1) ${d}s, transform 0.9s cubic-bezier(.16,1,.3,1) ${d}s`,
+  });
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)] selection:bg-indigo-500/30">
-      <StarBackground />
+    <section className="relative z-10 flex flex-col justify-center" style={{ minHeight: "calc(100svh - 74px)", marginTop: "74px" }}>
+      <div className="max-w-4xl mx-auto px-6 md:px-12 w-full py-6">
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 px-6">
-        <div className="max-w-7xl mx-auto text-center relative z-10">
-          
-          <div
-            style={{
-              opacity: heroVisible ? 1 : 0,
-              transform: heroVisible ? 'scale(1)' : 'scale(0.9)',
-              transition: 'all 0.8s ease-out',
-            }}
-          >
-            <span className="inline-block py-1 px-3 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm font-medium mb-6 animate-pulse">
-              ✨ AI-Powered Education Platform
-            </span>
-            
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
-              Unlock Your Potential <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 animate-gradient">
-                with AI Learning
+        {/* ── Top label ── */}
+        <div style={anim(0)} className="pb-4 flex items-center justify-between">
+          <span className="font-mono text-[11px] uppercase tracking-[.18em] font-medium" style={muted}>
+            Study tool — 2026
+          </span>
+          <span className="font-mono text-[11px] uppercase tracking-[.18em] font-medium" style={muted}>
+            Early access
+          </span>
+        </div>
+
+        {/* ── Main content ── */}
+        <div>
+            {/* Version badge — Nothing.tech style */}
+            <div style={anim(0.02)} className="mb-4">
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full font-mono text-[11px]"
+                style={{ background: accentDim, border: `1px solid ${accentBorder}`, color: accent }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} />
+                Beta · March 2026
               </span>
+            </div>
+
+            <h1 className="font-black leading-[0.95] tracking-tight mb-5"
+              style={{ ...anim(0.05), fontSize: "clamp(2.6rem, 5vw, 4.5rem)", color: "var(--foreground)" }}>
+              Memorising is over.<br />
+              <span style={{ color: accent }}>Start understanding.</span>
             </h1>
-            
-            <p className="text-lg md:text-xl text-[var(--muted-foreground)] max-w-2xl mx-auto mb-10 leading-relaxed">
-              Visualize, interact, and master your subjects with mind maps, adaptive quizzes, and real-time insights. 
-              <span className="text-indigo-300 block mt-2">Study smarter, not harder.</span>
-            </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link 
-                to="/signup" 
-                className="group relative px-8 py-4 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-lg transition-all shadow-[0_0_40px_-10px_rgba(99,102,241,0.5)] hover:shadow-[0_0_60px_-15px_rgba(99,102,241,0.6)] flex items-center gap-2 hover:scale-105"
-              >
-                Start Learning Free
-                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-              </Link>
-              <Link 
-                to="#" 
-                className="px-8 py-4 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-lg transition-all backdrop-blur-sm hover:scale-105"
-              >
-                View Demo
-              </Link>
-            </div>
-          </div>
-
-          {/* Abstract Visual Representation with Parallax */}
-          <div 
-            className="mt-20 relative max-w-4xl mx-auto transition-transform duration-100 ease-out"
-            style={{ transform: `translateY(${parallaxOffset}px)` }}
-          >
-             <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-[var(--card)] hover:border-indigo-500/30 transition-colors duration-500">
-                {/* Mock UI Header */}
-                <div className="h-8 bg-[var(--muted)] flex items-center px-4 gap-2 border-b border-white/5">
-                  <div className="w-3 h-3 rounded-full bg-red-500/50" />
-                  <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
-                  <div className="w-3 h-3 rounded-full bg-green-500/50" />
-                </div>
-                {/* Mock UI Body */}
-                <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8 opacity-80">
-                   <div className="space-y-4">
-                      <div className="h-32 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center hover:bg-indigo-500/30 transition-colors">
-                        <Network className="text-indigo-400 w-12 h-12" />
-                      </div>
-                      <div className="h-4 w-3/4 rounded bg-white/10 animate-pulse" />
-                      <div className="h-4 w-1/2 rounded bg-white/10" />
-                   </div>
-                   <div className="space-y-4 pt-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400"><CheckCircle2 size={16}/></div>
-                        <div className="h-3 w-32 rounded bg-white/10" />
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400"><CheckCircle2 size={16}/></div>
-                        <div className="h-3 w-40 rounded bg-white/10" />
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400"><Zap size={16}/></div>
-                        <div className="h-3 w-24 rounded bg-white/10" />
-                      </div>
-                   </div>
-                </div>
-             </div>
-             {/* Decorative blurred blobs */}
-             <div className="absolute -top-20 -left-20 w-72 h-72 bg-indigo-600/30 rounded-full blur-[100px] -z-10 animate-pulse" />
-             <div className="absolute -bottom-20 -right-20 w-72 h-72 bg-purple-600/20 rounded-full blur-[100px] -z-10" />
-          </div>
-        </div>
-      </section>
-
-      {/* Features Bento Grid */}
-      <section className="py-24 px-6 relative z-10">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Everything you need to excel</h2>
-            <p className="text-[var(--muted-foreground)] max-w-2xl mx-auto">
-              A comprehensive suite of tools designed to adapt to your unique learning style.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <FeatureItem 
-              icon={Network}
-              title="Interactive Mind Maps"
-              description="See connections, not just facts. Build and explore visual topic maps that mimic how your brain actually works."
-              delay={0.1}
-            />
-            <FeatureItem 
-              icon={Brain}
-              title="Adaptive Quizzes"
-              description="Test your knowledge with quizzes that adapt in real-time to your strengths and weaknesses."
-              delay={0.2}
-            />
-            <FeatureItem 
-              icon={BarChart3}
-              title="Real-Time Insights"
-              description="Track your progress with beautiful analytics and get instant feedback to stay motivated."
-              delay={0.3}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* How it Works / Info Cards */}
-      <section className="py-24 px-6 relative z-10 bg-gradient-to-b from-transparent to-[var(--card)]/30">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* Card 1 */}
-            <div 
-              className="p-8 rounded-3xl bg-[var(--card)] border border-white/5 shadow-xl hover:-translate-y-1 transition-transform duration-300 hover:border-white/10"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-400 mb-6">
-                <BookOpen size={24} />
-              </div>
-              <h3 className="text-2xl font-bold mb-4">How It Works</h3>
-              <p className="text-[var(--muted-foreground)] mb-6 leading-relaxed">
-                Start by signing up, drop in your PDFs from class, and let our AI generate a quiz and a personalized mind map to track your progress.
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6 max-w-2xl" style={anim(0.12)}>
+              <p className="text-[14px] leading-relaxed" style={muted}>
+                Upload any study material. HydrusLearn builds quizzes and mind maps from your actual content — then shows you exactly where your understanding breaks.
               </p>
-              <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full w-2/3 bg-blue-500/50 rounded-full animate-pulse" />
-              </div>
-            </div>
-
-            {/* Card 2 */}
-            <div 
-              className="p-8 rounded-3xl bg-[var(--card)] border border-white/5 shadow-xl hover:-translate-y-1 transition-transform duration-300 hover:border-white/10"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/20 flex items-center justify-center text-purple-400 mb-6">
-                <Sparkles size={24} />
-              </div>
-              <h3 className="text-2xl font-bold mb-4">Why HydrusLearn?</h3>
-              <p className="text-[var(--muted-foreground)] mb-6 leading-relaxed">
-                We combine adaptive quizzes, visual learning and real-time feedback to help you truly understand, not just memorize.
+              <p className="text-[14px] leading-relaxed" style={muted}>
+                Quiz yourself. Explore the map. Use the Learning Playground to generate any revision tool you can describe — flashcards, study guides, Q&A sets — or check Mind's Mirror to understand how you actually think.
               </p>
-              <ul className="space-y-2">
-                {['Visual Learning', 'AI Adaptation', 'Progress Tracking'].map((item, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
-                    <CheckCircle2 size={14} className="text-purple-400" /> {item}
-                  </li>
-                ))}
-              </ul>
             </div>
 
-            {/* Card 3 - CTA */}
-            <div 
-              className="p-8 rounded-3xl bg-gradient-to-br from-indigo-600 to-purple-700 border border-white/10 shadow-xl text-white relative overflow-hidden hover:-translate-y-1 transition-transform duration-300 group"
-            >
-              <div className="absolute top-0 right-0 p-32 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-white/20 transition-colors" />
-              <div className="relative z-10">
-                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white mb-6">
-                  <Users size={24} />
-                </div>
-                <h3 className="text-2xl font-bold mb-4">Get Started</h3>
-                <p className="text-indigo-100 mb-8 leading-relaxed">
-                  Create your free account and unlock a smarter way to study. Join thousands of students today.
-                </p>
-                <Link 
-                  to="/signup" 
-                  className="inline-flex items-center justify-center w-full py-3 rounded-xl bg-white text-indigo-600 font-bold hover:bg-indigo-50 transition-all hover:scale-105"
-                >
-                  Sign Up Free
-                </Link>
-              </div>
+            <div className="flex flex-wrap items-center gap-4" style={anim(0.18)}>
+              <Link to="/signup"
+                className="group inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-[14px] transition-all duration-200"
+                style={{ background: accent, color: "var(--primary-foreground)" }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; e.currentTarget.style.boxShadow = "0 0 36px -4px color-mix(in oklch, var(--primary) 55%, transparent)"; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.boxShadow = "none"; }}>
+                Start free
+                <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+              <a href="#how-it-works"
+                className="inline-flex items-center gap-1.5 text-[14px] font-medium transition-colors duration-150"
+                style={muted}
+                onMouseEnter={e => e.currentTarget.style.color = "var(--foreground)"}
+                onMouseLeave={e => e.currentTarget.style.color = "var(--muted-foreground)"}>
+                See how it works
+              </a>
             </div>
 
-          </div>
         </div>
-      </section>
 
-      {/* CTA Section */}
-      <section className="py-24 px-6 relative z-10">
-        <div className="max-w-5xl mx-auto rounded-[2.5rem] bg-gradient-to-r from-indigo-900/50 to-purple-900/50 border border-white/10 p-12 md:p-20 text-center relative overflow-hidden group hover:border-indigo-500/30 transition-colors duration-500">
-          {/* Background decoration */}
-          <div className="absolute inset-0 opacity-20">
-            <div className="absolute inset-0" style={{
-              backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)',
-              backgroundSize: '40px 40px'
-            }} />
+        {/* ── Bottom rule + scroll nudge ── */}
+        <div style={{ ...rule, ...anim(0.22) }} className="pt-4 pb-2 flex items-center justify-between">
+          <div className="flex flex-wrap gap-8">
+            {["No credit card needed", "Any subject", "Free to start"].map(t => (
+              <span key={t} className="font-mono text-[11px]" style={muted}>{t}</span>
+            ))}
           </div>
-          
-          <div className="relative z-10">
-            <h2 className="text-3xl md:text-5xl font-bold mb-6">Ready to transform your learning?</h2>
-            <p className="text-lg text-indigo-200 mb-10 max-w-2xl mx-auto">
-              Join students using HydrusLearn to master their subjects with confidence. The future of education is here.
+          <a href="#how-it-works" className="flex items-center gap-1.5 font-mono text-[11px] transition-colors"
+            style={muted}
+            onMouseEnter={e => e.currentTarget.style.color = "var(--foreground)"}
+            onMouseLeave={e => e.currentTarget.style.color = "var(--muted-foreground)"}>
+            Scroll <ChevronDown size={12} />
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+/* ═══════════════════════════════════════════
+   HOW IT WORKS
+═══════════════════════════════════════════ */
+const HowItWorks = () => {
+  const steps = [
+    { n: "01", icon: Upload,        title: "Upload anything",       body: "PDF, notes, a paste of text. Any subject. HydrusLearn reads your content in seconds and builds a structured model of the material." },
+    { n: "02", icon: ClipboardList,  title: "Get targeted quizzes",  body: "Questions come from your exact material — not a generic bank. The system identifies gaps and drills you on the concepts you've misunderstood." },
+    { n: "03", icon: Network,        title: "Explore the mind map",  body: "Every concept is extracted and linked into an interactive mind map. See how ideas connect, click any node to expand sub-topics at a glance." },
+    { n: "04", icon: Microscope,     title: "Mind's Mirror",         body: "Your metacognitive analysis. HydrusLearn shows you not just what you got wrong — but how you think, where your reasoning patterns break, and what to do about it." },
+  ];
+
+  const extras = [
+    { icon: FlaskConical, title: "Learning Playground", body: "Describe what you want to revise in plain English and the AI picks the best tool for the job — flashcards, study guides, Q&A sets, and more. No image generation yet, but every text-based format is on the table." },
+    { icon: BarChart3,    title: "Per-topic progress",  body: "See your performance at concept level — not just a session score. Know exactly which chapters you've nailed and which need another pass." },
+  ];
+
+  return (
+    <section id="how-it-works" className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-32">
+      {/* Section header */}
+      <Reveal>
+        <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-8 md:gap-20 items-end mb-20" style={rule}>
+          <div className="pt-8">
+            <p className="font-mono text-[11px] uppercase tracking-[.18em] font-semibold mb-3" style={{ color: accent, opacity: 0.75 }}>
+              How it works
             </p>
-            <Link 
-              to="/signup" 
-              className="inline-block px-10 py-4 rounded-full bg-white text-indigo-900 font-bold text-lg hover:scale-105 transition-transform shadow-lg hover:shadow-xl"
-            >
-              Get Started Now
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight leading-[1.02]" style={fg}>
+              Five tools.<br />One system.
+            </h2>
+          </div>
+          <p className="pb-1 text-[15px] leading-relaxed max-w-lg" style={muted}>
+            Upload your material once. HydrusLearn gives you quizzes, a mind map, a learning playground, and Mind's Mirror — all built from your actual content.
+          </p>
+        </div>
+      </Reveal>
+
+      {/* Core 4-step flow */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-px mb-px"
+        style={{ background: "var(--border)", outline: "1px solid var(--border)", borderRadius: "16px 16px 0 0", overflow: "hidden" }}>
+        {steps.map((step, i) => (
+          <Reveal key={step.n} delay={i * 0.07}>
+            <div className="p-8 md:p-10 h-full transition-colors duration-300"
+              style={{ background: "var(--background)" }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--card)"}
+              onMouseLeave={e => e.currentTarget.style.background = "var(--background)"}>
+              <div className="flex items-start justify-between mb-8">
+                <span className="font-mono text-[13px] tracking-widest font-bold" style={{ color: accent, opacity: 0.7 }}>{step.n}</span>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ background: accentDim, border: `1px solid ${accentBorder}` }}>
+                  <step.icon size={15} style={{ color: accent }} />
+                </div>
+              </div>
+              <h3 className="text-[17px] font-bold mb-3 tracking-tight" style={fg}>{step.title}</h3>
+              <p className="text-[14px] leading-relaxed" style={muted}>{step.body}</p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+
+      {/* Also included — supplementary features */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-px"
+        style={{ background: "var(--border)", outline: "1px solid var(--border)", borderRadius: "0 0 16px 16px", overflow: "hidden" }}>
+        {extras.map((feat, i) => (
+          <Reveal key={feat.title} delay={0.28 + i * 0.07}>
+            <div className="p-8 md:p-10 h-full transition-colors duration-300"
+              style={{ background: "var(--background)" }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--card)"}
+              onMouseLeave={e => e.currentTarget.style.background = "var(--background)"}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-7 h-7 rounded-md flex items-center justify-center"
+                  style={{ background: accentDim, border: `1px solid ${accentBorder}` }}>
+                  <feat.icon size={13} style={{ color: accent }} />
+                </div>
+                <h3 className="text-[15px] font-bold tracking-tight" style={fg}>{feat.title}</h3>
+              </div>
+              <p className="text-[13px] leading-relaxed" style={muted}>{feat.body}</p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+/* ═══════════════════════════════════════════
+   FAQ
+═══════════════════════════════════════════ */
+const faqData = [
+  { q: "What file types can I upload?",                a: "PDFs are fully supported right now. Plain text and markdown also work. Word doc import is on the roadmap." },
+  { q: "How are quiz questions generated?",            a: "Every question is produced from your uploaded material by our AI — not sourced from an external bank. If your notes don't cover a topic, you won't be asked about it." },
+  { q: "What is the Learning Playground?",             a: "The Learning Playground lets you create revision tools from plain-English prompts. Just describe what you need — flashcards, a Q&A set, a concept breakdown, or anything else — and the AI picks the most appropriate format and builds it for you. No image generation yet, but all text-based tools are supported." },
+  { q: "What is Mind's Mirror?",                      a: "Mind's Mirror is your metacognitive analysis. It goes beyond quiz scores to show you how you think — identifying patterns in your mistakes and reasoning so you can address root causes, not just symptoms." },
+  { q: "Is my uploaded content private?",              a: "Yes. Your documents are processed securely and are never used to train our models or shared with any third party." },
+  { q: "Does it work for any subject?",                a: "Yes — arts, sciences, law, medicine, social sciences, engineering. If a subject can be written down and structured, HydrusLearn can map it." },
+  { q: "Is there a free plan?",                        a: "Yes. The free plan includes 5 uploads per month and 10 quiz questions per session. No credit card required to sign up." },
+  { q: "How is this different from Anki or Quizlet?",  a: "Anki and Quizlet require you to create the cards yourself. HydrusLearn generates everything from your uploaded material, maps the concept structure, adapts to where you're actually weak — and then reflects your thinking back to you via Mind's Mirror." },
+];
+
+const FAQRow = ({ q, a }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+      <button className="w-full flex items-start justify-between gap-6 py-6 text-left"
+        onClick={() => setOpen(o => !o)}>
+        <span className="text-[14px] font-semibold leading-snug" style={fg}>{q}</span>
+        <ChevronDown size={15} className="mt-0.5 shrink-0 transition-transform duration-200"
+          style={{ color: "var(--muted-foreground)", transform: open ? "rotate(180deg)" : "rotate(0deg)" }} />
+      </button>
+      <div style={{
+        maxHeight: open ? "300px" : "0",
+        overflow: "hidden",
+        transition: "max-height 0.35s cubic-bezier(.16,1,.3,1)",
+      }}>
+        <p className="text-[14px] leading-relaxed pb-6" style={muted}>{a}</p>
+      </div>
+    </div>
+  );
+};
+
+const FAQ = () => (
+  <section id="faq" className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-32">
+    <Reveal>
+      <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-8 md:gap-20 items-start" style={rule}>
+        <div className="pt-8">
+          <p className="font-mono text-[11px] uppercase tracking-[.18em] font-semibold mb-3" style={{ color: accent, opacity: 0.75 }}>
+            FAQ
+          </p>
+          <h2 className="text-4xl md:text-5xl font-black tracking-tight leading-[1.02]" style={fg}>
+            Questions.
+          </h2>
+        </div>
+
+        <div className="pt-8">
+          {faqData.map(item => <FAQRow key={item.q} {...item} />)}
+          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }} />
+        </div>
+      </div>
+    </Reveal>
+  </section>
+);
+
+/* ═══════════════════════════════════════════
+   FINAL CTA
+═══════════════════════════════════════════ */
+const FinalCTA = () => (
+  <section className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-32">
+    <Reveal>
+      <div className="relative rounded-2xl overflow-hidden px-10 md:px-20 py-20"
+        style={{
+          background: "var(--card)",
+          border: "1px solid var(--border)",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.3), 0 8px 32px rgba(0,0,0,0.3)",
+        }}>
+
+        {/* Subtle radial accent */}
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ background: `radial-gradient(ellipse at 20% 50%, color-mix(in oklch, var(--primary) 8%, transparent) 0%, transparent 60%)` }} />
+
+        <div className="relative grid grid-cols-1 md:grid-cols-[1fr_auto] gap-10 items-center">
+          <div>
+            <p className="font-mono text-[11px] uppercase tracking-[.18em] font-semibold mb-5" style={{ color: accent, opacity: 0.75 }}>
+              Get started
+            </p>
+            <h2 className="text-4xl md:text-[56px] font-black tracking-tight leading-[1.0] mb-5" style={fg}>
+              Stop rereading.<br />
+              <span style={{ color: accent }}>Start understanding.</span>
+            </h2>
+            <p className="text-[15px] leading-relaxed max-w-lg" style={muted}>
+              Join the students using HydrusLearn to turn passive revision into real, lasting understanding. Free to start — no card needed.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 shrink-0">
+            <Link to="/signup"
+              className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-xl font-bold text-[15px] transition-all duration-200"
+              style={{ background: accent, color: "var(--primary-foreground)", whiteSpace: "nowrap" }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; e.currentTarget.style.boxShadow = "0 0 40px -6px color-mix(in oklch, var(--primary) 60%, transparent)"; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.boxShadow = "none"; }}>
+              Start for free <ArrowRight size={15} />
             </Link>
           </div>
         </div>
-      </section>
+      </div>
+    </Reveal>
+  </section>
+);
 
-      {/* Footer */}
-      <footer className="py-12 px-6 border-t border-white/5 relative z-10 bg-[var(--background)]">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-2 font-bold text-xl">
-            <Sparkles className="text-indigo-400" />
-            <span>HydrusLearn</span>
-          </div>
-          <div className="text-[var(--muted-foreground)] text-sm">
-            &copy; {new Date().getFullYear()} HydrusLearn. All rights reserved.
-          </div>
-          <div className="flex gap-6">
-            {['Twitter', 'GitHub', 'Discord'].map((social) => (
-              <a key={social} href="#" className="text-[var(--muted-foreground)] hover:text-white transition-colors text-sm">
-                {social}
-              </a>
-            ))}
-          </div>
-        </div>
-      </footer>
+/* ═══════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════ */
+const Footer = () => (
+  <footer className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-10" style={rule}>
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="flex items-center gap-2 font-bold text-[14px] tracking-tight" style={fg}>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 50" width="160" height="34">
+          <defs>
+            <path id="ft-star" d="M 0 -6 L 1.5 -1.5 L 6 0 L 1.5 1.5 L 0 6 L -1.5 1.5 L -6 0 L -1.5 -1.5 Z" fill="currentColor"/>
+            <path id="ft-small-star" d="M 0 -4 L 1 -1 L 4 0 L 1 1 L 0 4 L -1 1 L -4 0 L -1 -1 Z" fill="currentColor"/>
+          </defs>
+          <g transform="translate(10, -5) scale(0.55)">
+            <path d="M 30 20 L 20 80 L 65 40 L 60 55 L 70 70 L 100 65" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/>
+            <use href="#ft-star" x="30" y="20"/>
+            <use href="#ft-star" x="20" y="80"/>
+            <use href="#ft-star" x="65" y="40"/>
+            <use href="#ft-small-star" x="60" y="55"/>
+            <use href="#ft-small-star" x="70" y="70"/>
+            <use href="#ft-star" x="100" y="65"/>
+          </g>
+          <text x="75" y="34" fontFamily="system-ui, -apple-system, sans-serif" fontSize="24" fontWeight="600" fill="currentColor">HydrusLearn</text>
+        </svg>
+      </div>
 
-      {/* CSS Animations */}
-      <style>{`
-        @keyframes gradient {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        .animate-gradient {
-          background-size: 200% 200%;
-          animation: gradient 8s ease infinite;
-        }
-      `}</style>
-    </main>
+      <div className="flex flex-wrap gap-8 font-mono text-[11px]" style={{ color: "var(--muted-foreground)", opacity: 0.45 }}>
+        <Link to="/privacy" className="hover:opacity-75 transition-opacity">Privacy</Link>
+        <Link to="/terms" className="hover:opacity-75 transition-opacity">Terms</Link>
+        {["Twitter", "GitHub", "Discord"].map(l => (
+          <a key={l} href="#" className="hover:opacity-75 transition-opacity">{l}</a>
+        ))}
+      </div>
+
+      <p className="font-mono text-[11px]" style={{ color: "var(--muted-foreground)", opacity: 0.3 }}>
+        © {new Date().getFullYear()} HydrusLearn
+      </p>
+    </div>
+  </footer>
+);
+
+/* ═══════════════════════════════════════════
+   PAGE ROOT
+═══════════════════════════════════════════ */
+export default function LandingPage() {
+  return (
+    <div className="relative min-h-screen" style={{ background: "var(--background)", color: "var(--foreground)" }}>
+      <DotGrid />
+      <Hero />
+      <HowItWorks />
+      <FAQ />
+      <FinalCTA />
+      <Footer />
+    </div>
   );
 }

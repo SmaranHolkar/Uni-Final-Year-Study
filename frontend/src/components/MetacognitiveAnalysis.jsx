@@ -68,7 +68,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
         setAnalysis(data.analysis);
       } catch (err) {
         console.error('Error fetching metacognitive analysis:', err);
-        setError(err.message);
+        setError("Unable to load learning insights. Please try again");
       } finally {
         setLoading(false);
       }
@@ -138,7 +138,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
             <div className="flex items-center gap-2 mb-2">
               <Brain className="w-6 h-6 text-[var(--primary)]" />
               <h2 className="text-2xl font-bold text-[var(--foreground)]">
-                Metacognitive Analysis
+                Your minds mirror: Metacognitive Analysis
               </h2>
             </div>
             <p className="text-sm text-[var(--muted-foreground)]">
@@ -514,7 +514,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
               <div className="bg-[var(--card)] p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-4">
                   <BarChart3 className="w-5 h-5 text-[var(--primary)]" />
-                  <h4 className="text-sm font-semibold text-[var(--foreground)]">Performance by Question Type</h4>
+                  <h4 className="text-sm font-semibold text-[var(--foreground)]">Errors by Topic</h4>
                 </div>
                 <div className="h-64">
                   <Bar
@@ -522,15 +522,8 @@ export default function MetacognitiveAnalysis({ quizId }) {
                       labels: analysis.algorithmicMetrics.questionClassification.typeBreakdown.map(t => t.type),
                       datasets: [
                         {
-                          label: 'Correct',
-                          data: analysis.algorithmicMetrics.questionClassification.typeBreakdown.map(t => t.correct),
-                          backgroundColor: 'rgba(34, 197, 94, 0.7)',
-                          borderColor: 'rgba(34, 197, 94, 1)',
-                          borderWidth: 1,
-                        },
-                        {
-                          label: 'Incorrect',
-                          data: analysis.algorithmicMetrics.questionClassification.typeBreakdown.map(t => t.total - t.correct),
+                          label: 'Error Count',
+                          data: analysis.algorithmicMetrics.questionClassification.typeBreakdown.map(t => t.errorCount),
                           backgroundColor: 'rgba(239, 68, 68, 0.7)',
                           borderColor: 'rgba(239, 68, 68, 1)',
                           borderWidth: 1,
@@ -542,7 +535,6 @@ export default function MetacognitiveAnalysis({ quizId }) {
                       maintainAspectRatio: false,
                       scales: {
                         x: {
-                          stacked: true,
                           ticks: {
                             color: 'rgb(156, 163, 175)',
                             font: { size: 10 }
@@ -552,7 +544,6 @@ export default function MetacognitiveAnalysis({ quizId }) {
                           }
                         },
                         y: {
-                          stacked: true,
                           beginAtZero: true,
                           ticks: {
                             color: 'rgb(156, 163, 175)',
@@ -568,14 +559,6 @@ export default function MetacognitiveAnalysis({ quizId }) {
                           labels: {
                             color: 'rgb(156, 163, 175)',
                             font: { size: 11 }
-                          }
-                        },
-                        tooltip: {
-                          callbacks: {
-                            afterLabel: function(context) {
-                              const typeData = analysis.algorithmicMetrics.questionClassification.typeBreakdown[context.dataIndex];
-                              return `Accuracy: ${typeData.percentage}%`;
-                            }
                           }
                         }
                       }
@@ -657,69 +640,63 @@ export default function MetacognitiveAnalysis({ quizId }) {
               </div>
             )}
 
-            {/* Error Distribution Chart */}
-            {analysis.algorithmicMetrics.errorClustering?.mostProblematicType && (
+            {/* Error Type Profile */}
+            {analysis.algorithmicMetrics.errorClustering?.errorTypeProfile && (
               <div className="bg-[var(--card)] p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-4">
                   <AlertTriangle className="w-5 h-5 text-[var(--destructive)]" />
-                  <h4 className="text-sm font-semibold text-[var(--foreground)]">Error Distribution</h4>
+                  <h4 className="text-sm font-semibold text-[var(--foreground)]">Error Type Profile</h4>
                 </div>
-                {analysis.algorithmicMetrics.questionClassification?.typeBreakdown && (
-                  <div className="h-48">
-                    <Bar
-                      data={{
-                        labels: analysis.algorithmicMetrics.questionClassification.typeBreakdown.map(t => t.type),
-                        datasets: [{
-                          label: 'Error Rate (%)',
-                          data: analysis.algorithmicMetrics.questionClassification.typeBreakdown.map(t => 100 - t.percentage),
-                          backgroundColor: 'rgba(239, 68, 68, 0.7)',
-                          borderColor: 'rgba(239, 68, 68, 1)',
-                          borderWidth: 1,
-                        }]
-                      }}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        indexAxis: 'y',
-                        scales: {
-                          x: {
-                            beginAtZero: true,
-                            max: 100,
-                            ticks: {
-                              color: 'rgb(156, 163, 175)',
-                              callback: function(value) {
-                                return value + '%';
+                {(() => {
+                  const ep = analysis.algorithmicMetrics.errorClustering.errorTypeProfile;
+                  const labels = ['Conceptual Misunderstanding', 'Recall Failure', 'Careless Error', 'Unclassified'];
+                  const values = [ep.conceptualMisunderstanding, ep.recallFailure, ep.carelessError, ep.unclassified];
+                  const colors = ['rgba(239,68,68,0.75)', 'rgba(59,130,246,0.75)', 'rgba(251,191,36,0.75)', 'rgba(156,163,175,0.75)'];
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="h-48">
+                        <Pie
+                          data={{
+                            labels,
+                            datasets: [{ data: values, backgroundColor: colors, borderWidth: 2 }]
+                          }}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: {
+                                position: 'bottom',
+                                labels: { color: 'rgb(156,163,175)', font: { size: 10 } }
                               }
-                            },
-                            grid: {
-                              color: 'rgba(156, 163, 175, 0.1)'
                             }
-                          },
-                          y: {
-                            ticks: {
-                              color: 'rgb(156, 163, 175)',
-                              font: { size: 10 }
-                            },
-                            grid: {
-                              display: false
-                            }
-                          }
-                        },
-                        plugins: {
-                          legend: {
-                            display: false
-                          }
-                        }
-                      }}
-                    />
-                  </div>
-                )}
+                          }}
+                        />
+                      </div>
+                      <div className="flex flex-col justify-center space-y-2 text-sm">
+                        {[
+                          { label: 'Conceptual', desc: 'High confidence + wrong', val: ep.conceptualMisunderstanding, color: 'text-red-500' },
+                          { label: 'Recall', desc: 'Low confidence + wrong', val: ep.recallFailure, color: 'text-blue-500' },
+                          { label: 'Careless', desc: 'Uncertain + wrong', val: ep.carelessError, color: 'text-amber-500' },
+                          { label: 'Unclassified', desc: 'No confidence data', val: ep.unclassified, color: 'text-gray-400' },
+                        ].map(({ label, desc, val, color }) => (
+                          <div key={label} className="flex items-center justify-between">
+                            <div>
+                              <span className={`font-semibold ${color}`}>{label}</span>
+                              <span className="text-xs text-[var(--muted-foreground)] ml-1">({desc})</span>
+                            </div>
+                            <span className="font-mono font-bold text-[var(--foreground)]">{val}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
             {/* Classification Method */}
             <div className="bg-[var(--card)] p-3 rounded">
-              <p className="text-sm font-semibold text-[var(--foreground)] mb-1">Question Classification</p>
+              <p className="text-sm font-semibold text-[var(--foreground)] mb-1">Topic Error Breakdown</p>
               <p className="text-xs text-[var(--muted-foreground)]">
                 Method: <span className="font-mono text-[var(--primary)]">{analysis.algorithmicMetrics.questionClassification?.method}</span>
               </p>
@@ -727,9 +704,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
                 {analysis.algorithmicMetrics.questionClassification?.typeBreakdown?.map((type, idx) => (
                   <div key={idx} className="flex justify-between text-xs">
                     <span className="text-[var(--foreground)]">{type.type}</span>
-                    <span className="font-mono text-[var(--muted-foreground)]">
-                      {type.correct}/{type.total} ({type.percentage}%)
-                    </span>
+                    <span className="font-mono text-[var(--destructive)]">{type.errorCount} error{type.errorCount !== 1 ? 's' : ''}</span>
                   </div>
                 ))}
               </div>
@@ -743,8 +718,8 @@ export default function MetacognitiveAnalysis({ quizId }) {
                   {analysis.algorithmicMetrics.errorClustering.mostProblematicType && (
                     <p>
                       Most Problematic: <span className="font-semibold text-[var(--destructive)]">
-                        {analysis.algorithmicMetrics.errorClustering.mostProblematicType.type}
-                      </span> ({analysis.algorithmicMetrics.errorClustering.mostProblematicType.percentage}% of errors)
+                        {analysis.algorithmicMetrics.errorClustering.mostProblematicType}
+                      </span>
                     </p>
                   )}
                   <p>
@@ -756,7 +731,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
                       <div className="flex flex-wrap gap-1">
                         {analysis.algorithmicMetrics.errorClustering.errorSignatureWords.map((word, idx) => (
                           <span key={idx} className="px-2 py-0.5 bg-[var(--destructive)]/10 text-[var(--destructive)] rounded font-mono text-xs">
-                            {word.word} ({word.frequency}×)
+                            {word}
                           </span>
                         ))}
                       </div>

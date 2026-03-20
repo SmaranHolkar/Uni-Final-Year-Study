@@ -3,7 +3,7 @@ import { useAuth } from "../../AuthContext";
 import { supabase } from "../../supabaseClient";
 
 export default function StepOne({ onNext }) {
-  const { session, setCurrentDocumentId, setCurrentDocumentTitle } = useAuth();
+  const { setCurrentDocumentId, setCurrentDocumentTitle } = useAuth();
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -87,7 +87,7 @@ export default function StepOne({ onNext }) {
         return;
       }
 
-      console.log('🔑 Auth token available:', freshSession.access_token.substring(0, 20) + '...');
+      console.log('Auth token available:', freshSession.access_token.substring(0, 20) + '...');
 
       const formData = new FormData();
       formData.append("document", file);
@@ -96,7 +96,7 @@ export default function StepOne({ onNext }) {
       const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
       // Use query parameter as fallback if headers don't work
       const uploadUrl = `${API_BASE}/api/upload-document?token=${encodeURIComponent(freshSession.access_token)}`;
-      console.log('📤 Uploading to:', API_BASE + '/api/upload-document');
+      console.log('Uploading to:', API_BASE + '/api/upload-document');
       
       const response = await fetch(uploadUrl, {
         method: "POST",
@@ -107,9 +107,9 @@ export default function StepOne({ onNext }) {
         body: formData
       });
 
-      console.log('📥 Response status:', response.status);
+      console.log('Response status:', response.status);
       const data = await response.json();
-      console.log('📥 Response data:', data);
+      console.log('Response data:', data);
 
       if (!response.ok) {
         throw new Error(data.error || data.message || "Upload failed");
@@ -125,7 +125,7 @@ export default function StepOne({ onNext }) {
       onNext(data);
     } catch (err) {
       console.error("Upload error:", err);
-      setError(err.message || "Failed to upload document. Please try again.");
+      setError("Failed to upload document. Please try again");
     } finally {
       setUploading(false);
     }
@@ -175,13 +175,13 @@ export default function StepOne({ onNext }) {
               Browse Files
               <input
                 type="file"
-                accept=".pdf,.doc,.docx,.txt"
+                accept=".pdf,.txt"
                 onChange={handleFileChange}
                 style={styles.fileInput}
               />
             </label>
             <p style={styles.helpText}>
-              Supported formats: PDF, DOC, DOCX, TXT (Max 10MB)
+              Supported formats: PDF, TXT (Max 50MB)
             </p>
           </>
         ) : (

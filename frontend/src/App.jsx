@@ -17,50 +17,43 @@ import History from "./pages/History";
 import QuizDetail from "./pages/QuizDetail";
 import Profile from "./pages/Profile";
 import ResetPassword from './pages/ResetPassword';
+import Learningplayground from './pages/Learningplayground.jsx';
+import PublicPageBackground from './components/PublicPageBackground.jsx';
+import TermsAndConditions from './pages/TermsAndConditions';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 function AppContent() {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        backgroundColor: '#0a0a0a'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '50px',
-            height: '50px',
-            border: '4px solid rgba(255, 255, 255, 0.1)',
-            borderTop: '4px solid #ffffff',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 20px'
-          }}></div>
-          <p style={{ color: '#fff', fontSize: '14px' }}>Loading...</p>
+      <div className="flex h-screen items-center justify-center bg-black">
+        <div className="text-center">
+          <div className="mx-auto mb-5 size-12 animate-spin rounded-full border-4 border-white/10 border-t-white" />
+          <p className="text-sm text-white">Loading...</p>
         </div>
       </div>
     );
   }
-  
+
   return (
     <>
       {user ? <Sidebar /> : <Navbar />}
       <Routes>
         <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <HeroSection />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/signup" element={<PublicPageBackground><Signup /></PublicPageBackground>} />
+        <Route path="/login" element={<PublicPageBackground><Login /></PublicPageBackground>} />
+        <Route path="/forgot-password" element={<PublicPageBackground><ForgotPassword /></PublicPageBackground>} />
+        <Route path="/reset-password" element={<PublicPageBackground><ResetPassword /></PublicPageBackground>} />
+        <Route path="/terms" element={<PublicPageBackground><TermsAndConditions /></PublicPageBackground>} />
+        <Route path="/privacy" element={<PublicPageBackground><PrivacyPolicy /></PublicPageBackground>} />
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/learningpage" element={<PrivateRoute><Learn /></PrivateRoute>} />
+        <Route path="/Learningplayground" element={<PrivateRoute><Learningplayground /></PrivateRoute>} />
         <Route path="/history" element={<PrivateRoute><History /></PrivateRoute>} />
         <Route path="/Profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
         <Route path="/quiz/:quizId" element={<PrivateRoute><QuizDetail /></PrivateRoute>} />
-        <Route path="*" element={<NotFound />} />
+        <Route path="*" element={user ? <NotFound /> : <PublicPageBackground><NotFound /></PublicPageBackground>} />
       </Routes>
     </>
   );

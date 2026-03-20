@@ -29,13 +29,15 @@ export default function ForgotPassword() {
       );
 
       if (resetError) {
-        return setError(resetError.message);
+        console.error("Password reset error:", resetError);
+        return setError("Unable to send reset link. Please try again");
       }
 
       setSuccess(true);
       setEmail("");
     } catch (err) {
-      setError(err.message || "An error occurred. Please try again.");
+      console.error("Password reset error:", err);
+      setError("An error occurred. Please try again");
     } finally {
       setLoading(false);
     }
@@ -43,32 +45,32 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-lg p-8">
+      <div className="w-full max-w-md rounded-xl bg-[var(--card)] p-8 shadow-lg">
         <Link
           to="/login"
-          className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 mb-6"
+          className="mb-6 inline-flex items-center gap-2 text-sm text-[var(--muted-foreground)] transition-opacity hover:opacity-80"
         >
           <ArrowLeft size={16} />
           Back to login
         </Link>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <h1 className="mb-2 text-2xl font-bold text-[var(--foreground)]">
           Forgot password?
         </h1>
-        <p className="text-gray-500 mb-6">
+        <p className="mb-6 text-[var(--muted-foreground)]">
           Enter your email address and we'll send you a link to reset your
           password.
         </p>
 
         {error && (
-          <div className="flex items-center gap-2 mb-4 rounded-md border border-red-300 bg-red-100 px-3 py-2 text-sm text-red-700">
+          <div className="mb-4 flex items-center gap-2 rounded-md border border-red-300 bg-red-100 px-3 py-2 text-sm text-red-700">
             <AlertCircle size={18} />
             <span>{error}</span>
           </div>
         )}
 
         {success && (
-          <div className="flex items-center gap-2 mb-4 rounded-md border border-green-300 bg-green-100 px-3 py-2 text-sm text-green-700">
+          <div className="mb-4 flex items-center gap-2 rounded-md border border-green-300 bg-green-100 px-3 py-2 text-sm text-green-700">
             <CheckCircle size={18} />
             <span>
               Password reset link sent! Check your email inbox.
@@ -78,7 +80,7 @@ export default function ForgotPassword() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
               Email address
             </label>
             <input
@@ -87,22 +89,22 @@ export default function ForgotPassword() {
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
               placeholder="you@example.com"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100"
+              className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] disabled:opacity-50"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-blue-600 py-2 text-white font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full rounded-md bg-[var(--primary)] py-2 font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? "Sending..." : "Send reset link"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
+        <p className="mt-6 text-center text-sm text-[var(--muted-foreground)]">
           Remember your password?{" "}
-          <Link to="/login" className="text-blue-600 hover:underline">
+          <Link to="/login" className="text-[var(--primary)] no-underline transition-opacity hover:opacity-80">
             Log in
           </Link>
         </p>

@@ -9,7 +9,6 @@ export default function Learningpage() {
       <Sidebar />
 
       <main className="main-content">
-        <h1 style={{marginTop:0}}>Learn</h1>
         <MultiStepForm />
       </main>
     </>

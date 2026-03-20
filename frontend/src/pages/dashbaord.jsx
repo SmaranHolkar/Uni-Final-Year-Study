@@ -13,13 +13,14 @@ import {
 import { Line } from 'react-chartjs-2';
 import { useAuth } from '../AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Compass } from 'lucide-react';
+import { Compass, Bell } from 'lucide-react';
 import Vela from '../components/Vela.jsx';
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 export default function Dashboard() {
   const { user, session } = useAuth();
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState(2);
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -51,7 +52,7 @@ useEffect(() => {
         setQuizzes(data.data || [])
       } catch (err) {
         console.error("Error fetching quiz history:", err)
-        setError(err.message)
+        setError("Unable to load quiz history. Please try again")
       } finally {
         setLoading(false)
       }
@@ -88,34 +89,59 @@ useEffect(() => {
     navigate(`/quiz/${quiz.id}`)
   }
 
-  // Calculate topics mastered (>= 80% score)
+  // Calculate topics mastered (100% score = fully mastered)
   const calculateTopicsMastered = () => {
     const topicScores = {}
-    
     quizzes.forEach((quiz) => {
       const quizTitle = quiz.title || 'Unknown Topic'
       const correctCount = Array.isArray(quiz.quiz) ? quiz.quiz.filter(q => q.isCorrect).length : 0
       const totalCount = Array.isArray(quiz.quiz) ? quiz.quiz.length : 0
       const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0
-      
-      // Track best score for each topic
       if (!topicScores[quizTitle] || topicScores[quizTitle] < score) {
         topicScores[quizTitle] = score
       }
     })
-    
-    // Count topics with 80%+ mastery
-    const masteredCount = Object.values(topicScores).filter(score => score >= 80).length
+    const masteredCount = Object.values(topicScores).filter(score => score === 100).length
     const totalTopics = Object.keys(topicScores).length
-    
     return { masteredCount, totalTopics }
   }
 
-  const { masteredCount, totalTopics } = calculateTopicsMastered()
-  const weeklyGoal = 3 // For future pro feature
-  const weeklyProgress = Math.min((masteredCount % weeklyGoal) / weeklyGoal * 100, 100)
+  // Calculate current study streak (consecutive days with ≥1 quiz)
+  const calculateStreak = () => {
+    if (!quizzes.length) return 0
+    const quizDays = new Set(
+      quizzes.map(q => new Date(q.created_at).toISOString().slice(0, 10))
+    )
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayStr = today.toISOString().slice(0, 10)
+    const checkDate = new Date(today)
+    // If no quiz today, start checking from yesterday
+    if (!quizDays.has(todayStr)) {
+      checkDate.setDate(checkDate.getDate() - 1)
+    }
+    let streak = 0
+    while (quizDays.has(checkDate.toISOString().slice(0, 10))) {
+      streak++
+      checkDate.setDate(checkDate.getDate() - 1)
+    }
+    return streak
+  }
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
+  // Calculate average score across all quizzes
+  const calculateAverageScore = () => {
+    if (!quizzes.length) return 0
+    const scores = quizzes.map(q => {
+      const correct = Array.isArray(q.quiz) ? q.quiz.filter(x => x.isCorrect).length : 0
+      const total = Array.isArray(q.quiz) ? q.quiz.length : 0
+      return total > 0 ? Math.round((correct / total) * 100) : 0
+    })
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+  }
+
+  const { masteredCount, totalTopics } = calculateTopicsMastered()
+  const streak = calculateStreak()
+  const averageScore = calculateAverageScore()
 
 
   if (!user) {
@@ -147,16 +173,17 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
       legend: { display: false },
       title: { display: false },
       tooltip: {
-        backgroundColor: 'var(--popover)',
-        titleColor: 'var(--popover-foreground)',
-        bodyColor: 'var(--muted-foreground)',
-        borderColor: 'var(--border)',
+        backgroundColor: '#1e1c30',
+        titleColor: '#ede8d8',
+        bodyColor: '#9090b0',
+        borderColor: '#3a3858',
         borderWidth: 1,
         padding: 12,
         displayColors: false,
         callbacks: {
           label: function(context) {
-            return 'Grade: ' + context.parsed.y + '%';
+            const v = context.parsed.y;
+            return v === 1 ? '1 quiz' : v + ' quizzes';
           }
         }
       }
@@ -164,21 +191,23 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
     scales: {
       y: {
         beginAtZero: true,
-        grid: { 
-          color: 'var(--border)',
-          drawBorder: false
+        ticks: {
+          color: '#9090b0',
+          font: { size: 12 },
+          stepSize: 1,
+          precision: 0
         },
-        ticks: { 
-          color: 'var(--muted-foreground)',
-          font: { family: 'var(--font-sans)' }
+        grid: { 
+          color: '#2d2b42',
+          drawBorder: false
         },
         border: { display: false }
       },
       x: {
         grid: { display: false },
         ticks: { 
-          color: 'var(--muted-foreground)',
-          font: { family: 'var(--font-sans)' }
+          color: '#9090b0',
+          font: { size: 12 }
         },
         border: { display: false }
       }
@@ -192,31 +221,62 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
     }
   };
 
+  // Build last-6-weeks quiz count
+  const buildWeeklyData = () => {
+    const weeks = Array.from({ length: 6 }, (_, i) => {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      // week 0 = current week (Mon-based), week 1 = last week, etc.
+      const dayOfWeek = (start.getDay() + 6) % 7; // Mon=0 … Sun=6
+      start.setDate(start.getDate() - dayOfWeek - (5 - i) * 7);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 7);
+      return { start, end };
+    });
+
+    const counts = weeks.map(({ start, end }) =>
+      quizzes.filter(q => {
+        const d = new Date(q.created_at);
+        return d >= start && d < end;
+      }).length
+    );
+
+    const labels = weeks.map(({ start }) =>
+      start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    );
+
+    return { labels, counts };
+  };
+
+  const { labels: chartLabels, counts: chartCounts } = buildWeeklyData();
+
   const chartData = {
-    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6'],
+    labels: chartLabels,
     datasets: [
       {
-        label: 'Average Grade',
-        data: [65, 72, 70, 81, 86, 95],
-        borderColor: 'var(--chart-5)',
+        label: 'Quizzes',
+        data: chartCounts,
+        borderColor: '#c2844b',
         backgroundColor: (context) => {
           const ctx = context.chart.ctx;
           const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-          gradient.addColorStop(0, 'rgba(229, 91, 135, 0.3)');
-          gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+          gradient.addColorStop(0, 'rgba(194, 132, 75, 0.35)');
+          gradient.addColorStop(1, 'rgba(194, 132, 75, 0)');
           return gradient;
         },
         fill: true,
-        pointBackgroundColor: 'var(--primary)',
-        pointBorderColor: 'var(--primary)',
+        pointBackgroundColor: '#d4a853',
+        pointBorderColor: '#d4a853',
         pointBorderWidth: 2,
         pointRadius: 5,
         pointHoverRadius: 8,
         pointHoverBorderWidth: 3,
-        pointHoverBackgroundColor: 'var(--primary)'
+        pointHoverBackgroundColor: '#d4a853'
       },
     ],
   };
+
+
 
 
   return (
@@ -240,18 +300,18 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
             </p>
           </div>
           <div className="flex items-center space-x-4">
-            <button 
+            <Link
+              to="/Learningpage"
               className="px-4 py-2 rounded-lg font-medium transition-all hover:opacity-90 flex items-center gap-2"
-              style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
+              style={{ background: 'var(--primary)', color: 'var(--primary-foreground)', textDecoration: 'none' }}
             >
-              <span>+</span><Link to="/Learningpage">New Session</Link>
-            </button>
+              <span>+</span> New Session
+            </Link>
             <button 
               className="p-2 rounded-full relative transition-all border"
-              style={{ background: 'var(--accent)', borderColor: 'var(--border)' }}
-              onClick={() => setNotifications(0)}
+              style={{ background: 'var(--accent)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
             >
-              
+              <Bell size={18} />
             </button>
             <div 
               className="h-10 w-10 rounded-full flex items-center justify-center font-bold text-lg border-2 transition-all cursor-pointer"
@@ -287,10 +347,10 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
                   Study Streak
                 </p>
                 <p className="text-3xl font-bold mt-2" style={{ color: 'var(--card-foreground)' }}>
-                  5 Days
+                  {streak} {streak === 1 ? 'Day' : 'Days'}
                 </p>
                 <p className="text-sm mt-2 font-medium" style={{ color: 'var(--chart-4)' }}>
-                  ↗ Personal best!
+                  {streak === 0 ? 'Start your streak today!' : streak >= 7 ? '🚀 On fire!' : 'Keep it up!'}
                 </p>
               </div>
               <div className="text-4xl opacity-20">🔥</div>
@@ -313,14 +373,17 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
                   Topics Mastered
                 </p>
                 <p className="text-3xl font-bold mt-2" style={{ color: 'var(--card-foreground)' }}>
-                  {masteredCount}<span className="text-lg text-[var(--muted-foreground)])">/{totalTopics}</span>
+                  {masteredCount}<span className="text-lg" style={{ color: 'var(--muted-foreground)' }}>/{totalTopics}</span>
+                </p>
+                <p className="text-xs mt-2 font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                  100% score required
                 </p>
               </div>
               <div className="text-4xl opacity-20">🎯</div>
             </div>
           </div>
 
-          {/* Weekly Goal Card */}
+          {/* Average Score Card */}
           <div
             className="rounded-xl p-6 border transition-all cursor-pointer hover:-translate-y-1"
             style={{
@@ -331,26 +394,26 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
             }}
           >
             <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)' }}>
-              Weekly Goal
+              Average Score
             </p>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                <span>Progress</span>
-                <span className="font-semibold">{masteredCount % weeklyGoal}/{weeklyGoal}</span>
+            {quizzes.length === 0 ? (
+              <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>No quizzes yet</p>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-3xl font-bold" style={{ color: 'var(--card-foreground)' }}>
+                  {averageScore}<span className="text-lg" style={{ color: 'var(--muted-foreground)' }}>%</span>
+                </p>
+                <div className="relative h-2 rounded-full overflow-hidden" style={{ background: 'var(--muted)' }}>
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${averageScore}%`, background: averageScore >= 80 ? 'var(--chart-4)' : averageScore >= 60 ? '#d4a853' : 'var(--chart-3)' }}
+                  />
+                </div>
+                <p className="text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                  across {quizzes.length} {quizzes.length === 1 ? 'quiz' : 'quizzes'}
+                </p>
               </div>
-              <div className="relative h-2 rounded-full overflow-hidden" style={{ background: 'var(--muted)' }}>
-                <div 
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{ 
-                    width: `${weeklyProgress}%`,
-                    background: 'var(--chart-4)'
-                  }}
-                ></div>
-              </div>
-              <p className="text-xs font-medium" style={{ color: 'var(--chart-4)' }}>
-                {masteredCount >= weeklyGoal ? 'Goal reached!' : `${weeklyGoal - (masteredCount % weeklyGoal)} more to go!`}
-              </p>
-            </div>
+            )}
           </div>
         </div>
 
@@ -363,7 +426,7 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
               className="rounded-xl p-6 border"
               style={{ background: 'var(--card)', borderColor: 'var(--border)', boxShadow: 'var(--shadow)' }}
             >
-              <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--foreground)' }}>Progress</h2>
+              <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--foreground)' }}>Quizzes per Week</h2>
               <div className="relative h-48 w-full">
                 <Line options={chartOptions} data={chartData} />
               </div>
