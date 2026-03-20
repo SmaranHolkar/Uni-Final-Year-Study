@@ -77,6 +77,9 @@ if (global.gc) {
   }, 60000); // Every minute
 }
 
-app.listen(PORT, '0.0.0.0', () =>
-  console.log(`Server running on http://localhost:${PORT}`)
-);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`SUPABASE_URL set: ${!!process.env.SUPABASE_URL}`);
+  console.log(`SUPABASE_ANON_KEY set: ${!!process.env.SUPABASE_ANON_KEY}`);
+  console.log(`SUPABASE_SERVICE_ROLE_KEY set: ${!!process.env.SUPABASE_SERVICE_ROLE_KEY}`);
+});

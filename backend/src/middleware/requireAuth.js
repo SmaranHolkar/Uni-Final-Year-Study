@@ -1,8 +1,10 @@
-import { supabase } from '../supabaseClient.js';
+import { supabase, supabaseAdmin } from '../supabaseClient.js';
 
 export default async function requireAuth(req, res, next) {
   try {
-    if (!supabase) {
+    // Prefer service-role client for server-side token verification
+    const client = supabaseAdmin || supabase;
+    if (!client) {
       console.error('Supabase client not configured');
       return res.status(500).json({ error: 'Supabase client not configured' });
     }
@@ -31,7 +33,7 @@ export default async function requireAuth(req, res, next) {
       return res.status(401).json({ error: 'Unauthorized: Missing authentication token' });
     }
 
-    const { data, error } = await supabase.auth.getUser(token);
+    const { data, error } = await client.auth.getUser(token);
     
     if (error || !data?.user) {
       console.error('Invalid token or user not found:', error?.message || 'No user data');
