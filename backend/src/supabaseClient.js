@@ -45,6 +45,11 @@ function resolveSupabaseUrl(rawUrl, anonKey) {
 
 const resolvedUrl = resolveSupabaseUrl(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+console.log('[supabaseClient] SUPABASE_URL raw format:', SUPABASE_URL ? SUPABASE_URL.substring(0, 15) + '...' : 'NOT SET');
+console.log('[supabaseClient] Resolved URL:', resolvedUrl ? resolvedUrl.substring(0, 30) + '...' : 'FAILED TO RESOLVE');
+console.log('[supabaseClient] SUPABASE_ANON_KEY set:', !!SUPABASE_ANON_KEY);
+console.log('[supabaseClient] SUPABASE_SERVICE_ROLE_KEY set:', !!SUPABASE_SERVICE_ROLE_KEY);
+
 if (!resolvedUrl || !SUPABASE_ANON_KEY) {
   console.warn('Missing or invalid SUPABASE_URL/SUPABASE_ANON_KEY for Supabase client.');
 }
@@ -56,3 +61,6 @@ export const supabase = resolvedUrl && SUPABASE_ANON_KEY
 export const supabaseAdmin = resolvedUrl && SUPABASE_SERVICE_ROLE_KEY
   ? createClient(resolvedUrl, SUPABASE_SERVICE_ROLE_KEY)
   : null;
+
+console.log('[supabaseClient] supabase client created:', !!supabase);
+console.log('[supabaseClient] supabaseAdmin client created:', !!supabaseAdmin);
