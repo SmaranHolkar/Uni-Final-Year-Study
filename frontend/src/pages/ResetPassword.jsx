@@ -12,28 +12,43 @@ export default function ResetPassword() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [validSession, setValidSession] = useState(false);
+  const [checking, setChecking] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if there's already a session (e.g. page refresh)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setValidSession(true);
-      }
-    });
+    let cancelled = false;
 
-    // Listen for the PASSWORD_RECOVERY event fired when Supabase
-    // processes the reset token from the URL hash
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
       if (event === "PASSWORD_RECOVERY") {
         setValidSession(true);
-        setError("");
-      } else if (!session) {
-        setError("Invalid or expired reset link. Please request a new one.");
+        setChecking(false);
+      } else if (event === "INITIAL_SESSION" && session?.user) {
+        // Already have a session (e.g. page refresh after exchange)
+        setValidSession(true);
+        setChecking(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Fallback: if PASSWORD_RECOVERY hasn't fired after 5s, show error
+    const timeout = setTimeout(() => {
+      if (cancelled) return;
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (cancelled) return;
+        if (session?.user) {
+          setValidSession(true);
+        } else {
+          setError("Invalid or expired reset link. Please request a new one.");
+        }
+        setChecking(false);
+      });
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   async function handleSubmit(e) {
@@ -76,6 +91,16 @@ export default function ResetPassword() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-xl bg-[var(--card)] p-8 shadow-lg text-center text-[var(--muted-foreground)]">
+          Verifying reset link...
+        </div>
+      </div>
+    );
   }
 
   if (!validSession && error) {
