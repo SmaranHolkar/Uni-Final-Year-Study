@@ -11,56 +11,19 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [validSession, setValidSession] = useState(false);
   const [checking, setChecking] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    let cancelled = false;
-
-    // Explicitly exchange PKCE code if present in URL (Supabase v2 PKCE flow)
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code");
-    if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-        if (error) {
-          if (!cancelled) {
-            setError("Invalid or expired reset link. Please request a new one.");
-            setChecking(false);
-          }
-        }
-        // On success, PASSWORD_RECOVERY event will fire via onAuthStateChange
-      });
-    }
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (cancelled) return;
-      if (event === "PASSWORD_RECOVERY") {
-        setValidSession(true);
+    // Check if there's a valid reset session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setChecking(false);
+      } else {
+        setError("Invalid or expired reset link. Please request a new one.");
         setChecking(false);
       }
-      // Do NOT treat a normal INITIAL_SESSION as a valid recovery session
     });
-
-    // Fallback: if PASSWORD_RECOVERY hasn't fired after 5s, show error
-    const timeout = setTimeout(() => {
-      if (cancelled) return;
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (cancelled) return;
-        if (session?.user) {
-          setValidSession(true);
-        } else {
-          setError("Invalid or expired reset link. Please request a new one.");
-        }
-        setChecking(false);
-      });
-    }, 5000);
-
-    return () => {
-      cancelled = true;
-      subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
   }, []);
 
   async function handleSubmit(e) {
@@ -89,26 +52,18 @@ export default function ResetPassword() {
 
       if (updateError) {
         console.error("Password update error:", updateError);
-        // Surface the real Supabase error so the user knows what to fix
-        const msg = updateError.message || "";
-        if (msg.toLowerCase().includes("same password") || msg.toLowerCase().includes("different from")) {
-          return setError("New password must be different from your current password.");
-        }
-        if (msg.toLowerCase().includes("expired") || msg.toLowerCase().includes("invalid")) {
-          return setError("Your reset link has expired. Please request a new one.");
-        }
-        return setError(updateError.message || "Unable to update password. Please try again.");
+        setError(updateError.message || "Unable to update password. Please try again");
+        setLoading(false);
+        return;
       }
 
       setSuccess(true);
-
       setTimeout(() => {
         navigate("/login");
       }, 2000);
     } catch (err) {
       console.error("Password update error:", err);
-      setError("An error occurred. Please try again");
-    } finally {
+      setError(err.message || "An error occurred. Please try again");
       setLoading(false);
     }
   }
@@ -123,13 +78,13 @@ export default function ResetPassword() {
     );
   }
 
-  if (!validSession) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="w-full max-w-md rounded-xl bg-[var(--card)] p-8 shadow-lg">
           <div className="mb-4 flex items-center gap-2 rounded-md border border-red-300 bg-red-100 px-3 py-2 text-sm text-red-700">
             <AlertCircle size={18} />
-            <span>{error || "Invalid or expired reset link. Please request a new one."}</span>
+            <span>{error}</span>
           </div>
           <button
             onClick={() => navigate("/forgot-password")}
@@ -151,13 +106,6 @@ export default function ResetPassword() {
         <p className="mb-6 text-[var(--muted-foreground)]">
           Enter your new password below.
         </p>
-
-        {error && (
-          <div className="mb-4 flex items-center gap-2 rounded-md border border-red-300 bg-red-100 px-3 py-2 text-sm text-red-700">
-            <AlertCircle size={18} />
-            <span>{error}</span>
-          </div>
-        )}
 
         {success && (
           <div className="mb-4 flex items-center gap-2 rounded-md border border-green-300 bg-green-100 px-3 py-2 text-sm text-green-700">
