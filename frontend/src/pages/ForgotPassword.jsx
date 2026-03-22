@@ -21,10 +21,11 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
+      const frontendUrl = import.meta.env.VITE_FRONTEND_URL || window.location.origin;
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         email,
         {
-          redirectTo: `${window.location.origin}/reset-password`,
+          redirectTo: `${frontendUrl}/reset-password`,
         }
       );
 

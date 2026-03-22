@@ -1,7 +1,7 @@
 services:
   # Frontend Static Site Service
   - type: web
-    name: uni-final-year-study-frontend
+    name: uni-final-year-study
     runtime: static
     region: oregon
     plan: free
@@ -10,6 +10,8 @@ services:
     envVars:
       - key: BACKEND_URL
         value: https://uni-final-year-study-backend.onrender.com
+      - key: VITE_FRONTEND_URL
+        value: https://uni-final-year-study.onrender.com
     routes:
       - path: /*
         destination: /index.html
