@@ -18,16 +18,28 @@ export default function ResetPassword() {
   useEffect(() => {
     let cancelled = false;
 
+    // Explicitly exchange PKCE code if present in URL (Supabase v2 PKCE flow)
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (error) {
+          if (!cancelled) {
+            setError("Invalid or expired reset link. Please request a new one.");
+            setChecking(false);
+          }
+        }
+        // On success, PASSWORD_RECOVERY event will fire via onAuthStateChange
+      });
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
       if (event === "PASSWORD_RECOVERY") {
         setValidSession(true);
         setChecking(false);
-      } else if (event === "INITIAL_SESSION" && session?.user) {
-        // Already have a session (e.g. page refresh after exchange)
-        setValidSession(true);
-        setChecking(false);
       }
+      // Do NOT treat a normal INITIAL_SESSION as a valid recovery session
     });
 
     // Fallback: if PASSWORD_RECOVERY hasn't fired after 5s, show error
@@ -77,7 +89,15 @@ export default function ResetPassword() {
 
       if (updateError) {
         console.error("Password update error:", updateError);
-        return setError("Unable to update password. Please try again");
+        // Surface the real Supabase error so the user knows what to fix
+        const msg = updateError.message || "";
+        if (msg.toLowerCase().includes("same password") || msg.toLowerCase().includes("different from")) {
+          return setError("New password must be different from your current password.");
+        }
+        if (msg.toLowerCase().includes("expired") || msg.toLowerCase().includes("invalid")) {
+          return setError("Your reset link has expired. Please request a new one.");
+        }
+        return setError(updateError.message || "Unable to update password. Please try again.");
       }
 
       setSuccess(true);
@@ -103,13 +123,13 @@ export default function ResetPassword() {
     );
   }
 
-  if (!validSession && error) {
+  if (!validSession) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="w-full max-w-md rounded-xl bg-[var(--card)] p-8 shadow-lg">
           <div className="mb-4 flex items-center gap-2 rounded-md border border-red-300 bg-red-100 px-3 py-2 text-sm text-red-700">
             <AlertCircle size={18} />
-            <span>{error}</span>
+            <span>{error || "Invalid or expired reset link. Please request a new one."}</span>
           </div>
           <button
             onClick={() => navigate("/forgot-password")}
