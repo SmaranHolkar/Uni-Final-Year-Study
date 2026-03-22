@@ -23,6 +23,10 @@ export default function Signup() {
     if (!email.trim()) return setError("Please enter your email.");
     if (password.length < 6) return setError("Password must be at least 6 characters.");
     if (!agreedToTerms) return setError("You must agree to the Terms & Conditions.");
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+    if (!passwordRegex.test(password)) return setError("Password must include uppercase, lowercase, a digit, and a symbol.");
+
+
 
     setLoading(true);
     try {

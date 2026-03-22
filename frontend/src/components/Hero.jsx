@@ -1,5 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import learningPlaygroundImg from "../assets/learningplayground.png";
+import mindMapImg from "../assets/mindmap.png";
+import uploadDocsImg from "../assets/uploaddocs.png";
+import mindsMirrorImg from "../assets/mindsmirror.png";
+import dashboardImg from "../assets/dashboard.png";
 import {
   ArrowRight,
   Sparkles,
@@ -15,9 +20,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 
-/* ═══════════════════════════════════════════
-   DOT GRID BACKGROUND — Nothing.tech style
-═══════════════════════════════════════════ */
+/* DOT GRID BACKGROUND — Nothing.tech style */
 const DotGrid = () => (
   <div style={{
     position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
@@ -27,9 +30,7 @@ const DotGrid = () => (
   }} />
 );
 
-/* ═══════════════════════════════════════════
-   SCROLL REVEAL
-═══════════════════════════════════════════ */
+/*             SCROLL REVEAL                */
 const useReveal = (threshold = 0.1) => {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
@@ -56,9 +57,7 @@ const Reveal = ({ children, delay = 0, className = "" }) => {
   );
 };
 
-/* ═══════════════════════════════════════════
-   SHARED TOKENS
-═══════════════════════════════════════════ */
+/* SHARED TOKENS*/
 const rule        = { borderTop: "1px solid var(--border)" };
 const muted       = { color: "var(--muted-foreground)" };
 const fg          = { color: "var(--foreground)" };
@@ -66,9 +65,7 @@ const accent      = "var(--primary)";
 const accentDim   = "color-mix(in oklch, var(--primary) 12%, transparent)";
 const accentBorder = "color-mix(in oklch, var(--primary) 35%, transparent)";
 
-/* ═══════════════════════════════════════════
-   HERO
-═══════════════════════════════════════════ */
+/*  HERO  */
 const Hero = () => {
   const [on, setOn] = useState(false);
   useEffect(() => { setTimeout(() => setOn(true), 100); }, []);
@@ -109,14 +106,9 @@ const Hero = () => {
               <span style={{ color: accent }}>Start understanding.</span>
             </h1>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-6 max-w-2xl" style={anim(0.12)}>
-              <p className="text-[14px] leading-relaxed" style={muted}>
-                Upload any study material. HydrusLearn builds quizzes and mind maps from your actual content — then shows you exactly where your understanding breaks.
-              </p>
-              <p className="text-[14px] leading-relaxed" style={muted}>
-                Quiz yourself. Explore the map. Use the Learning Playground to generate any revision tool you can describe — flashcards, study guides, Q&A sets — or check Mind's Mirror to understand how you actually think.
-              </p>
-            </div>
+            <p className="text-[15px] leading-relaxed mb-6 max-w-xl" style={{ ...anim(0.12), ...muted }}>
+              Upload any study material. HydrusLearn builds quizzes and mind maps from your actual content, drills you where you're weak, and reflects how you actually think — so you stop rereading and start understanding.
+            </p>
 
             <div className="flex flex-wrap items-center gap-4" style={anim(0.18)}>
               <Link to="/signup"
@@ -162,19 +154,19 @@ const Hero = () => {
 ═══════════════════════════════════════════ */
 const HowItWorks = () => {
   const steps = [
-    { n: "01", icon: Upload,        title: "Upload anything",       body: "PDF, notes, a paste of text. Any subject. HydrusLearn reads your content in seconds and builds a structured model of the material." },
+    { n: "01", icon: Upload,        title: "Upload anything",       body: "PDF, notes, a paste of text. Any subject. HydrusLearn reads your content in seconds and builds a structured model of the material.", image: uploadDocsImg },
     { n: "02", icon: ClipboardList,  title: "Get targeted quizzes",  body: "Questions come from your exact material — not a generic bank. The system identifies gaps and drills you on the concepts you've misunderstood." },
-    { n: "03", icon: Network,        title: "Explore the mind map",  body: "Every concept is extracted and linked into an interactive mind map. See how ideas connect, click any node to expand sub-topics at a glance." },
-    { n: "04", icon: Microscope,     title: "Mind's Mirror",         body: "Your metacognitive analysis. HydrusLearn shows you not just what you got wrong — but how you think, where your reasoning patterns break, and what to do about it." },
+    { n: "03", icon: Network,        title: "Explore the mind map",  body: "Every concept is extracted and linked into an interactive mind map. See how ideas connect, click any node to expand sub-topics at a glance.", image: mindMapImg },
+    { n: "04", icon: Microscope,     title: "Mind's Mirror",         body: "Your metacognitive analysis. HydrusLearn shows you not just what you got wrong — but how you think, where your reasoning patterns break, and what to do about it.", image: mindsMirrorImg },
   ];
 
   const extras = [
-    { icon: FlaskConical, title: "Learning Playground", body: "Describe what you want to revise in plain English and the AI picks the best tool for the job — flashcards, study guides, Q&A sets, and more. No image generation yet, but every text-based format is on the table." },
-    { icon: BarChart3,    title: "Per-topic progress",  body: "See your performance at concept level — not just a session score. Know exactly which chapters you've nailed and which need another pass." },
+    { n: "05", icon: FlaskConical, title: "Learning Playground", body: "Describe what you want to revise in plain English and the AI picks the best tool for the job — flashcards, study guides, Q&A sets, and more. No image generation yet, but every text-based format is on the table.", image: learningPlaygroundImg },
+    { n: "06", icon: BarChart3,    title: "Per-topic progress",  body: "See your performance at concept level — not just a session score. Know exactly which chapters you've nailed and which need another pass.", image: dashboardImg },
   ];
 
   return (
-    <section id="how-it-works" className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-32">
+    <section id="how-it-works" className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 pt-8 pb-32">
       {/* Section header */}
       <Reveal>
         <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-8 md:gap-20 items-end mb-20" style={rule}>
@@ -202,7 +194,7 @@ const HowItWorks = () => {
               onMouseEnter={e => e.currentTarget.style.background = "var(--card)"}
               onMouseLeave={e => e.currentTarget.style.background = "var(--background)"}>
               <div className="flex items-start justify-between mb-8">
-                <span className="font-mono text-[13px] tracking-widest font-bold" style={{ color: accent, opacity: 0.7 }}>{step.n}</span>
+                <span className="inline-block font-mono text-[13px] tracking-widest font-bold px-2 py-0.5 rounded" style={{ color: accent, opacity: 0.9, background: accentDim, border: `1px solid ${accentBorder}` }}>{step.n}</span>
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center"
                   style={{ background: accentDim, border: `1px solid ${accentBorder}` }}>
                   <step.icon size={15} style={{ color: accent }} />
@@ -210,6 +202,11 @@ const HowItWorks = () => {
               </div>
               <h3 className="text-[17px] font-bold mb-3 tracking-tight" style={fg}>{step.title}</h3>
               <p className="text-[14px] leading-relaxed" style={muted}>{step.body}</p>
+              {step.image && (
+                <div className="mt-6 rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+                  <img src={step.image} alt={step.title} className="w-full h-auto block" style={{ opacity: 0.9 }} />
+                </div>
+              )}
             </div>
           </Reveal>
         ))}
@@ -224,14 +221,20 @@ const HowItWorks = () => {
               style={{ background: "var(--background)" }}
               onMouseEnter={e => e.currentTarget.style.background = "var(--card)"}
               onMouseLeave={e => e.currentTarget.style.background = "var(--background)"}>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-7 h-7 rounded-md flex items-center justify-center"
+              <div className="flex items-start justify-between mb-8">
+                <span className="inline-block font-mono text-[13px] tracking-widest font-bold px-2 py-0.5 rounded" style={{ color: accent, opacity: 0.9, background: accentDim, border: `1px solid ${accentBorder}` }}>{feat.n}</span>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
                   style={{ background: accentDim, border: `1px solid ${accentBorder}` }}>
-                  <feat.icon size={13} style={{ color: accent }} />
+                  <feat.icon size={15} style={{ color: accent }} />
                 </div>
-                <h3 className="text-[15px] font-bold tracking-tight" style={fg}>{feat.title}</h3>
               </div>
-              <p className="text-[13px] leading-relaxed" style={muted}>{feat.body}</p>
+              <h3 className="text-[17px] font-bold mb-3 tracking-tight" style={fg}>{feat.title}</h3>
+              <p className="text-[14px] leading-relaxed" style={muted}>{feat.body}</p>
+              {feat.image && (
+                <div className="mt-6 rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+                  <img src={feat.image} alt={feat.title} className="w-full h-auto block" style={{ opacity: 0.9 }} />
+                </div>
+              )}
             </div>
           </Reveal>
         ))}
@@ -276,7 +279,7 @@ const FAQRow = ({ q, a }) => {
 };
 
 const FAQ = () => (
-  <section id="faq" className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-32">
+  <section id="faq" className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 pt-8 pb-32">
     <Reveal>
       <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-8 md:gap-20 items-start" style={rule}>
         <div className="pt-8">
@@ -323,9 +326,11 @@ const FinalCTA = () => (
               Stop rereading.<br />
               <span style={{ color: accent }}>Start understanding.</span>
             </h2>
-            <p className="text-[15px] leading-relaxed max-w-lg" style={muted}>
-              Join the students using HydrusLearn to turn passive revision into real, lasting understanding. Free to start — no card needed.
-            </p>
+            <div className="space-y-4">
+              <p className="text-[15px] leading-relaxed max-w-lg" style={muted}>
+                Join the students using HydrusLearn to turn passive revision into real, lasting understanding. Free to start — no card needed.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 shrink-0">
@@ -349,7 +354,8 @@ const FinalCTA = () => (
 const Footer = () => (
   <footer className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-10" style={rule}>
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-      <div className="flex items-center gap-2 font-bold text-[14px] tracking-tight" style={fg}>
+      <div>
+        <div className="flex items-center gap-2 font-bold text-[14px] tracking-tight mb-1" style={fg}>
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 50" width="160" height="34">
           <defs>
             <path id="ft-star" d="M 0 -6 L 1.5 -1.5 L 6 0 L 1.5 1.5 L 0 6 L -1.5 1.5 L -6 0 L -1.5 -1.5 Z" fill="currentColor"/>
@@ -366,6 +372,8 @@ const Footer = () => (
           </g>
           <text x="75" y="34" fontFamily="system-ui, -apple-system, sans-serif" fontSize="24" fontWeight="600" fill="currentColor">HydrusLearn</text>
         </svg>
+        </div>
+        <p className="text-[11px] font-mono" style={{ color: "var(--muted-foreground)", opacity: 0.45 }}>Turn notes into understanding.</p>
       </div>
 
       <div className="flex flex-wrap gap-8 font-mono text-[11px]" style={{ color: "var(--muted-foreground)", opacity: 0.45 }}>
