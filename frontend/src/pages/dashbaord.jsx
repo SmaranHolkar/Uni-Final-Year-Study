@@ -109,19 +109,28 @@ useEffect(() => {
   // Calculate current study streak (consecutive days with ≥1 quiz)
   const calculateStreak = () => {
     if (!quizzes.length) return 0
+
+    const toLocalDayKey = (value) => {
+      const d = new Date(value)
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
+
     const quizDays = new Set(
-      quizzes.map(q => new Date(q.created_at).toISOString().slice(0, 10))
+      quizzes.map(q => toLocalDayKey(q.created_at))
     )
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const todayStr = today.toISOString().slice(0, 10)
+    const todayStr = toLocalDayKey(today)
     const checkDate = new Date(today)
     // If no quiz today, start checking from yesterday
     if (!quizDays.has(todayStr)) {
       checkDate.setDate(checkDate.getDate() - 1)
     }
     let streak = 0
-    while (quizDays.has(checkDate.toISOString().slice(0, 10))) {
+    while (quizDays.has(toLocalDayKey(checkDate))) {
       streak++
       checkDate.setDate(checkDate.getDate() - 1)
     }

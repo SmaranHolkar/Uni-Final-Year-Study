@@ -44,16 +44,23 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!session) return;
 
-    const sessionStart = parseInt(localStorage.getItem('session_start') || '0', 10);
+    let sessionStart = parseInt(localStorage.getItem('session_start') || '0', 10);
+    
+    // If we have a session but no start time (e.g., PASSWORD_RECOVERY event), set it now
+    if (!sessionStart) {
+      sessionStart = Date.now();
+      localStorage.setItem('session_start', sessionStart.toString());
+    }
+
     const elapsed = Date.now() - sessionStart;
 
-    if (sessionStart && elapsed >= SESSION_DURATION) {
+    if (elapsed >= SESSION_DURATION) {
       supabase.auth.signOut();
       return;
     }
 
     const remaining = SESSION_DURATION - elapsed;
-    const timer = setTimeout(() => supabase.auth.signOut(), remaining);
+    const timer = setTimeout(() => supabase.auth.signOut(), Math.max(0, remaining));
     return () => clearTimeout(timer);
   }, [session]);
 
