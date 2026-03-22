@@ -15,13 +15,25 @@ export default function ResetPassword() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Check if there's already a session (e.g. page refresh)
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+      if (session?.user) {
         setValidSession(true);
-      } else {
+      }
+    });
+
+    // Listen for the PASSWORD_RECOVERY event fired when Supabase
+    // processes the reset token from the URL hash
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setValidSession(true);
+        setError("");
+      } else if (!session) {
         setError("Invalid or expired reset link. Please request a new one.");
       }
     });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   async function handleSubmit(e) {
