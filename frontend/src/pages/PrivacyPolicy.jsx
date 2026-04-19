@@ -59,6 +59,7 @@ const sections = [
   },
 ];
 
+// Handles PrivacyPolicy logic.
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen px-4 py-16">

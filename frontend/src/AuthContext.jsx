@@ -6,6 +6,7 @@ export { AuthContext } from './authContextInstance';
 
 const SESSION_DURATION = 24 * 60 * 60 * 1000; // 1 day
 
+// Handles AuthProvider logic.
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
@@ -79,6 +80,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+// Handles useAuth logic.
 export function useAuth() {
   return useContext(AuthContext);
 }

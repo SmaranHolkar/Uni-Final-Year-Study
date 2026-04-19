@@ -21,6 +21,7 @@ const storage = multer.diskStorage({
   }
 });
 
+// Handles fileFilter logic.
 const fileFilter = (req, file, cb) => {
   const allowedTypes = ['.pdf', '.docx', '.txt'];
   const ext = path.extname(file.originalname).toLowerCase();

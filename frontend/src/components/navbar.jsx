@@ -1,3 +1,4 @@
+// Displays the top navigation bar with auth-aware actions.
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
@@ -5,11 +6,13 @@ import { supabase } from "../supabaseClient";
 import "../App.css";
 import "../index.css";
 
+// Renders the responsive navigation bar for guests and signed-in users.
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Signs out the user and collapses the mobile menu.
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");

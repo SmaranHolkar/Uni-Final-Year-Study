@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 /* DOT GRID BACKGROUND — Nothing.tech style */
+// Handles DotGrid logic.
 const DotGrid = () => (
   <div style={{
     position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
@@ -66,6 +67,7 @@ const accentDim   = "color-mix(in oklch, var(--primary) 12%, transparent)";
 const accentBorder = "color-mix(in oklch, var(--primary) 35%, transparent)";
 
 /*  HERO  */
+// Handles Hero logic.
 const Hero = () => {
   const [on, setOn] = useState(false);
   useEffect(() => { setTimeout(() => setOn(true), 100); }, []);
@@ -152,6 +154,7 @@ const Hero = () => {
 /* ═══════════════════════════════════════════
    HOW IT WORKS
 ═══════════════════════════════════════════ */
+// Handles HowItWorks logic.
 const HowItWorks = () => {
   const steps = [
     { n: "01", icon: Upload,        title: "Upload anything",       body: "PDF, notes, a paste of text. Any subject. HydrusLearn reads your content in seconds and builds a structured model of the material.", image: uploadDocsImg },
@@ -243,9 +246,7 @@ const HowItWorks = () => {
   );
 };
 
-/* ═══════════════════════════════════════════
-   FAQ
-═══════════════════════════════════════════ */
+/*                  FAQ                 */
 const faqData = [
   { q: "What file types can I upload?",                a: "PDFs are fully supported right now. Plain text and markdown also work. Word doc import is on the roadmap." },
   { q: "How are quiz questions generated?",            a: "Every question is produced from your uploaded material by our AI — not sourced from an external bank. If your notes don't cover a topic, you won't be asked about it." },
@@ -257,6 +258,7 @@ const faqData = [
   { q: "How is this different from Anki or Quizlet?",  a: "Anki and Quizlet require you to create the cards yourself. HydrusLearn generates everything from your uploaded material, maps the concept structure, adapts to where you're actually weak — and then reflects your thinking back to you via Mind's Mirror." },
 ];
 
+// Handles FAQRow logic.
 const FAQRow = ({ q, a }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -278,6 +280,7 @@ const FAQRow = ({ q, a }) => {
   );
 };
 
+// Handles FAQ logic.
 const FAQ = () => (
   <section id="faq" className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 pt-8 pb-32">
     <Reveal>
@@ -303,6 +306,7 @@ const FAQ = () => (
 /* ═══════════════════════════════════════════
    FINAL CTA
 ═══════════════════════════════════════════ */
+// Handles FinalCTA logic.
 const FinalCTA = () => (
   <section className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-32">
     <Reveal>
@@ -351,6 +355,7 @@ const FinalCTA = () => (
 /* ═══════════════════════════════════════════
    FOOTER
 ═══════════════════════════════════════════ */
+// Handles Footer logic.
 const Footer = () => (
   <footer className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 py-10" style={rule}>
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -394,6 +399,7 @@ const Footer = () => (
 /* ═══════════════════════════════════════════
    PAGE ROOT
 ═══════════════════════════════════════════ */
+// Handles LandingPage logic.
 export default function LandingPage() {
   return (
     <div className="relative min-h-screen" style={{ background: "var(--background)", color: "var(--foreground)" }}>

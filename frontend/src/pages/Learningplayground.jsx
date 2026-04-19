@@ -27,6 +27,7 @@ const defaultSuggestions = [
   },
 ]
 
+// Handles Learningplayground logic.
 function Learningplayground() {
   const { user, session } = useAuth()
   const [messages, setMessages] = useState([])
@@ -38,6 +39,7 @@ function Learningplayground() {
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
 
+  // Handles toText logic.
   const toText = (value) => {
     if (typeof value === 'string') return value.trim()
     if (value == null) return ''
@@ -49,6 +51,7 @@ function Learningplayground() {
     }
   }
 
+  // Handles normalizeToolPayload logic.
   const normalizeToolPayload = (tool) => {
     if (!tool || typeof tool !== 'object') return null
 
@@ -104,6 +107,7 @@ function Learningplayground() {
     }
   }
 
+  // Handles scrollToBottom logic.
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -125,6 +129,7 @@ function Learningplayground() {
       return
     }
 
+    // Handles fetchSuggestions logic.
     const fetchSuggestions = async () => {
       try {
         const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
@@ -187,11 +192,13 @@ function Learningplayground() {
     fetchSuggestions()
   }, [user?.id, session?.access_token])
 
+  // Handles handleSuggestionClick logic.
   const handleSuggestionClick = (prompt) => {
     setInputValue(prompt)
     textareaRef.current?.focus()
   }
 
+  // Handles renderGeneratedTool logic.
   const renderGeneratedTool = () => {
     if (!generatedTool && !generationStage) return null
 
@@ -308,6 +315,7 @@ function Learningplayground() {
     )
   }
 
+  // Handles handleSubmit logic.
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!inputValue.trim() || isLoading) return
@@ -389,6 +397,7 @@ function Learningplayground() {
     }
   }
 
+  // Handles handleKeyDown logic.
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()

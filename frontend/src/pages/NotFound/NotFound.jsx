@@ -1,6 +1,8 @@
+// Shows a friendly 404 page with a link back to the home route.
 import React from 'react';
 import { Link } from 'react-router-dom';
 
+// Renders a fallback page for unknown routes.
 const NotFound = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-4">

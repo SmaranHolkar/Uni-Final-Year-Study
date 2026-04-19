@@ -76,6 +76,7 @@ const sections = [
   },
 ];
 
+// Handles TermsAndConditions logic.
 export default function TermsAndConditions() {
   return (
     <div className="min-h-screen px-4 py-16">

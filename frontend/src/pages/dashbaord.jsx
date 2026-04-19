@@ -18,6 +18,7 @@ import Vela from '../components/Vela.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
+// Handles Dashboard logic.
 export default function Dashboard() {
   const { user, session } = useAuth();
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ export default function Dashboard() {
 useEffect(() => {
     if (!user?.id || !session?.access_token) return
     
+    // Fetch quiz history from backend API using access token for authentication
     const fetchQuizHistory = async () => {
       setLoading(true)
       setError(null)
@@ -58,6 +60,7 @@ useEffect(() => {
       }
     }
 
+    // Handles fetchSuggestions logic.
     const fetchSuggestions = async () => {
       try {
         const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -83,6 +86,7 @@ useEffect(() => {
     fetchSuggestions();
   }, [user?.id, session?.access_token])
 
+  // Handles handleViewQuiz logic.
   const handleViewQuiz = (quiz) => {
     // Store quiz data in sessionStorage to pass to detail page
     sessionStorage.setItem(`quiz_${quiz.id}`, JSON.stringify(quiz))
@@ -110,6 +114,7 @@ useEffect(() => {
   const calculateStreak = () => {
     if (!quizzes.length) return 0
 
+    // Handles toLocalDayKey logic.
     const toLocalDayKey = (value) => {
       const d = new Date(value)
       const y = d.getFullYear()

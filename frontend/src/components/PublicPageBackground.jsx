@@ -1,3 +1,5 @@
+// Wraps public pages with a dotted ambient background layer.
+// Draws a full-screen dotted grid used behind public pages.
 const DotGrid = () => (
   <div style={{
     position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
@@ -7,6 +9,7 @@ const DotGrid = () => (
   }} />
 );
 
+// Applies the public-page background and keeps page content in the foreground.
 export default function PublicPageBackground({ children }) {
   return (
     <div className="relative min-h-screen overflow-x-hidden bg-[var(--background)] text-[var(--foreground)]">

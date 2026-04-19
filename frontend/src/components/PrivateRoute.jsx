@@ -1,6 +1,8 @@
+// Protects routes by redirecting unauthenticated users to the login page.
 import { useAuth } from '../AuthContext';
 import { Navigate } from 'react-router-dom';
 
+// Guards child routes until auth state is loaded and a user is present.
 export default function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
 

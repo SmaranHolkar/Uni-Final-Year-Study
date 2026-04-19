@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react";
 import { supabase } from "../supabaseClient";
 
+// Signup page with form validation and error handling
 export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
@@ -15,6 +16,7 @@ export default function Signup() {
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
 
+  // Handles handleSignup logic.
   async function handleSignup(e) {
     e.preventDefault();
     setError(""); setSuccess("");

@@ -32,6 +32,7 @@ ChartJS.register(
   Filler
 );
 
+// Handles MetacognitiveAnalysis logic.
 export default function MetacognitiveAnalysis({ quizId }) {
   const { session } = useAuth();
   const [analysis, setAnalysis] = useState(null);
@@ -39,6 +40,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    // Handles fetchAnalysis logic.
     const fetchAnalysis = async () => {
       if (!quizId || !session?.access_token) return;
 
@@ -107,6 +109,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
     );
   }
 
+  // Handles getConfidenceColor logic.
   const getConfidenceColor = (level) => {
     switch (level?.toLowerCase()) {
       case 'high':
@@ -120,6 +123,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
     }
   };
 
+  // Handles getScoreColor logic.
   const getScoreColor = (score) => {
     if (score >= 80) return 'text-[var(--chart-2)]';
     if (score >= 60) return 'text-[var(--chart-3)]';

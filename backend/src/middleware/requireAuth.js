@@ -1,5 +1,6 @@
 import { supabase, supabaseAdmin } from '../supabaseClient.js';
 
+// Handles requireAuth logic.
 export default async function requireAuth(req, res, next) {
   try {
     // Prefer service-role client for server-side token verification

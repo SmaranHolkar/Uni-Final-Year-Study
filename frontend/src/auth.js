@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
+// Handles Auth logic.
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,6 +20,7 @@ export default function Auth() {
     return () => subscription?.unsubscribe();
   }, []);
 
+  // Handles signUp logic.
   async function signUp() {
     setMsg('Signing up...');
     const { error } = await supabase.auth.signUp({ email, password });
@@ -28,6 +30,7 @@ export default function Auth() {
     } else setMsg('Check your email for confirmation .');
   }
 
+  // Handles signIn logic.
   async function signIn() {
     setMsg('Signing in...');
     const { error, data } = await supabase.auth.signInWithPassword({ email, password });
@@ -39,6 +42,7 @@ export default function Auth() {
     setMsg(`Signed in as ${data.user.email}`);
   }
 
+  // Handles signOut logic.
   async function signOut() {
     await supabase.auth.signOut();
     setMsg('Signed out');

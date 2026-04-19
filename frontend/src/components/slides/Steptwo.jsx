@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useAuth } from "../../AuthContext";
 import { supabase } from "../../supabaseClient";
 
+// Handles StepTwo logic.
 export default function StepTwo({ onNext }) {
   const { currentDocumentId } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -18,12 +19,13 @@ export default function StepTwo({ onNext }) {
   const answerChangeCounts = useRef({}); // i → how many times answer was changed
   const fetchInProgressRef = useRef(false); // Prevent duplicate requests
 
-  // ✅ helpers go HERE
+  // helpers go HERE
   const normalize = (v) =>
     String(v ?? "")
       .trim()
       .toLowerCase();
 
+  // Handles getCorrectAnswer logic.
   const getCorrectAnswer = (q) => {
     if (!q) return undefined;
     if (typeof q.answer === "number") return q.choices?.[q.answer];
@@ -32,6 +34,7 @@ export default function StepTwo({ onNext }) {
     return q.answer;
   };
 
+  // Handles fetchQuestions logic.
   const fetchQuestions = async () => {
     // Prevent duplicate requests
     if (fetchInProgressRef.current) {
@@ -89,6 +92,7 @@ export default function StepTwo({ onNext }) {
     fetchQuestions();
   }, []);
 
+  // Handles selectAnswer logic.
   const selectAnswer = (i, c) => {
     const copy = [...answers];
     // Track first-answer timestamp and change count
@@ -101,6 +105,7 @@ export default function StepTwo({ onNext }) {
     setAnswers(copy);
   };
 
+  // Handles handleFinish logic.
   const handleFinish = async () => {
     const wrongQs = questions.filter((q, i) => {
       const correct = getCorrectAnswer(q);

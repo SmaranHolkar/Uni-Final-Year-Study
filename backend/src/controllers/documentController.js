@@ -7,7 +7,7 @@ import { extractTextFromFile, chunkText } from '../services/documentService.js';
 
 /*  PROCESS & STORE DOCUMENT   */
 
-
+// Handles processAndStoreDocument logic.
 export async function processAndStoreDocument(req, res) {
   const client = await pool.connect();
   const uploadedFilePath = req.file?.path;
@@ -25,14 +25,12 @@ export async function processAndStoreDocument(req, res) {
     }
 
     /* AUTH USER */
-
     const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: 'User authentication required' });
     }
 
     /*  CHECK FOR DUPLICATES  */
-
     const duplicateCheck = await client.query(
       'SELECT COUNT(*) FROM public.w_embeddings WHERE title = $1 AND user_id = $2',
       [title, userId]
@@ -46,7 +44,6 @@ export async function processAndStoreDocument(req, res) {
     }
 
     /*  EXTRACT TEXT  */
-
     const text = await extractTextFromFile(
       req.file.path,
       req.file.mimetype
@@ -66,7 +63,6 @@ export async function processAndStoreDocument(req, res) {
     }
 
     /*  DB INSERT  */
-
     await client.query('BEGIN');
 
     let storedChunks = 0;
@@ -106,9 +102,7 @@ export async function processAndStoreDocument(req, res) {
           });
         }
     }
-
     await client.query('COMMIT');
-
     /*  RESPONSE  */
     // Get the ID of the first inserted embedding to return as documentId
     const idResult = await client.query(
@@ -158,6 +152,7 @@ export async function processAndStoreDocument(req, res) {
 /*  DELETE DOCUMENT EMBEDDINGS       */
 
 
+// Handles deleteDocumentEmbeddings logic.
 export async function deleteDocumentEmbeddings(req, res) {
   try {
     const { title } = req.params;

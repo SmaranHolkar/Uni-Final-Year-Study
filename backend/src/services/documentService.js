@@ -5,6 +5,7 @@ import PDFParser from 'pdf2json';
  * Extracts plain text from an uploaded file.
  * Supports: .txt, .pdf
  */
+// Handles extractTextFromFile logic.
 export async function extractTextFromFile(filePath, mimetype) {
   if (mimetype === 'text/plain') {
     return fs.readFileSync(filePath, 'utf-8');
@@ -43,6 +44,7 @@ export async function extractTextFromFile(filePath, mimetype) {
 /**
  * Splits text into overlapping word-based chunks for embedding.
  */
+// Handles chunkText logic.
 export function chunkText(text, chunkSize = 1000, overlap = 100) {
   const words = text.split(/\s+/);
   const chunks = [];

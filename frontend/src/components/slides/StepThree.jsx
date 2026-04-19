@@ -43,6 +43,7 @@ async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 2000) {
   }
 }
 
+// Handles StepThree logic.
 export default function StepThree({ data, onRetake, quizResults }) {
   const { user, session, currentDocumentTitle } = useAuth();
   const [selectedNode, setSelectedNode] = useState(null);
@@ -450,16 +451,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
            Generate MCQ
           </button>
 
-          <button
-            className="w-full mt-3 p-2 bg-slate-100 rounded flex justify-center gap-2"
-            onClick={() => {
-              const q = encodeURIComponent(selectedNode.data.label);
-              window.open(`https://www.google.com/search?q=${q}`, "_blank");
-            }}
-          >
-            <ExternalLink className="w-4 h-4" />
-            Search Resources
-          </button>
+
         </div>
       )}
 

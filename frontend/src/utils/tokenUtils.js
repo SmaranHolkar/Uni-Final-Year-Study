@@ -3,6 +3,7 @@
  * @param {string} token - JWT token
  * @returns {object|null} - Decoded payload or null if invalid
  */
+// Handles decodeToken logic.
 export function decodeToken(token) {
   try {
     if (!token || typeof token !== 'string') return null;
@@ -28,6 +29,7 @@ export function decodeToken(token) {
  * @param {object} decodedToken - Decoded JWT payload
  * @returns {boolean} - true if expired, false otherwise
  */
+// Handles isTokenExpired logic.
 export function isTokenExpired(decodedToken) {
   if (!decodedToken || !decodedToken.exp) {
     return true; // Consider invalid tokens as expired
@@ -42,6 +44,7 @@ export function isTokenExpired(decodedToken) {
  * @param {object} decodedToken - Decoded JWT payload
  * @returns {number} - Milliseconds until expiration, or 0 if already expired
  */
+// Handles getTokenTimeRemaining logic.
 export function getTokenTimeRemaining(decodedToken) {
   if (!decodedToken || !decodedToken.exp) {
     return 0;
@@ -58,6 +61,7 @@ export function getTokenTimeRemaining(decodedToken) {
  * @param {number} milliseconds - Time in milliseconds
  * @returns {string} - Formatted time string
  */
+// Handles formatTimeRemaining logic.
 export function formatTimeRemaining(milliseconds) {
   const seconds = Math.floor(milliseconds / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -80,6 +84,7 @@ export function formatTimeRemaining(milliseconds) {
  * @param {number} timeRemaining - Time in milliseconds until expiration
  * @returns {function} - Cleanup function to clear the timer
  */
+// Handles setupExpirationTimer logic.
 export function setupExpirationTimer(timeRemaining, onExpire) {
   if (timeRemaining <= 0) {
     // Token already expired

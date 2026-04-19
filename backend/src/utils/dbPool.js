@@ -1,3 +1,4 @@
+// Creates and exports the PostgreSQL connection pool used by backend services.
 import pkg from 'pg';
 const { Pool } = pkg;
 const DATABASE_URL = process.env.SUPABASE_DB_URL || process.env.SUPABASE_URL;

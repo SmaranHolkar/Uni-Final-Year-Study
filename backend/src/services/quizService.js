@@ -1,6 +1,7 @@
 import pool from '../utils/dbPool.js';
 import { getEmbedding } from '../utils/aiUtils.js';
 
+// Handles generateEmbeddingText logic.
 function generateEmbeddingText(quizResults, mindmapNodes) {
   let text = '';  
 
@@ -18,6 +19,7 @@ function generateEmbeddingText(quizResults, mindmapNodes) {
   return text.trim() || 'quiz mindmap';
 }
 
+// Handles saveQuizMindmap logic.
 export async function saveQuizMindmap({ userId, title, quizResults, mindmapNodes }) {
   let client;
   try {

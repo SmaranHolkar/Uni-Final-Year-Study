@@ -1,5 +1,7 @@
+// Defines authenticated API routes for question, mindmap, and suggestion workflows.
 import express from 'express';
-import { generateQuestions, generateMindmap, saveQuizMindmap, getQuizzesMindmapsController, getMetacognitiveAnalysis, generateLearningTool, getSuggestionsForUser, generateSimilarTopic, generateMCQForTopic, shareMindmapController, getSharedWithMeController } from '../controllers/questionController.js';
+import { generateQuestions, generateMindmap, saveQuizMindmap, getQuizzesMindmapsController, getMetacognitiveAnalysis, generateLearningTool, getSuggestionsForUser, shareMindmapController, getSharedWithMeController } from '../controllers/questionController.js';
+import { generateSimilarTopic, generateMCQForTopic } from '../controllers/topicController.js';
 import requireAuth from '../middleware/requireAuth.js';
 
 const router = express.Router();

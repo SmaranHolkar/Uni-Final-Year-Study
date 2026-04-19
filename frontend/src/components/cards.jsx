@@ -1,3 +1,4 @@
+// Renders a reusable card component with shared visual styles.
 import React from 'react';
 
 const cardStyles = {
@@ -39,6 +40,7 @@ const cardStyles = {
     },
 };
 
+// Displays a stylized card with optional image and custom child content.
 const Card = ({ title, description, image, onClick, children }) => {
     return (
         <div className="card" style={cardStyles.card} onClick={onClick}>

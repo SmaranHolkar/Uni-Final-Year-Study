@@ -1,3 +1,4 @@
+// Configures the main app router and auth-aware page layout.
 
 import { useAuth } from './AuthContext';
 import Sidebar from './components/sidebar.jsx';
@@ -22,6 +23,7 @@ import PublicPageBackground from './components/PublicPageBackground.jsx';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 
+// Renders routes and switches nav/sidebar based on authentication state.
 function AppContent() {
   const { user, loading } = useAuth();
 
@@ -59,6 +61,7 @@ function AppContent() {
   );
 }
 
+// Wraps the app in routing and auth providers.
 function App() {
   return (
     <Router>

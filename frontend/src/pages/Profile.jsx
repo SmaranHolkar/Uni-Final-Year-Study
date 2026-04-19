@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Key, LogOut, Edit2, Save, X, Trash2, UserX } from 'lucide-react';
 
+// Handles Profile logic.
 export default function Profile() {
   const { user, session } = useAuth();
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ export default function Profile() {
     }
   }, [user]);
 
+  // Handles handleInputChange logic.
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setProfile((prev) => ({
@@ -35,6 +37,7 @@ export default function Profile() {
     }));
   };
 
+  // Handles handleSaveProfile logic.
   const handleSaveProfile = async () => {
     setLoading(true);
     try {
@@ -55,11 +58,13 @@ export default function Profile() {
     }
   };
 
+  // Handles handleLogout logic.
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/login');
   };
 
+  // Handles handleDeleteData logic.
   const handleDeleteData = async () => {
     const confirmed = window.confirm('Delete all your study data? This cannot be undone.');
     if (!confirmed) return;
@@ -109,6 +114,7 @@ export default function Profile() {
     }
   };
 
+  // Handles handleDeleteAccount logic.
   const handleDeleteAccount = async () => {
     const confirmed = window.confirm('Delete your account permanently? This cannot be undone.');
     if (!confirmed) return;

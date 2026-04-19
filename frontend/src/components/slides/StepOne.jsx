@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useAuth } from "../../AuthContext";
 import { supabase } from "../../supabaseClient";
 
+// Handles StepOne logic.
 export default function StepOne({ onNext }) {
   const { setCurrentDocumentId, setCurrentDocumentTitle } = useAuth();
   const [file, setFile] = useState(null);
@@ -10,6 +11,7 @@ export default function StepOne({ onNext }) {
   const [error, setError] = useState("");
   const [dragActive, setDragActive] = useState(false);
 
+  // Handles handleFileChange logic.
   const handleFileChange = (e) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
@@ -17,6 +19,7 @@ export default function StepOne({ onNext }) {
     }
   };
 
+  // Handles validateAndSetFile logic.
   const validateAndSetFile = (selectedFile) => {
     // Validate file type
     const validTypes = [
@@ -42,6 +45,7 @@ export default function StepOne({ onNext }) {
     setFile(selectedFile);
   };
 
+  // Handles handleDrag logic.
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -52,6 +56,7 @@ export default function StepOne({ onNext }) {
     }
   };
 
+  // Handles handleDrop logic.
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -63,6 +68,7 @@ export default function StepOne({ onNext }) {
     }
   };
 
+  // Handles handleUpload logic.
   const handleUpload = async () => {
     if (!file) {
       setError("Please select a file first");
@@ -131,6 +137,7 @@ export default function StepOne({ onNext }) {
     }
   };
 
+  // Handles removeFile logic.
   const removeFile = () => {
     setFile(null);
     setError("");

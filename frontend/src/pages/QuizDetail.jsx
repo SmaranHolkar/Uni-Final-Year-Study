@@ -40,6 +40,7 @@ const categoryColors = [
   "hsl(280, 70%, 60%)",
 ]
 
+// Handles QuizDetail logic.
 function QuizDetail() {
   const { quizId } = useParams()
   const navigate = useNavigate()
@@ -77,6 +78,7 @@ function QuizDetail() {
     fetchQuizDetail()
   }, [quizId])
 
+  // Handles parseQuizData logic.
   const parseQuizData = (quizData) => {
     if (typeof quizData === 'string') {
       try {
@@ -88,6 +90,7 @@ function QuizDetail() {
     return quizData || []
   }
 
+  // Handles getAnswerText logic.
   const getAnswerText = (correctAnswer, choices) => {
     if (!correctAnswer || !choices) return correctAnswer
     
@@ -101,6 +104,7 @@ function QuizDetail() {
     return correctAnswer
   }
 
+  // Handles parseMindmapData logic.
   const parseMindmapData = (mindmapData) => {
     let parsed = mindmapData
     
@@ -181,10 +185,12 @@ function QuizDetail() {
     setEdges(initialEdges)
   }, [initialNodes, initialEdges, setNodes, setEdges])
 
+  // Handles handleNodeClick logic.
   const handleNodeClick = (_, node) => {
     setSelectedNodeId(node.id)
   }
 
+  // Handles handleAddSimilarTopic logic.
   const handleAddSimilarTopic = async () => {
     const selectedNode = nodes.find(n => n.id === selectedNodeId)
     if (!selectedNode) return

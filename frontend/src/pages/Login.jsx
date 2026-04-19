@@ -1,9 +1,11 @@
+// Implements the email/password login form with Supabase auth.
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle } from "lucide-react";
 import { supabase } from "../supabaseClient";
 
+// Presents the login form and manages sign-in state.
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -12,6 +14,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  // Authenticates with Supabase using email and password.
   async function handleLogin(e) {
     e.preventDefault();
     setError("");

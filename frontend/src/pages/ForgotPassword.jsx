@@ -1,14 +1,17 @@
+// Provides the password reset request form and feedback states.
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertCircle, CheckCircle, ArrowLeft } from "lucide-react";
 import { supabase } from "../supabaseClient";
 
+// Shows the forgot-password form and handles reset-link flow.
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
+  // Sends a password reset email through Supabase.
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");

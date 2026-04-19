@@ -5,6 +5,7 @@ import pool from './dbPool.js';
 const GROQ_KEY = process.env.GROQ_API;
 
 let embedder;
+// Handles getEmbedding logic.
 export async function getEmbedding(text) {
   if (!embedder) {
     console.log('Loading embedding model');
@@ -267,17 +268,24 @@ export async function generateLearningTool(userId, prompt) {
 
   // ── PHASE 1 — plan (~1 600 tokens, JSON) ───────────────────────────────────
   const planPrompt = `
-You are an educational tool planner. Given a user's learning request, decide the BEST tool format and produce a structured content plan.
+You are an educational tool planner. Given a user's learning request, decide the BEST tool format and produce a
+structured content plan.
 
 USER REQUEST: "${promptText}"
 
 Return ONLY valid JSON — no markdown, no extra text:
 {
-  "toolType": "the single best format for this request — you may use any of these or invent your own if it fits better: flashcards | quiz | timeline | diagram | comparison-table | flowchart | mnemonic | story | memory-game | study-guide | formula-visualizer | concept-map | checklist | drag-and-drop-sort | drag-and-drop-match | word-scramble | fill-in-the-blank | crossword | matching-pairs | ordering-activity | annotation | simulation | calculator | converter | cheat-sheet | reference-card | lesson | tutorial | debate | pros-cons | case-study",
+  "toolType": "the single best format for this request — you may use any of these or invent your own if it fits better:
+  flashcards | quiz | timeline | diagram | comparison-table | flowchart | mnemonic | story | memory-game | study-guide | 
+  formula-visualizer | concept-map | checklist | drag-and-drop-sort | drag-and-drop-match | word-scramble | fill-in-the-blank | 
+  crossword | matching-pairs | ordering-activity | annotation | simulation | calculator | converter | cheat-sheet | reference-card |
+   lesson | tutorial | debate | pros-cons | case-study",
   "title": "clear title for this tool",
   "description": "2 sentences explaining what this tool teaches and how",
   "ui": "best layout keyword: cards | list | board | graph | steps | grid | interactive | visual | game | table | document",
-  "htmlDesignBrief": "3–5 specific sentences describing exactly what the HTML app should look like and how it should behave. Reference the toolType, key interactions, layout, and any animations or game mechanics. This will be used directly as a build instruction — be precise.",
+  "htmlDesignBrief": "3–5 specific sentences describing exactly what the HTML app should look like and how it should behave.
+   Reference the toolType, key interactions, layout, and any animations or game mechanics. This will be used directly as a build
+  instruction — be precise.",
   "items": [
     {
       "id": "1",
@@ -290,7 +298,8 @@ Return ONLY valid JSON — no markdown, no extra text:
 
 Rules:
 - items array must have 12–18 entries, each substantive and specific to the request
-- htmlDesignBrief must describe the SPECIFIC tool being built, not be generic — if it is a word scramble, describe the scrambled letters mechanic; if a crossword, describe the grid; if a calculator, describe the inputs and formula; etc.
+- htmlDesignBrief must describe the SPECIFIC tool being built, not be generic — if it is a word scramble,
+ describe the scrambled letters mechanic; if a crossword, describe the grid; if a calculator, describe the inputs and formula; etc.
 - Keep ALL strings free of unescaped double-quotes (use single quotes inside strings)
 `;
 
@@ -477,6 +486,7 @@ ${TOOL_THEME_CSS}
 
 
 
+// Handles aiMindmapNode logic.
 export async function aiMindmapNode({ question, correctAnswer, context, sourceLink = '' }) {
   const prompt = `
 You are generating a corrective study mindmap node. End with one source link on its own line at the end(not Wikipedia)
@@ -555,7 +565,7 @@ export async function generateMetacognitiveAnalysis(quizData) {
   let underconfidentCount = 0;
   let calibrationScore = 0;
 
-  // --- Error type classification (1–5 confidence scale) ---
+  // error type classification (1–5 confidence scale)
   // ≥4 + wrong  → conceptual misunderstanding (held a false belief)
   // ≤2 + wrong  → recall failure (knew they didn't know)
   //  3 + wrong  → careless/uncertain error
@@ -575,6 +585,7 @@ export async function generateMetacognitiveAnalysis(quizData) {
       if (conf <= 2 && q.isCorrect) underconfidentCount++;
     });
 
+    // Incorrect questions breakdown
     incorrectQuestions.forEach((q) => {
       const conf = q?.confidence;
       if (conf == null) {
@@ -587,7 +598,8 @@ export async function generateMetacognitiveAnalysis(quizData) {
         errorTypeProfile.carelessError++;
       }
     });
-
+    
+    // Calibrated: correct when confident (≥4), incorrect when unsure (≤2)
     const calibrated = questions.filter((q) => {
       const conf = q?.confidence;
       if (conf == null) return false;
@@ -657,14 +669,18 @@ export async function generateMetacognitiveAnalysis(quizData) {
         .join('\n');
 
       const confidenceLine = hasConfidenceData
-        ? `Overconfident (high confidence + wrong): ${overconfidentCount}\nUnderconfident (low confidence + correct): ${underconfidentCount}\nCalibration score: ${calibrationScore}% (out of ${questionsWithConfidence.length} rated questions)`
+        ? `Overconfident (high confidence + wrong): ${overconfidentCount}\nUnderconfident (low confidence + correct):
+         ${underconfidentCount}\nCalibration score: ${calibrationScore}% (out of ${questionsWithConfidence.length} rated questions)`
         : 'No confidence data available.';
 
       const errorProfileLine = hasConfidenceData
-        ? `Error profile — Conceptual misunderstandings: ${errorTypeProfile.conceptualMisunderstanding}, Recall failures: ${errorTypeProfile.recallFailure}, Careless errors: ${errorTypeProfile.carelessError}${errorTypeProfile.unclassified ? `, Unclassified: ${errorTypeProfile.unclassified}` : ''}`
+        ? `Error profile — Conceptual misunderstandings: ${errorTypeProfile.conceptualMisunderstanding},
+         Recall failures: ${errorTypeProfile.recallFailure}, Careless errors: ${errorTypeProfile.carelessError}${errorTypeProfile.unclassified ? `,
+           Unclassified: ${errorTypeProfile.unclassified}` : ''}`
         : '';
 
-      const aiPrompt = `You are a metacognitive learning analyst. Based on the data below, write SPECIFIC and PERSONALISED feedback for this student. Avoid generic advice — reference the actual questions and patterns.
+      const aiPrompt = `You are a metacognitive learning analyst. Based on the data below, write SPECIFIC and 
+      PERSONALISED feedback for this student. Avoid generic advice — reference the actual questions and patterns.
 
 Score: ${correctCount}/${totalQuestions} (${scorePercentage}%)
 ${confidenceLine}
@@ -697,11 +713,14 @@ Return ONLY valid JSON with this exact structure:
 
   // --- Fallback rule-based strings ---
   const fallbackPatternSpecificity = incorrectQuestions.length
-    ? `Mistakes concentrated across ${incorrectQuestions.length} question${incorrectQuestions.length > 1 ? 's' : ''}${mostProblematicType ? `, especially around "${mostProblematicType}"` : ''}. Look for recurring cues in those prompts.`
+    ? `Mistakes concentrated across ${incorrectQuestions.length} question${incorrectQuestions.length > 1 ? 's' : ''}${mostProblematicType ? `,
+       especially around "${mostProblematicType}"` : ''}. Look for recurring cues in those prompts.`
     : 'No major error pattern detected in this quiz attempt.';
 
   const fallbackConfidenceMismatch = hasConfidenceData
-    ? `${overconfidentCount} overconfident answer${overconfidentCount !== 1 ? 's' : ''} (high confidence, wrong) and ${underconfidentCount} underconfident answer${underconfidentCount !== 1 ? 's' : ''} (low confidence, correct). Calibration: ${calibrationScore}%.`
+    ? `${overconfidentCount} overconfident answer${overconfidentCount !== 1 ? 's' : ''}
+     (high confidence, wrong) and ${underconfidentCount} underconfident answer${underconfidentCount !== 1 ? 's' : ''}
+      (low confidence, correct). Calibration: ${calibrationScore}%.`
     : null;
 
   const fallbackBehavioralInsight =

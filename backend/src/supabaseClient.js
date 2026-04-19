@@ -5,6 +5,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// Handles deriveRestUrlFromAnonKey logic.
 function deriveRestUrlFromAnonKey(anonKey) {
   try {
     // Ensure we have a JWT-like token: three dot-separated parts.
@@ -35,6 +36,7 @@ function deriveRestUrlFromAnonKey(anonKey) {
   return null;
 }
 
+// Handles resolveSupabaseUrl logic.
 function resolveSupabaseUrl(rawUrl, anonKey) {
   if (!rawUrl) return null;
   if (/^postgres(ql)?:\/\//i.test(rawUrl)) {

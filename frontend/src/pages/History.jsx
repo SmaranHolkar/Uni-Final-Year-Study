@@ -6,6 +6,7 @@ import { useAuth } from '../AuthContext'
 import { supabase } from '../supabaseClient'
 import { ChevronDown, ChevronUp, Eye } from 'lucide-react'
 
+// Handles History logic.
 function History() {
   const { user, session } = useAuth()
   const navigate = useNavigate()
@@ -20,6 +21,7 @@ function History() {
 
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000"
 
+  // Handles fetchQuizHistory logic.
   const fetchQuizHistory = async (token) => {
     setLoading(true)
     setError(null)
@@ -40,6 +42,7 @@ function History() {
     }
   }
 
+  // Handles fetchSharedWithMe logic.
   const fetchSharedWithMe = async (token) => {
     setSharedLoading(true)
     try {
@@ -83,12 +86,14 @@ function History() {
   }, [user?.id, session?.access_token])
 
   useEffect(() => {
+    // Handles refreshHistory logic.
     const refreshHistory = () => {
       setQuizzes([])
       setSharedQuizzes([])
       setExpandedId(null)
     }
 
+    // Handles handleStorage logic.
     const handleStorage = (event) => {
       if (event.key === 'user_data_cleared_at') {
         refreshHistory()
@@ -104,21 +109,25 @@ function History() {
     }
   }, [])
 
+  // Handles toggleExpand logic.
   const toggleExpand = (quizId) => {
     setExpandedId(expandedId === quizId ? null : quizId)
   }
 
+  // Handles handleViewQuiz logic.
   const handleViewQuiz = (quiz) => {
     sessionStorage.setItem(`quiz_${quiz.id}`, JSON.stringify(quiz))
     navigate(`/quiz/${quiz.id}`)
   }
 
+  // Handles handleViewShared logic.
   const handleViewShared = (shared) => {
     const quizObj = { id: shared.quiz_id, title: shared.title, quiz: shared.quiz, mindmap: shared.mindmap, created_at: shared.created_at }
     sessionStorage.setItem(`quiz_${shared.quiz_id}`, JSON.stringify(quizObj))
     navigate(`/quiz/${shared.quiz_id}`)
   }
 
+  // Handles parseQuizData logic.
   const parseQuizData = (quizData) => {
     if (typeof quizData === 'string') {
       try {
@@ -130,6 +139,7 @@ function History() {
     return quizData || []
   }
 
+  // Handles parseMindmapData logic.
   const parseMindmapData = (mindmapData) => {
     let parsed = mindmapData
     

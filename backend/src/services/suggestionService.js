@@ -4,6 +4,7 @@ import { getChatCompletion } from '../utils/aiUtils.js';
 /**
  * Fetches the last 10 quiz attempts for a user.
  */
+// Handles getUserQuizHistory logic.
 export async function getUserQuizHistory(userId) {
   try {
     return await sql`
@@ -22,6 +23,7 @@ export async function getUserQuizHistory(userId) {
 /**
  * Analyses quiz history to extract performance stats and weak topics.
  */
+// Handles analyzeQuizPerformance logic.
 export async function analyzeQuizPerformance(quizHistory) {
   if (!quizHistory?.length) return null;
 

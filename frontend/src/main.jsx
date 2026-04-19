@@ -1,3 +1,4 @@
+// Bootstraps the React application into the root DOM node.
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

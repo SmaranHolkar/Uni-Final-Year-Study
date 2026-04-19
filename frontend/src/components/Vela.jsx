@@ -1,3 +1,4 @@
+// Renders the animated Vela branding star and its CSS keyframes.
 import React from 'react';
 
 const velaStyles = `
@@ -51,6 +52,7 @@ const velaStyles = `
   }
 `;
 
+// Renders the animated Vela star graphic with inline CSS effects.
 export default function Vela() {
     return (
         <>

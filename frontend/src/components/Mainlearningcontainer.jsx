@@ -3,6 +3,7 @@ import StepOne from "./slides/StepOne.jsx";
 import StepTwo from "./slides/Steptwo.jsx";
 import StepThree from "./slides/StepThree.jsx"; // We'll create this next
 
+// Handles MultiStepForm logic.
 export default function MultiStepForm() {
   const [step, setStep] = useState(1);
   const [mindmapData, setMindmapData] = useState(null);

@@ -1,3 +1,4 @@
+// Initializes and exports the frontend Supabase client.
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -9,6 +10,6 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    clockSkewInSeconds: 3600, // Tolerate up to 1hr clock skew between server and client
+    clockSkewInSeconds: 3600, // up to 1hr clock skew between server and client
   },
 });

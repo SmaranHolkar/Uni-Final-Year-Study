@@ -6,6 +6,7 @@
  *   - string number (e.g. "2")
  *   - letter        (e.g. "B")
  */
+// Handles getCorrectAnswerText logic.
 export function getCorrectAnswerText(q) {
   if (!q) return 'Unknown';
 

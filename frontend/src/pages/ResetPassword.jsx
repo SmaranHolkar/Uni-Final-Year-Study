@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react";
 import { supabase } from "../supabaseClient";
 
+// Handles ResetPassword logic.
 export default function ResetPassword() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -13,6 +14,7 @@ export default function ResetPassword() {
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
 
+  // Handles handleSubmit logic.
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");

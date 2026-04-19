@@ -5,11 +5,13 @@ import { supabase } from "../supabaseClient";
 import "../App.css";
 import "../index.css";
 
+// Handles Sidebar logic.
 const Sidebar = () => {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Handles handleLogout logic.
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/");
