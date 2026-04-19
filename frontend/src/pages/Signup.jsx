@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, AlertCircle } from "lucide-react";
+import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react";
 import { supabase } from "../supabaseClient";
 
+// Signup page with form validation and error handling
 export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState("");
@@ -15,14 +16,19 @@ export default function Signup() {
   const [success, setSuccess] = useState("");
   const navigate = useNavigate();
 
+  // Handles handleSignup logic.
   async function handleSignup(e) {
     e.preventDefault();
     setError(""); setSuccess("");
 
-    if (!firstName.trim() || !lastName.trim()) return setError("Enter first & last name");
-    if (!email.trim()) return setError("Enter your email");
-    if (password.length < 6) return setError("Password must be 6+ chars");
-    if (!agreedToTerms) return setError("Agree to terms");
+    if (!firstName.trim() || !lastName.trim()) return setError("Please enter your full name.");
+    if (!email.trim()) return setError("Please enter your email.");
+    if (password.length < 6) return setError("Password must be at least 6 characters.");
+    if (!agreedToTerms) return setError("You must agree to the Terms & Conditions.");
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
+    if (!passwordRegex.test(password)) return setError("Password must include uppercase, lowercase, a digit, and a symbol.");
+
+
 
     setLoading(true);
     try {
@@ -32,115 +38,142 @@ export default function Signup() {
         options: { data: { first_name: firstName, last_name: lastName } },
       });
 
-      if (signupError) return setError(signupError.message);
+      if (signupError) throw signupError;
 
       if (data.user) {
-        setSuccess("Check your email to confirm your account.");
-        setTimeout(() => navigate("/login"), 2000);
+        setSuccess("Account created! Check your email to confirm.");
+        setTimeout(() => navigate("/login"), 3000);
       }
-
     } catch (err) {
-      setError(err.message || "Signup failed");
+      console.error("Signup error:", err);
+      setError("Unable to create account. Please try again");
     } finally { setLoading(false); }
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8"
-      style={{ background: "var(--background)", color: "var(--foreground)" }}
-    >
-      <div
-        className="w-full max-w-md sm:max-w-lg md:max-w-md p-6 sm:p-8 rounded-2xl shadow-xl"
-        style={{ background: "var(--card)", color: "var(--card-foreground)" }}
-      >
-        <h1 className="text-2xl sm:text-3xl font-semibold text-center">Create Account</h1>
-        <p className="text-center opacity-70 mb-6 text-sm sm:text-base">
-          Welcome! Start your journey.
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="w-full max-w-md rounded-xl bg-[var(--card)] p-8 shadow-lg">
+        <h1 className="mb-2 text-2xl font-bold text-[var(--foreground)]">
+          Create an account
+        </h1>
+        <p className="mb-6 text-[var(--muted-foreground)]">
+          Start your AI-powered learning journey.
         </p>
 
         {error && (
-          <div className="flex items-center gap-2 p-3 rounded-md mb-4 text-sm sm:text-base"
-            style={{ background: "var(--destructive)", color: "var(--destructive-foreground)" }}>
-            <AlertCircle size={18} /> {error}
+          <div className="mb-4 flex items-center gap-2 rounded-md border border-red-300 bg-red-100 px-3 py-2 text-sm text-red-700">
+            <AlertCircle size={18} />
+            <span>{error}</span>
           </div>
         )}
 
         {success && (
-          <div className="p-3 rounded-md mb-4 text-center font-medium text-sm sm:text-base"
-            style={{ background:"var(--primary)", color:"var(--primary-foreground)" }}>
-            {success}
+          <div className="mb-4 flex items-center gap-2 rounded-md border border-green-300 bg-green-100 px-3 py-2 text-sm text-green-700">
+            <CheckCircle size={18} />
+            <span>{success}</span>
           </div>
         )}
 
         <form onSubmit={handleSignup} className="space-y-4">
-          
-          {/* First/Last name → stacks on mobile */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+                First name
+              </label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                disabled={loading}
+                placeholder="Jane"
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] disabled:opacity-50"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+                Last name
+              </label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                disabled={loading}
+                placeholder="Doe"
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] disabled:opacity-50"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+              Email address
+            </label>
             <input
-              className="flex-1 px-3 py-2 rounded-md border bg-[var(--input)] text-[var(--foreground)] placeholder-gray-300 outline-none"
-              style={{ borderColor: "var(--border)" }}
-              placeholder="First name"
-              value={firstName}
-              onChange={(e)=>setFirstName(e.target.value)}
-            />
-            <input
-              className="flex-1 px-3 py-2 rounded-md border bg-[var(--input)] text-[var(--foreground)] placeholder-gray-300 outline-none"
-              style={{ borderColor: "var(--border)" }}
-              placeholder="Last name"
-              value={lastName}
-              onChange={(e)=>setLastName(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
+              placeholder="you@example.com"
+              className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] disabled:opacity-50"
             />
           </div>
 
-          <input
-            className="w-full px-3 py-2 rounded-md border bg-[var(--input)] text-[var(--foreground)] placeholder-gray-300 outline-none"
-            style={{ borderColor: "var(--border)" }}
-            placeholder="Email"
-            type="email"
-            value={email}
-            onChange={(e)=>setEmail(e.target.value)}
-          />
-
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              className="w-full px-3 py-2 rounded-md border bg-[var(--input)] text-[var(--foreground)] placeholder-gray-300 outline-none"
-              style={{ borderColor:"var(--border)" }}
-              value={password}
-              onChange={(e)=>setPassword(e.target.value)}
-            />
-            <button
-              type="button"
-              className="absolute right-3 top-2.5 opacity-70 hover:opacity-100"
-              onClick={()=>setShowPassword(!showPassword)}
-            >
-              {showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}
-            </button>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+              Password
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                placeholder="At least 6 characters"
+                className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 pr-10 text-sm text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                disabled={loading}
+                className="absolute inset-y-0 right-2 flex items-center text-[var(--muted-foreground)] transition-opacity"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
-          <label className="flex items-center gap-2 text-sm sm:text-base">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-[var(--muted-foreground)]">
             <input
               type="checkbox"
               checked={agreedToTerms}
-              onChange={(e)=>setAgreedToTerms(e.target.checked)}
-              className="h-4 w-4"
+              onChange={(e) => setAgreedToTerms(e.target.checked)}
+              className="rounded accent-[var(--primary)]"
             />
-            <span>I agree to the <b>Terms & Conditions</b></span>
+            I agree to the{" "}
+            <Link
+              to="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--primary)] font-medium transition-opacity hover:opacity-80"
+            >
+              Terms &amp; Conditions
+            </Link>
           </label>
 
           <button
-            className="w-full py-2 rounded-md font-semibold text-sm sm:text-base mt-2 transition hover:scale-[1.02]"
-            style={{ background:"var(--primary)", color:"var(--primary-foreground)" }}
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-md bg-[var(--primary)] py-2 font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? "Creating..." : "Create account"}
+            {loading ? "Creating account..." : "Create account"}
           </button>
         </form>
 
-        <p className="text-center mt-4 text-sm sm:text-base opacity-80">
+        <p className="mt-6 text-center text-sm text-[var(--muted-foreground)]">
           Already have an account?{" "}
-          <a href="/login" className="font-medium hover:underline"
-            style={{ color:"var(--primary)" }}>Login</a>
+          <Link to="/login" className="text-[var(--primary)] no-underline transition-opacity hover:opacity-80">
+            Log in here
+          </Link>
         </p>
       </div>
     </div>

@@ -2,10 +2,10 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon --watch src --exec node src/server.js",
+    "start": "node --max-old-space-size=512 --expose-gc src/server.js",
+    "dev": "nodemon --watch src --exec node --max-old-space-size=512 --expose-gc src/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -21,9 +21,10 @@
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "groq-sdk": "^0.37.0",
-    "mongodb": "^7.0.0",
-    "mongoose": "^8.19.3",
+    "mammoth": "^1.9.1",
+    "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
+    "pdf2json": "^4.0.2",
     "pg": "^8.16.3",
     "postgres": "^3.4.7",
     "react-hooks": "^1.0.1"

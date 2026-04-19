@@ -1,40 +1,75 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { useAuth } from "./AuthContext";
+// Configures the main app router and auth-aware page layout.
 
-import Navbar from "./components/navbar.jsx";
-import Sidebar from "./components/sidebar.jsx";
-
-import HeroSection from "./components/Hero.jsx";
+import { useAuth } from './AuthContext';
+import Sidebar from './components/sidebar.jsx';
+import './App.css';
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from './AuthContext';
+import Navbar from './components/navbar.jsx';
+import HeroSection from './components/Hero.jsx';
 import Signup from "./pages/Signup";
-import Login from "./pages/Login.jsx";
+import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/dashbaord";
+import PrivateRoute from "./components/PrivateRoute.jsx";
 import Learn from "./pages/Learningpage";
+import NotFound from "./pages/NotFound/NotFound";
+import History from "./pages/History";
+import QuizDetail from "./pages/QuizDetail";
+import Profile from "./pages/Profile";
+import ResetPassword from './pages/ResetPassword';
+import Learningplayground from './pages/Learningplayground.jsx';
+import PublicPageBackground from './components/PublicPageBackground.jsx';
+import TermsAndConditions from './pages/TermsAndConditions';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
-function App() {
+// Renders routes and switches nav/sidebar based on authentication state.
+function AppContent() {
   const { user, loading } = useAuth();
 
-  if (loading) return null; // prevent flicker
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-black">
+        <div className="text-center">
+          <div className="mx-auto mb-5 size-12 animate-spin rounded-full border-4 border-white/10 border-t-white" />
+          <p className="text-sm text-white">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Router>
-      {/* ✅ Navbar ONLY when logged out */}
-      {!user && <Navbar />}
-
-      {/* ✅ Sidebar ONLY when logged in */}
-      {user && <Sidebar />}
-
+    <>
+      {user ? <Sidebar /> : <Navbar />}
       <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<HeroSection />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/login" element={<Login />} />
-
-        {/* App routes (sidebar navigation) */}
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/learningpage" element={<Learn />} />
+        <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <HeroSection />} />
+        <Route path="/signup" element={<PublicPageBackground><Signup /></PublicPageBackground>} />
+        <Route path="/login" element={<PublicPageBackground><Login /></PublicPageBackground>} />
+        <Route path="/forgot-password" element={<PublicPageBackground><ForgotPassword /></PublicPageBackground>} />
+        <Route path="/reset-password" element={<PublicPageBackground><ResetPassword /></PublicPageBackground>} />
+        <Route path="/terms" element={<PublicPageBackground><TermsAndConditions /></PublicPageBackground>} />
+        <Route path="/privacy" element={<PublicPageBackground><PrivacyPolicy /></PublicPageBackground>} />
+        <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+        <Route path="/learningpage" element={<PrivateRoute><Learn /></PrivateRoute>} />
+        <Route path="/Learningplayground" element={<PrivateRoute><Learningplayground /></PrivateRoute>} />
+        <Route path="/history" element={<PrivateRoute><History /></PrivateRoute>} />
+        <Route path="/Profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+        <Route path="/quiz/:quizId" element={<PrivateRoute><QuizDetail /></PrivateRoute>} />
+        <Route path="*" element={user ? <NotFound /> : <PublicPageBackground><NotFound /></PublicPageBackground>} />
       </Routes>
+    </>
+  );
+}
+
+// Wraps the app in routing and auth providers.
+function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </Router>
   );
 }
 
-export default App;
+export default App

@@ -1,68 +1,171 @@
-import React, { useMemo, useState, useCallback } from "react";
-import ReactFlow, {
+import React, { useMemo, useState, useCallback, useEffect, useRef } from "react";
+import {
+  ReactFlow,
   useNodesState,
   useEdgesState,
   Controls,
   Background,
   BackgroundVariant,
   MiniMap,
-  addEdge,
-} from "reactflow";
-import "reactflow/dist/style.css";
+} from "@xyflow/react";
+import '@xyflow/react/dist/style.css';
 import { ArrowLeft, ExternalLink, Lightbulb, X } from "lucide-react";
+import axios from "axios";
+import { useAuth } from "../../AuthContext";
+import { supabase } from "../../supabaseClient";
 
-// Color palette from the top example
+// Color palette
 const categoryColors = [
-  "hsl(0, 70%, 60%)",   // Red-ish
-  "hsl(142, 70%, 50%)", // Green-ish
-  "hsl(195, 85%, 55%)", // Blue-ish
-  "hsl(280, 70%, 60%)"  // Purple-ish
+  "hsl(0, 70%, 60%)",
+  "hsl(142, 70%, 50%)",
+  "hsl(195, 85%, 55%)",
+  "hsl(280, 70%, 60%)",
 ];
 
-export default function StepThree({ data, onRetake }) {
-  const [selectedNode, setSelectedNode] = useState(null);
+// Helper function for exponential backoff retry
+async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 2000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      const isRateLimited = error.response?.status === 429 || 
+                           error.message?.includes('Rate limit') ||
+                           error.message?.includes('rate_limit_exceeded');
+      
+      if (isRateLimited && i < maxRetries - 1) {
+        const delay = initialDelay * Math.pow(2, i);
+        console.log(`Rate limited. Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        throw error;
+      }
+    }
+  }
+}
 
-  // 🧠 Build ReactFlow nodes + edges from backend mindmap
+// Handles StepThree logic.
+export default function StepThree({ data, onRetake, quizResults }) {
+  const { user, session, currentDocumentTitle } = useAuth();
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [mcq, setMcq] = useState(null);
+  const [saveStatus, setSaveStatus] = useState(null);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const hasAutoSavedRef = useRef(false);
+
+ 
+  // Build initial nodes & edges
   const { initialNodes, initialEdges } = useMemo(() => {
-    if (!data || !data.nodes || !data.edges) {
+    if (!data?.nodes || !data?.edges) {
       return { initialNodes: [], initialEdges: [] };
     }
 
-    const nodes = data.nodes.map((n, i) => {
-      // Pick a color based on index to mimic categories
-      const color = categoryColors[i % categoryColors.length];
+    // Build tree structure for layout calculation
+    const nodeMap = {};
+    const children = {};
+    
+    data.nodes.forEach(n => {
+      nodeMap[n.id] = n;
+      children[n.id] = [];
+    });
+
+    // Parse edges - handle both {from, to} and {source, target} formats
+    const edgeList = data.edges.map(e => ({
+      from: e.from || e.source,
+      to: e.to || e.target,
+    }));
+
+    edgeList.forEach(e => {
+      if (children[e.from]) {
+        children[e.from].push(e.to);
+      }
+    });
+
+    // Find root nodes (nodes with no incoming edges)
+    const incomingCount = {};
+    data.nodes.forEach(n => {
+      incomingCount[n.id] = 0;
+    });
+
+    edgeList.forEach(e => {
+      incomingCount[e.to] = (incomingCount[e.to] || 0) + 1;
+    });
+
+    const roots = data.nodes.filter(n => incomingCount[n.id] === 0);
+
+    if (roots.length === 0 && data.nodes.length > 0) {
+      roots.push(data.nodes[0]);
+    }
+
+    // Calculate positions using BFS (top-down tree layout)
+    const positions = {};
+    const visited = new Set();
+    const depthLevels = {};
+
+    const queue = roots.map((r) => ({ id: r.id, depth: 0 }));
+
+    while (queue.length > 0) {
+      const { id, depth } = queue.shift();
       
+      if (visited.has(id)) continue;
+      visited.add(id);
+
+      if (!depthLevels[depth]) {
+        depthLevels[depth] = [];
+      }
+      depthLevels[depth].push(id);
+
+      if (children[id]) {
+        children[id].forEach((childId) => {
+          if (!visited.has(childId)) {
+            queue.push({ id: childId, depth: depth + 1 });
+          }
+        });
+      }
+    }
+
+    // Assign positions: y based on depth, x spread horizontally
+    Object.entries(depthLevels).forEach(([depth, nodeIds]) => {
+      const y = parseInt(depth) * 200; // Vertical spacing
+      const totalWidth = (nodeIds.length - 1) * 200;
+      const startX = -totalWidth / 2;
+
+      nodeIds.forEach((id, idx) => {
+        positions[id] = {
+          x: startX + idx * 200,
+          y: y,
+        };
+      });
+    });
+
+    const nodes = data.nodes.map((n, i) => {
+      const color = categoryColors[i % categoryColors.length];
+
       return {
         id: n.id,
-        // Store extra data for the popup card
-        data: { 
+        data: {
           label: n.label,
-          description: n.description || "Review this concept to improve your understanding.",
+          description:
+            n.description || "Review this concept to improve your understanding.",
           category: n.category || "Review Topic",
-          sourceLink: n.sourceLink || ""
+          sourceLink: n.sourceLink,
         },
-        position: {
-          x: i * 250,
-          y: i % 2 === 0 ? 0 : 150,
-        },
-        // Styling from the "KnowledgeGraph" example
+        position: positions[n.id] || { x: 0, y: 0 },
         style: {
           background: color,
           color: "white",
-          border: "2px solid rgba(255, 255, 255, 0.3)",
           borderRadius: "12px",
           padding: "12px 20px",
-          fontSize: "14px",
-          fontWeight: "600",
-          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
-          width: 'auto',
-          minWidth: '150px',
-          textAlign: 'center'
+          fontWeight: 600,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+          minWidth: "150px",
+          textAlign: "center",
         },
       };
     });
 
-    const edges = data.edges.map((e, i) => ({
+    const edges = edgeList.map((e, i) => ({
       id: `e-${i}`,
       source: e.from,
       target: e.to,
@@ -80,181 +183,330 @@ export default function StepThree({ data, onRetake }) {
     setSelectedNode(node);
   }, []);
 
-  // If no data was provided, show a friendly message and action
+  // Save quiz and mindmap to database with rate limiting
+  const handleSaveQuizAndMindmap = async () => {
+    const accessToken = session?.access_token;
+    if (!user?.id || !accessToken || !data || data._perfect || data._failed) {
+      setSaveStatus('error');
+      setSaveMessage('Cannot save: Missing session or invalid data');
+      return;
+    }
+
+    setSaveStatus('saving');
+    setSaveMessage('Saving your progress...');
+
+    try {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      
+      await retryWithBackoff(async () => {
+        return await axios.post(
+          `${API_BASE}/api/save-quiz-mindmap?token=${encodeURIComponent(accessToken)}`,
+          {
+            userId: user.id,
+            title: currentDocumentTitle || `Quiz - ${new Date().toLocaleDateString()}`,
+            quizResults: quizResults || [],
+            mindmapNodes: {
+              nodes: data.nodes || [],
+              edges: data.edges || []
+            }
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+            withCredentials: true
+          }
+        );
+      });
+
+      setSaveStatus('success');
+      setSaveMessage('Quiz and mindmap saved successfully!');
+      
+      setTimeout(() => {
+        setSaveStatus(null);
+        setSaveMessage('');
+      }, 3000);
+    } catch (err) {
+      console.error("Error saving quiz and mindmap:", err);
+      setSaveStatus('error');
+      setSaveMessage('Failed to save. Please try again');
+    }
+  };
+
+  useEffect(() => {
+    if (hasAutoSavedRef.current) return;
+    if (!user?.id || !session?.access_token || !data || data._perfect || data._failed) return;
+
+    hasAutoSavedRef.current = true;
+    handleSaveQuizAndMindmap();
+  }, [user?.id, session?.access_token, data]);
+
+ 
+  // Add Similar Topic Node
+  
+  const handleAddSimilarTopic = async () => {
+    if (!selectedNode) return;
+
+    setLoading(true);
+    try {
+      const { data: { session: freshSession } } = await supabase.auth.getSession();
+      if (!freshSession?.access_token) {
+        alert('Session expired. Please refresh and log in again.');
+        setLoading(false);
+        return;
+      }
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const res = await axios.post(
+        `${API_BASE}/api/generate-similar-topic?token=${encodeURIComponent(freshSession.access_token)}`,
+        { topic: selectedNode.data.label, description: selectedNode.data.description },
+        { headers: { Authorization: `Bearer ${freshSession.access_token}` }, withCredentials: true }
+      );
+
+      const newId = `node-${Date.now()}`;
+
+      const newNode = {
+        id: newId,
+        data: {
+          label: res.data.label,
+          description: res.data.description,
+          category: "Related Topic",
+        },
+        position: {
+          x: selectedNode.position.x,
+          y: selectedNode.position.y + 220, // Position below parent in tree layout
+        },
+        style: {
+          background:
+            categoryColors[Math.floor(Math.random() * categoryColors.length)],
+          color: "white",
+          borderRadius: "12px",
+          padding: "12px 20px",
+          fontWeight: 600,
+        },
+      };
+
+      const newEdge = {
+        id: `e-${selectedNode.id}-${newId}`,
+        source: selectedNode.id,
+        target: newId,
+        animated: true,
+        style: { strokeWidth: 2 },
+      };
+
+      setNodes((nds) => [...nds, newNode]);
+      setEdges((eds) => [...eds, newEdge]);
+    } catch {
+      alert("Failed to generate similar topic");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  
+  // Generate MCQ
+
+  const handleGenerateMCQ = async () => {
+    if (!selectedNode) return;
+
+    setLoading(true);
+    try {
+      const { data: { session: freshSession } } = await supabase.auth.getSession();
+      if (!freshSession?.access_token) {
+        alert('Session expired. Please refresh and log in again.');
+        setLoading(false);
+        return;
+      }
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const res = await axios.post(
+        `${API_BASE}/api/generate-mcq-for-topic?token=${encodeURIComponent(freshSession.access_token)}`,
+        { topic: selectedNode.data.label, description: selectedNode.data.description },
+        { headers: { Authorization: `Bearer ${freshSession.access_token}` }, withCredentials: true }
+      );
+
+      setMcq(res.data); // { question, choices[], answer }
+      setSelectedAnswer(null);
+    } catch {
+      alert("Failed to generate MCQ");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  
+  // Empty, Perfect, Failed States
+
   if (!data) {
     return (
-      <div className="h-80 flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-dashed border-gray-300 p-8 text-center">
-        <h2 className="text-xl font-semibold text-slate-700 mb-2">No review map available</h2>
-        <p className="text-sm text-slate-500 mb-4">Complete the quiz to generate a personalized review map.</p>
-        <button
-          onClick={onRetake}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          Take Quiz
-        </button>
+      <div className="h-80 flex flex-col items-center justify-center text-center">
+        <p>No review map available</p>
+        <button onClick={onRetake}>Take Quiz</button>
       </div>
     );
   }
 
-  // Handle Perfect Score State
-  if (data && data._perfect) {
+  if (data._perfect) {
     return (
-      <div className="h-80 flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-dashed border-gray-300 p-8 text-center">
-        <div className="bg-green-100 p-4 rounded-full mb-4">
-          <Lightbulb className="w-8 h-8 text-green-600" />
-        </div>
-        <h2 className="text-2xl font-bold mb-2 text-gray-800">🎉 Perfect Score!</h2>
-        <p className="mb-6 text-gray-600 max-w-md">You mastered these topics completely. No review map needed!</p>
-        <button
-          onClick={onRetake}
-          className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors shadow-lg"
-        >
-          Restart Quiz
-        </button>
+      <div className="h-80 flex flex-col items-center justify-center text-center">
+        <Lightbulb className="w-10 h-10 text-green-600 mb-2" />
+        <h2 className="text-xl font-bold">Perfect Score 🎉</h2>
+        <button onClick={onRetake}>Restart Quiz</button>
       </div>
     );
   }
 
-  //Handle "Failed Generation" State --
-  if (data && data._failed) {
+  if (data._failed) {
     return (
-      <div className="h-[500px] flex flex-col items-center justify-center bg-red-50 rounded-xl border border-red-200 p-8 text-center">
-        <h2 className="text-2xl font-bold mb-2 text-red-700">Mindmap Not Available</h2>
-        <p className="mb-6 text-red-600">
-          There was a glitch generating your review map.
-        </p>
-        <button
-          onClick={onRetake}
-          className="px-6 py-2 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors shadow-lg"
-        >
-          Try Again
-        </button>
+      <div className="h-80 flex flex-col items-center justify-center text-center">
+        <h2 className="text-xl font-bold text-red-600">
+          Mindmap Generation Failed
+        </h2>
+        <button onClick={onRetake}>Try Again</button>
       </div>
     );
   }
-const [printMode, setPrintMode] = useState(false);
 
-  //Main Mindmap with ReactFlow
+  // Main Render
+ 
   return (
-    <div className="h-full w-full flex flex-col bg-slate-50 rounded-xl border border-slate-200 shadow-xl relative overflow-visible">
-      
-      {/* Header Bar */}
-      <div className="p-4 bg-white border-b flex items-center justify-between z-10 shadow-sm">
-        <div className="flex items-center gap-4">
+    <div className="h-[900px] relative bg-slate-50 rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="p-4 bg-white border-b flex items-center justify-between">
+        <div className="flex items-center gap-2">
           <button
             onClick={onRetake}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors border"
+            className="flex items-center gap-2 px-3 py-1 border rounded-md hover:bg-slate-100"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
-          
-          <div>
-            <h1 className="text-lg font-bold text-slate-800">Your Review Map</h1>
-            <p className="text-xs text-slate-500">Click nodes to see details</p>
-          </div>
-          <div>
-            
-          </div>
-
+          <h1 className="font-bold text-lg">Your Review Map</h1>
         </div>
+
+        <div />
       </div>
 
-      <div className="flex-1 flex relative">
-        <div className="flex-1 relative bg-slate-50">
-          <div className="w-full h-full" style={{ height: '1000px' }}>
-            <ReactFlow
-              className="w-full h-full"
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onNodeClick={onNodeClick}
-              fitView
+      {/* Status Message */}
+      {saveMessage && (
+        <div className={`px-4 py-2 text-sm font-medium text-center ${
+          saveStatus === 'success'
+            ? 'bg-green-50 text-green-700'
+            : saveStatus === 'error'
+            ? 'bg-red-50 text-red-700'
+            : 'bg-blue-50 text-blue-700'
+        }`}>
+          {saveMessage}
+        </div>
+      )}
+
+      {/* Graph */}
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        onPaneClick={() => setSelectedNode(null)}
+        fitView
+      >
+        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+        <Controls />
+        <MiniMap />
+      </ReactFlow>
+
+      {/* Node Details Panel */}
+      {selectedNode && (
+        <div className="absolute top-4 right-4 w-80 bg-white rounded-xl shadow-xl p-6 z-20">
+          <div className="flex justify-between mb-2">
+            <span
+              className="text-xs text-white px-2 py-1 rounded"
+              style={{ background: selectedNode.style.background }}
             >
-              <Background variant={BackgroundVariant.Dots} gap={16} size={1} color="#cbd5e1" />
-              <Controls className="bg-white border shadow-md" />
-              <MiniMap
-                nodeColor={(node) => (node?.style?.background ?? '#3b82f6')}
-                style={{ background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}
-              />
-            </ReactFlow>
+              {selectedNode.data.category}
+            </span>
+            <button onClick={() => setSelectedNode(null)}>
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Hint Overlay */}
-          {!selectedNode && (
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-lg border border-slate-200 flex items-center gap-2 animate-fade-in">
-              <Lightbulb className="w-4 h-4 text-yellow-500" />
-              <p className="text-sm font-medium text-slate-600">Select a topic to view details</p>
-            </div>
-          )}
+          <h2 className="font-bold text-lg mb-2">
+            {selectedNode.data.label}
+          </h2>
+          <p className="text-sm text-slate-600 mb-4">
+            {selectedNode.data.description}
+          </p>
+
+          <button
+            className="w-full mb-2 p-2 bg-blue-600 text-white rounded"
+            onClick={handleAddSimilarTopic}
+            disabled={loading}
+          >
+            Add Similar Topic
+          </button>
+
+          <button
+            className="w-full p-2 bg-purple-600 text-white rounded"
+            onClick={handleGenerateMCQ}
+            disabled={loading}
+          >
+           Generate MCQ
+          </button>
+
+
         </div>
+      )}
 
-        {/* Floating Details Card (Styled like the reference) */}
-        {selectedNode && (
-          <div className="absolute top-4 right-4 w-80 bg-white/95 backdrop-blur-sm rounded-xl border border-slate-200 shadow-2xl overflow-hidden z-20 animate-in slide-in-from-right-10 fade-in duration-300">
-            <div className="p-6 space-y-4">
-              <div className="flex justify-between items-start">
-                <span 
-                  className="px-2 py-1 text-xs font-bold rounded-md text-white"
-                  style={{ backgroundColor: selectedNode.style.background }}
-                >
-                  {selectedNode.data.category}
-                </span>
-                <button 
-                  onClick={() => setSelectedNode(null)}
-                  className="text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+      {/* MCQ Modal */}
+      {mcq && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl w-[420px]">
+            <h2 className="font-bold mb-4">{mcq.question}</h2>
 
-              <div className="h-full w-full">
-                <h2 className="text-xl font-bold text-slate-800 mb-2">{selectedNode.data.label}</h2>
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  {selectedNode.data.description}
-                </p>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-3">
-                  Recommended Action
-                </h3>
-
-                {selectedNode.data.sourceLink && (
-                  <a
-                    href={selectedNode.data.sourceLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg 
-                              bg-slate-100 hover:bg-slate-200 text-slate-700 
-                              transition-all text-sm font-medium group
-                              hover:shadow-sm active:scale-[0.98]"
+            <div className="space-y-2">
+              {mcq.choices.map((c, i) => {
+                const letterMap = ['A', 'B', 'C', 'D'];
+                const letter = letterMap[i];
+                const isSelected = selectedAnswer === letter;
+                const isCorrect = mcq.answer === letter;
+                let btnClass = 'w-full p-2 border rounded text-left transition-colors ';
+                if (selectedAnswer) {
+                  if (isCorrect) btnClass += 'bg-green-100 border-green-500 text-green-800 font-semibold';
+                  else if (isSelected) btnClass += 'bg-red-100 border-red-400 text-red-700';
+                  else btnClass += 'bg-white text-slate-500';
+                } else {
+                  btnClass += 'hover:bg-slate-100';
+                }
+                return (
+                  <button
+                    key={i}
+                    className={btnClass}
+                    disabled={!!selectedAnswer}
+                    onClick={() => setSelectedAnswer(letter)}
                   >
-                    <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                    <span className="truncate max-w-[200px]">
-                      Open Learning Resource
-                    </span>
-                  </a>
-                )}
-
-              </div>
+                    <span className="font-medium mr-2">{letter}.</span>{c}
+                    {selectedAnswer && isCorrect && <span className="ml-2">✓</span>}
+                    {selectedAnswer && isSelected && !isCorrect && <span className="ml-2">✗</span>}
+                  </button>
+                );
+              })}
             </div>
+
+            {selectedAnswer && (
+              <p className={`mt-3 text-sm font-medium ${selectedAnswer === mcq.answer ? 'text-green-700' : 'text-red-600'}`}>
+                {selectedAnswer === mcq.answer
+                  ? '🎉 Correct!'
+                  : `Incorrect. The correct answer is ${mcq.answer}.`}
+              </p>
+            )}
+
+            <button
+              className="mt-4 w-full bg-slate-700 text-white p-2 rounded"
+              onClick={() => { setMcq(null); setSelectedAnswer(null); }}
+            >
+              Close
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
-
-//                 {selectedNode.data.sourceLink && (
-//   <a
-//     href={selectedNode.data.sourceLink}
-//     target="_blank"
-//     rel="noopener noreferrer"
-//     className="w-full flex items-center justify-center gap-2 p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors text-sm font-medium group"
-//   >
-//     <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
-//     Open Learning Resource
-//   </a>
-// )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
 
+// Handles Auth logic.
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,29 +20,35 @@ export default function Auth() {
     return () => subscription?.unsubscribe();
   }, []);
 
+  // Handles signUp logic.
   async function signUp() {
     setMsg('Signing up...');
     const { error } = await supabase.auth.signUp({ email, password });
-    if (error) setMsg(error.message);
-    else setMsg('Check your email for confirmation .');
+    if (error) {
+      console.error('Signup error:', error);
+      setMsg('Unable to create account. Please try again');
+    } else setMsg('Check your email for confirmation .');
   }
 
+  // Handles signIn logic.
   async function signIn() {
     setMsg('Signing in...');
     const { error, data } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      setMsg(error.message);
+      console.error('Signin error:', error);
+      setMsg('Invalid email or password');
       return;
     }
     setMsg(`Signed in as ${data.user.email}`);
   }
 
+  // Handles signOut logic.
   async function signOut() {
     await supabase.auth.signOut();
     setMsg('Signed out');
   }
 
-  // Example: call backend with Bearer token
+  // call backend with Bearer token
   async function callProtected() {
     const { data } = await supabase.auth.getSession();
     const token = data?.session?.access_token;

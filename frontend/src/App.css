@@ -1,3 +1,144 @@
+/* Sidebar Styles - Enhanced */
+.sidebar-toggle {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  background: var(--sidebar-primary, var(--primary));
+  color: var(--sidebar-primary-foreground, var(--primary-foreground));
+  border: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius, 12px);
+  font-size: 1.2rem;
+  cursor: pointer;
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar {
+  position: fixed;
+  left: -18rem;
+  width: 18rem;
+  height: 100vh;
+  background: var(--sidebar, var(--card));
+  color: var(--sidebar-foreground, var(--card-foreground));
+  transition: left 0.3s ease, transform 0.3s ease;
+  z-index: 99;
+  border-right: 1px solid var(--sidebar-border, var(--border));
+}
+
+.sidebar.open {
+  left: 0;
+}
+
+.sidebar-content {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 0.5rem;
+}
+
+.sidebar-logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--sidebar-primary, var(--primary));
+  text-decoration: none;
+  margin-bottom: 1.5rem;
+  display: block;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sidebar-link {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius, 12px);
+  text-decoration: none;
+  color: var(--sidebar-foreground, var(--card-foreground));
+  font-weight: 500;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar-link:hover {
+  background-color: var(--sidebar-accent, var(--primary));
+  color: var(--sidebar-accent-foreground, var(--primary-foreground));
+}
+
+.sidebar-primary {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--sidebar-primary, var(--primary));
+  color: var(--sidebar-primary-foreground, var(--primary-foreground));
+  text-align: center;
+  border-radius: var(--radius, 12px);
+  font-weight: 600;
+  text-decoration: none;
+  margin-top: 1rem;
+  transition: opacity 0.2s;
+}
+
+.sidebar-primary:hover {
+  opacity: 0.9;
+}
+
+.sidebar-primary:hover {
+  opacity: 0.9;
+}
+
+.sidebar-section {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--muted-foreground);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sidebar-logout {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  border: none;
+  border-radius: var(--radius, 12px);
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: auto;
+  transition: opacity 0.2s;
+}
+
+.sidebar-logout:hover {
+  opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .sidebar-toggle {
+    display: flex;
+  }
+  .sidebar {
+    left: -18rem;
+  }
+  .sidebar.open {
+    left: 0;
+  }
+}
+
+@media (min-width: 769px) {
+  .sidebar {
+    left: 0 !important;
+  }
+  .sidebar-toggle {
+    display: none;
+  }
+}
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -50,8 +191,9 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  background-color: var(--primary);
-  /* Will be light by default */
+  background-color: color-mix(in oklch, var(--chart-2) 75%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: var(--card);
   font-family: var(--font-sans);
   border-bottom: 1px solid var(--border);
@@ -68,7 +210,7 @@
 }
 
 .nav-links a {
-  color: var(--shadow-2xs);
+  color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
   font-weight: 500;
   transition: color 0.2s;
@@ -76,7 +218,7 @@
 }
 
 .nav-links a:hover {
-  color: var(--foreground);
+  color: #ffffff;
 }
 
 .logout-btn {
@@ -107,7 +249,9 @@
     position: absolute;
     top: 60px;
     right: 0;
-    background-color: var(--card-foreground);
+    background-color: color-mix(in oklch, var(--chart-2) 85%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     flex-direction: column;
     align-items: flex-start;
     width: 100%;
@@ -115,6 +259,7 @@
     gap: 10px;
     display: none;
     border-radius: 16px;
+    border: 1px solid var(--border);
   }
 
   .nav-links.open {
@@ -132,100 +277,42 @@
   }
 }
 
-.navbar {
-  width: 70%;
-  margin: 5px auto 0 auto;
-  border-radius: 15px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 20px;
-  position: fixed;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  background-color: var(--primary);
-  /* Will be light by default */
-  color: var(--card);
-  font-family: var(--font-sans);
-  border-bottom: 1px solid var(--border);
-}
-
-.nav-logo {
-  font-weight: bold;
-  font-size: 1.2rem;
-}
-
-.nav-links {
-  display: flex;
-  gap: 20px;
-}
-
-.nav-links a {
-  color: var(--shadow-2xs);
+.shadow__btn,
+a.shadow__btn {
+  display: inline-block;
   text-decoration: none;
-  font-weight: 500;
-  transition: color 0.2s;
-  padding: 0.4rem 1.0rem;
-}
-
-.nav-links a:hover {
-  color: var(--foreground);
-}
-
-/* Hamburger (hidden on desktop) */
-.hamburger {
-  display: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-}
-
-/* ✅ Responsive behaviour */
-@media (max-width: 768px) {
-  .nav-links {
-    position: absolute;
-    top: 60px;
-    right: 0;
-    background-color: var(--card-foreground);
-    flex-direction: column;
-    align-items: flex-start;
-    width: 100%;
-    padding: 15px;
-    gap: 10px;
-    display: none;
-    border-radius: 16px;
-  }
-
-  .nav-links.open {
-    display: flex;
-  }
-
-  .hamburger {
-    display: block;
-    border-radius: 14;
-  }
-
-  .sidebar {
-    width: 70%;
-    padding: 10px 15px;
-  }
-}
-
-.shadow__btn {
-  color: var(--shadow-2xs);
-  border: none;
-  padding: 0.75rem 1.5rem;
-  font-size: 1rem;
+  border: 1.5px solid transparent;
+  padding: 0.45rem 1.2rem;
+  font-size: 0.9rem;
+  font-weight: 600;
   border-radius: var(--radius);
   cursor: pointer;
-  box-shadow: var(--);
-  transition: box-shadow 0.2s, transform 0.2s;
+  transition: background-color 0.2s, transform 0.15s, box-shadow 0.2s;
+  /* Sign up — solid white with dark text */
+  background-color: #ffffff;
+  color: #0d0d1a !important;
+  box-shadow: var(--shadow-md);
 }
 
-.shadow__btn {
-  background-color: var(--destructive);
-  box-shadow: var(--shadow-md);
+.shadow__btn:hover {
+  background-color: oklch(0.840 0.120 68);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Login ghost variant */
+.shadow__btn--ghost {
+  background-color: transparent;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: none;
+}
+
+.shadow__btn--ghost:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+  box-shadow: none;
 }
 
 .signup-page {
@@ -351,141 +438,9 @@
 .submit-btn:hover {
   opacity: 0.9;
 }
-.sidebar-toggle {
-      position: fixed;
-      top: 1rem;
-      left: 1rem;
-      background: var(--sidebar-primary);
-      color: var(--sidebar-primary-foreground);
-      border: none;
-      width: 2.5rem;
-      height: 2.5rem;
-      border-radius: var(--radius);
-      font-size: 1.2rem;
-      cursor: pointer;
-      z-index: 100;
-      display: none;
-      align-items: center;
-      justify-content: center;
-    }
 
-    /* Sidebar */
-    .sidebar {
-      position: fixed;
-      top: 0;
-      left: -18rem;
-      width: 18rem;
-      height: 100vh;
-      background: var(--sidebar);
-      color: var(--sidebar-foreground);
-      transition: left 0.3s ease, transform 0.3s ease;
-      z-index: 99;
-      border-right: 1px solid var(--sidebar-border);
-    }
+/* Sidebar responsive styles */
 
-    .sidebar.open {
-      left: 0;
-    }
-
-    .sidebar-content {
-      padding: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      gap: 0.5rem;
-    }
-
-    /* Logo */
-    .sidebar-logo {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--sidebar-primary);
-      text-decoration: none;
-      margin-bottom: 1.5rem;
-      display: block;
-    }
-
-    /* Navigation Links */
-    .sidebar-nav {
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-
-    .sidebar-link {
-      padding: 0.75rem 1rem;
-      border-radius: var(--radius);
-      text-decoration: none;
-      color: var(--sidebar-foreground);
-      font-weight: 500;
-      transition: background-color 0.2s, color 0.2s;
-    }
-
-    .sidebar-link:hover {
-      background-color: var(--sidebar-accent);
-      color: var(--sidebar-accent-foreground);
-    }
-
-    /* Primary Action */
-    .sidebar-primary {
-      display: block;
-      width: 100%;
-      padding: 0.75rem 1rem;
-      background: var(--sidebar-primary);
-      color: var(--sidebar-primary-foreground);
-      text-align: center;
-      border-radius: var(--radius);
-      font-weight: 600;
-      text-decoration: none;
-      margin-top: 1rem;
-      transition: opacity 0.2s;
-    }
-
-    .sidebar-primary:hover {
-      opacity: 0.9;
-    }
-
-    /* Section Header */
-    .sidebar-section {
-      margin-top: 1.5rem;
-      margin-bottom: 0.5rem;
-      font-size: 0.875rem;
-      color: var(--muted-foreground);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    /* Logout Button */
-    .sidebar-logout {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      background: var(--destructive);
-      color: var(--destructive-foreground);
-      border: none;
-      border-radius: var(--radius);
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: auto;
-      transition: opacity 0.2s;
-    }
-
-    .sidebar-logout:hover {
-      opacity: 0.9;
-    }
-
-/* On desktop, always show sidebar */
-@media (min-width: 769px) {
-  .sidebar {
-    left: 0 !important;
-    box-shadow: none;
-    border-right: 1px solid #e5e7eb;
-  }
-
-  .sidebar-toggle {
-    display: none;
-  }
-}
 
 /* Center hero vertically while preserving existing spacing/look */
 .hero-section {
@@ -571,15 +526,74 @@
 
 /* Main content area that sits to the right of the fixed sidebar */
 .main-content {
-  margin-left: 260px;
-  padding: 2rem;
+  margin-left: 288px;
+  padding: 0;
   /* Use calc to subtract the sidebar width from the total width */
-  width: calc(100% - 260px);
-  min-height: calc(100vh - 90px);
+  width: calc(100% - 288px);
+  min-height: 100vh ;
   box-sizing: border-box;
   /* Ensures padding doesn't add to width */
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+}
+
+.main-content > main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.surface-card {
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.surface-muted {
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.border-default {
+  border-color: var(--border);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.text-primary {
+  color: var(--primary);
+}
+
+.text-success {
+  color: var(--chart-2);
+}
+
+.text-danger {
+  color: var(--destructive);
+}
+
+.button-primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.button-primary:hover {
+  opacity: 0.92;
+}
+
+.surface-hover:hover {
+  background: var(--muted);
+}
+
+.alert-error {
+  background: var(--card);
+  color: var(--destructive);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--destructive);
 }
 
 @media (max-width: 900px) {
@@ -589,6 +603,8 @@
     padding: 1.5rem;
   }
 }
+
+/* Primary action style for sidebar (aligns with app color scheme) */
 
 
 /* Mobile: hide sidebar off-canvas and show toggle */
@@ -624,38 +640,14 @@
 }
 
 .main-learning-container {
-  margin-left: 150px;
+    margin-left: 18rem; /* or 240px, matching your sidebar width */
   /* Width of the sidebar + some spacing */
   padding: 1%;
   background-color: #302e2e;
 }
 
-.print-container {
-    padding: 24px;
-    font-family: serif;
-  }
-
-  h1 {
-    font-size: 24px;
-    margin-bottom: 16px;
-  }
-
-  h2 {
-    margin-top: 24px;
-    font-size: 18px;
-    border-bottom: 2px solid #ddd;
-  }
-
-  .print-node {
-    margin: 12px 0;
-    padding: 12px;
-    border-left: 4px solid;
-  }
-
-  .print-node.review {
-    border-color: #ef4444;
-  }
-
-  .print-node.correct {
-    border-color: #22c55e;
-  }
+/* Loading spinner animation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

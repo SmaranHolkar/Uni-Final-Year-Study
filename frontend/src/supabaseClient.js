@@ -1,3 +1,4 @@
+// Initializes and exports the frontend Supabase client.
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -7,4 +8,8 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn('VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is not set. Auth may not work.');
 }
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    clockSkewInSeconds: 3600, // up to 1hr clock skew between server and client
+  },
+});

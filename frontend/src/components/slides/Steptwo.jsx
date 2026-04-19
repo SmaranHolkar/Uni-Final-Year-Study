@@ -1,20 +1,31 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { useAuth } from "../../AuthContext";
+import { supabase } from "../../supabaseClient";
 
+// Handles StepTwo logic.
 export default function StepTwo({ onNext }) {
+  const { currentDocumentId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState([]);
+  const [errorMessage, setErrorMessage] = useState('');
   const [fetchingMindmap, setFetchingMindmap] = useState(false);
   const [score, setScore] = useState(null);
   const [showScore, setShowScore] = useState(false);
   const [mindmapData, setMindmapData] = useState(undefined);
+  const [quizResults, setQuizResults] = useState([]);
+  const quizStartTime = useRef(Date.now());
+  const answerTimestamps = useRef({}); // i → timestamp of first answer
+  const answerChangeCounts = useRef({}); // i → how many times answer was changed
+  const fetchInProgressRef = useRef(false); // Prevent duplicate requests
 
-  // ✅ helpers go HERE
+  // helpers go HERE
   const normalize = (v) =>
     String(v ?? "")
       .trim()
       .toLowerCase();
 
+  // Handles getCorrectAnswer logic.
   const getCorrectAnswer = (q) => {
     if (!q) return undefined;
     if (typeof q.answer === "number") return q.choices?.[q.answer];
@@ -23,22 +34,57 @@ export default function StepTwo({ onNext }) {
     return q.answer;
   };
 
+  // Handles fetchQuestions logic.
   const fetchQuestions = async () => {
+    // Prevent duplicate requests
+    if (fetchInProgressRef.current) {
+      console.log('Request already in progress, skipping duplicate');
+      return;
+    }
+
+    fetchInProgressRef.current = true;
     setLoading(true);
+    setErrorMessage('');
     try {
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setErrorMessage('Your session has expired. Please refresh the page and log in again.');
+        setLoading(false);
+        fetchInProgressRef.current = false;
+        return;
+      }
+
       const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const resp = await fetch(`${API_BASE}/api/generate-questions`, {
+      const resp = await fetch(`${API_BASE}/api/generate-questions?token=${encodeURIComponent(session.access_token)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ queryText: "Generate questions", topK: 5, count: 8 })
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          queryText: "Generate questions", 
+          count: 15,
+          documentId: currentDocumentId
+        })
       });
       const data = await resp.json();
+      if (!resp.ok) {
+        console.error("Question generation error:", data);
+        setErrorMessage('Failed to generate questions. Please try again');
+        setQuestions([]);
+        setAnswers([]);
+        return;
+      }
       setQuestions(data.questions || []);
       setAnswers(Array((data.questions || []).length).fill(null));
     } catch (e) {
-      console.error(e);
+      console.error("Quiz loading error:", e);
+      setErrorMessage('Unable to load quiz. Please try again');
     } finally {
       setLoading(false);
+      fetchInProgressRef.current = false;
     }
   };
 
@@ -46,12 +92,20 @@ export default function StepTwo({ onNext }) {
     fetchQuestions();
   }, []);
 
+  // Handles selectAnswer logic.
   const selectAnswer = (i, c) => {
     const copy = [...answers];
+    // Track first-answer timestamp and change count
+    if (answerTimestamps.current[i] === undefined) {
+      answerTimestamps.current[i] = Date.now();
+    } else {
+      answerChangeCounts.current[i] = (answerChangeCounts.current[i] || 0) + 1;
+    }
     copy[i] = c;
     setAnswers(copy);
   };
 
+  // Handles handleFinish logic.
   const handleFinish = async () => {
     const wrongQs = questions.filter((q, i) => {
       const correct = getCorrectAnswer(q);
@@ -100,9 +154,50 @@ export default function StepTwo({ onNext }) {
         return normalize(selected) !== normalize(correct);
     });
 
+    // Construct quiz results object
+    const finishTime = Date.now();
+    const totalElapsed = (finishTime - quizStartTime.current) / 1000; // seconds
+    const avgTimePerQ = totalElapsed / questions.length;
+
+    const quizResults = questions.map((q, i) => {
+      // Time from quiz start to first answer (seconds)
+      const firstAnswerTime = answerTimestamps.current[i]
+        ? (answerTimestamps.current[i] - quizStartTime.current) / 1000
+        : totalElapsed; // answered at the very end (or not at all)
+      const changes = answerChangeCounts.current[i] || 0;
+
+      // Confidence on 1–5 scale:
+      // fast + no changes → 5, slow + changed → 1
+      let confidence;
+      if (changes >= 2) {
+        confidence = 1; // very uncertain — changed mind multiple times
+      } else if (changes === 1) {
+        confidence = 2; // uncertain — changed once
+      } else if (firstAnswerTime <= avgTimePerQ * 0.5) {
+        confidence = 5; // very fast, no changes → very confident
+      } else if (firstAnswerTime <= avgTimePerQ) {
+        confidence = 4; // reasonably fast → confident
+      } else if (firstAnswerTime <= avgTimePerQ * 1.75) {
+        confidence = 3; // average pace → neutral
+      } else {
+        confidence = 2; // slow → uncertain
+      }
+
+      return {
+        id: i,
+        prompt: q.prompt,
+        choices: q.choices,
+        userAnswer: answers[i],
+        correctAnswer: getCorrectAnswer(q),
+        isCorrect: !wrongQs.find(wq => wq === q),
+        confidence,
+      };
+    });
+
     const score = questions.length - wrongQs.length;
     setScore(score);
     setShowScore(true);
+    setQuizResults(quizResults);
 
     // Save mindmap (or null) and let user click Next.
     if (wrongQs.length === 0) {
@@ -113,15 +208,29 @@ export default function StepTwo({ onNext }) {
 
     setFetchingMindmap(true);
     try {
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        console.error('No auth token for mindmap generation');
+        setMindmapData({ _failed: true });
+        setFetchingMindmap(false);
+        return;
+      }
+
       const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const res = await fetch(`${API_BASE}/api/generate-mindmap`, {
+      const res = await fetch(`${API_BASE}/api/generate-mindmap?token=${encodeURIComponent(session.access_token)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        credentials: 'include',
         body: JSON.stringify({ wrongQuestions: wrongQs })
       });
 
       const data = await res.json();
       setMindmapData(data.mindmap);
+      
     } catch (err) {
       console.error("Mindmap failed", err);
       // mark failure so StepThree can show an error instead of an empty "perfect" screen
@@ -133,7 +242,9 @@ export default function StepTwo({ onNext }) {
 
 
   if (loading) return <div>Loading Quiz...</div>;
-  if (!questions.length) return <div>No questions found.</div>;
+  if (!questions.length) {
+    return <div>{errorMessage || 'No questions found.'}</div>;
+  }
   //Shows quiz questions
   return (
     <div>
@@ -157,19 +268,46 @@ export default function StepTwo({ onNext }) {
       ))}
    {/* Show score when finished */}
       {showScore && (
-        <div style={{margin: '10px 0', padding: '8px', background: 'oklch(0.7162 0.1597 290.3962)', borderRadius: 4}}>
-          You scored {score} / {questions.length}
+        <div style={{ margin: '10px 0', padding: '12px', background: 'var(--muted)', borderRadius: 6 }}>
+          <div style={{ fontWeight: 600, marginBottom: 8 }}>
+            You scored {score} / {questions.length}
+          </div>
+          <div style={{ display: 'grid', gap: 10 }}>
+            {quizResults.map((result, idx) => (
+              <div
+                key={result.id ?? idx}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  padding: 10,
+                  background: 'var(--card)'
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                  Q{idx + 1}. {result.prompt}
+                </div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 14 }}>
+                  <span style={{ color: result.isCorrect ? 'var(--chart-2)' : 'var(--destructive)' }}>
+                    Your Answer: {result.userAnswer ?? 'No answer'}
+                  </span>
+                  <span style={{ color: 'var(--primary)' }}>
+                    Correct Answer: {result.correctAnswer ?? 'Not available'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
       <div style={{display: 'flex', gap: 10, marginTop: 8}}>
         <button onClick={handleFinish} disabled={fetchingMindmap} style={{padding: '10px 20px', background: '#3b82f6', color:'white', borderRadius: 15}}>
-          {fetchingMindmap ? 'checking and Creating mindmap please wait' : 'Finish Quiz'}
+          {fetchingMindmap ? 'Creating Mindmap please wait...' : 'Finish Quiz'}
         </button>
       {/* Button to go to the mindmap */}
         {mindmapData !== undefined && (
-          <button onClick={() => onNext(mindmapData)} style={{padding: '10px 20px', background: '#10b981', color:'white', borderRadius: 4}}>
-            Next
+          <button onClick={() => onNext(mindmapData, quizResults)} style={{padding: '10px 20px', background: '#10b981', color:'white', borderRadius: 4}}>
+            Mindmap created press here to view.
           </button>
         )}
       </div>

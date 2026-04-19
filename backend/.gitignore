@@ -1,0 +1,6 @@
+/.env
+node_modules
+uploads
+
+migration_additional_fields_to_users.js
+migration_add_source_file.sql
