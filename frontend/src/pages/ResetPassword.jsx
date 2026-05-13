@@ -45,7 +45,7 @@ export default function ResetPassword() {
       // Validate that a recovery session exists at submit time.
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-        setError("Invalid or expired reset link. Please request a new one.");
+        setError("Something went wrong. Please try again.");
         setLoading(false);
         return;
       }
@@ -56,7 +56,7 @@ export default function ResetPassword() {
 
       if (updateError) {
         console.error("Password update error:", updateError);
-        setError(updateError.message || "Unable to update password. Please try again");
+        setError("Something went wrong. Please try again.");
         setLoading(false);
         return;
       }
@@ -67,7 +67,7 @@ export default function ResetPassword() {
       }, 2000);
     } catch (err) {
       console.error("Password update error:", err);
-      setError(err.message || "An error occurred. Please try again");
+      setError("Something went wrong. Please try again.");
       setLoading(false);
     }
   }

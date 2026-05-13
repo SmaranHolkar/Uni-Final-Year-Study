@@ -251,7 +251,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
     try {
       const { data: { session: freshSession } } = await supabase.auth.getSession();
       if (!freshSession?.access_token) {
-        alert('Session expired. Please refresh and log in again.');
+        alert('Something went wrong. Please try again.');
         setLoading(false);
         return;
       }
@@ -296,7 +296,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
       setNodes((nds) => [...nds, newNode]);
       setEdges((eds) => [...eds, newEdge]);
     } catch {
-      alert("Failed to generate similar topic");
+      alert("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -312,7 +312,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
     try {
       const { data: { session: freshSession } } = await supabase.auth.getSession();
       if (!freshSession?.access_token) {
-        alert('Session expired. Please refresh and log in again.');
+        alert('Something went wrong. Please try again.');
         setLoading(false);
         return;
       }
@@ -326,7 +326,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
       setMcq(res.data); // { question, choices[], answer }
       setSelectedAnswer(null);
     } catch {
-      alert("Failed to generate MCQ");
+      alert("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -368,7 +368,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
   // Main Render
  
   return (
-    <div className="h-[900px] relative bg-slate-50 rounded-xl overflow-hidden">
+    <div className="h-full w-full min-h-[600px] relative bg-slate-50 rounded-xl overflow-hidden flex flex-col">
       {/* Header */}
       <div className="p-4 bg-white border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -399,19 +399,21 @@ export default function StepThree({ data, onRetake, quizResults }) {
       )}
 
       {/* Graph */}
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={onNodeClick}
-        onPaneClick={() => setSelectedNode(null)}
-        fitView
-      >
-        <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-        <Controls />
-        <MiniMap />
-      </ReactFlow>
+      <div className="flex-1 w-full relative">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick}
+          onPaneClick={() => setSelectedNode(null)}
+          fitView
+        >
+          <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+          <Controls />
+          <MiniMap />
+        </ReactFlow>
+      </div>
 
       {/* Node Details Panel */}
       {selectedNode && (

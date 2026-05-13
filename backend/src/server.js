@@ -2,22 +2,30 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import questionRoutes from './routes/questionRoutes.js';
-import documentRoutes from './routes/documentRoutes.js';
-import authRoutes from './routes/auth.js';
-import requireAuth from './middleware/requireAuth.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Feature routers
+import authRouter from './features/auth/auth.routes.js';
+import documentRouter from './features/documents/document.routes.js';
+import questionRouter from './features/questions/question.routes.js';
+import quizRouter from './features/quiz/quiz.routes.js';
+import topicRouter from './features/topics/topic.routes.js';
+import marketplaceRouter from './features/marketplace/marketplace.routes.js';
+
+// Shared middleware
+import requireAuth from './shared/middleware/requireAuth.js';
+
 const app = express();
 const PORT = process.env.PORT || 5000;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /*  MIDDLEWARE */
 
-
 const allowedOrigins = [
   'https://uni-final-year-study.onrender.com',  // Production frontend
+  'https://hydruslearn.com*',
   'http://localhost:5173',  // Local Vite dev server
   'http://localhost:3000'   // Alternative dev port
 ];
@@ -37,11 +45,15 @@ app.use(cors({
 // Memory optimization: Limit request body size
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 
-// ROUTES
-app.use('/api', questionRoutes);
-app.use('/api', documentRoutes);
-app.use('/api/auth', authRoutes);
+// ROUTES — each feature mounts its own router
+app.use('/api/auth', authRouter);
+app.use('/api', documentRouter);
+app.use('/api', marketplaceRouter);
+app.use('/api', questionRouter);
+app.use('/api', quizRouter);
+app.use('/api', topicRouter);
 
 // Health check endpoint for Render
 app.get('/api/health', (req, res) => {

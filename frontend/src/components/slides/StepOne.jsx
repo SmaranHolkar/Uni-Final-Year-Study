@@ -118,7 +118,7 @@ export default function StepOne({ onNext }) {
       console.log('Response data:', data);
 
       if (!response.ok) {
-        throw new Error(data.error || data.message || "Upload failed");
+        throw new Error("Upload failed");
       }
       
       // Store document ID and title in context for use in StepTwo/StepThree

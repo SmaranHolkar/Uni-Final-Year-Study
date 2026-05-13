@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from '../supabaseClient.js';
+import { supabase, supabaseAdmin } from '../config/supabaseClient.js';
 
 // Handles requireAuth logic.
 export default async function requireAuth(req, res, next) {

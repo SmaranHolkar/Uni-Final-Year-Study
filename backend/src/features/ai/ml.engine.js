@@ -1,6 +1,8 @@
 import fetch from 'node-fetch';
 import { pipeline } from '@huggingface/transformers';
-import pool from './dbPool.js';
+import pool from '../../shared/config/dbPool.js';
+import fs from 'fs/promises';
+import path from 'path';
 
 const GROQ_KEY = process.env.GROQ_API;
 
@@ -23,21 +25,19 @@ export async function getEmbedding(text) {
   return Array.from(output.data);
 }
 
-
 // Retry helper with backoff
 async function retryWithBackoff(fn, maxRetries = 5, initialDelay = 2000) {
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await fn();
     } catch (error) {
-      // Check for rate limit in multiple places
       const errorStr = error.message || '';
-      const isRateLimited = 
-        error.response?.status === 429 || 
+      const isRateLimited =
+        error.response?.status === 429 ||
         errorStr.includes('rate_limit') ||
         errorStr.includes('Rate limit') ||
         errorStr.includes('rate_limit_exceeded');
-      
+
       if (isRateLimited && i < maxRetries - 1) {
         const delay = initialDelay * Math.pow(2, i);
         console.log(`Rate limited by GROQ. Retrying in ${delay}ms... (Attempt ${i + 1}/${maxRetries})`);
@@ -49,9 +49,193 @@ async function retryWithBackoff(fn, maxRetries = 5, initialDelay = 2000) {
   }
 }
 
+// Extract an image URL from different possible API response shapes.
+function extractImageUrl(payload) {
+  if (!payload || typeof payload !== 'object') return '';
+  if (typeof payload.imageUrl === 'string' && payload.imageUrl) return payload.imageUrl;
+  if (typeof payload.url === 'string' && payload.url) return payload.url;
+  if (typeof payload.output === 'string' && payload.output) return payload.output;
+  if (payload.data && typeof payload.data === 'object') {
+    if (typeof payload.data.imageUrl === 'string' && payload.data.imageUrl) return payload.data.imageUrl;
+    if (typeof payload.data.url === 'string' && payload.data.url) return payload.data.url;
+  }
+  if (Array.isArray(payload.data) && payload.data.length > 0) {
+    const first = payload.data[0];
+    if (typeof first === 'string' && first) return first;
+    if (first && typeof first === 'object') {
+      if (typeof first.url === 'string' && first.url) return first.url;
+      if (typeof first.imageUrl === 'string' && first.imageUrl) return first.imageUrl;
+    }
+  }
+  if (Array.isArray(payload.images) && payload.images.length > 0) {
+    const first = payload.images[0];
+    if (typeof first === 'string' && first) return first;
+    if (first && typeof first === 'object') {
+      if (typeof first.url === 'string' && first.url) return first.url;
+      if (typeof first.imageUrl === 'string' && first.imageUrl) return first.imageUrl;
+    }
+  }
+  if (payload.output && typeof payload.output === 'object') {
+    const media = payload.output.media_url;
+    if (Array.isArray(media) && media.length > 0 && typeof media[0] === 'string') return media[0];
+  }
+  return '';
+}
 
-// Embedding model gets embeddings.
+// Generate an image through the FLUXImage API (Pixazo) and return the resulting URL.
+async function generateFluxImage(prompt) {
+  const apiKey = process.env.FLUXImage || process.env.FLUXIMAGE_API_KEY || '';
+  const endpointList = String(
+    process.env.FLUXIMAGE_API_URLS ||
+    process.env.FLUXIMAGE_API_URL ||
+    'https://gateway.pixazo.ai/flux-1-schnell/v1/getData'
+  )
+    .split(',')
+    .map((endpoint) => endpoint.trim())
+    .filter((endpoint) => /flux-1-schnell\/v1\/getData/i.test(endpoint));
+  const modelList = String(process.env.FLUXIMAGE_FREE_MODELS || 'flux-schnell,flux-dev,flux')
+    .split(',')
+    .map((m) => m.trim())
+    .filter(Boolean);
 
+  if (!apiKey) {
+    return { imageUrl: '', error: 'FLUXImage API key is missing.' };
+  }
+
+  const buildPayload = (model) => {
+    return {
+      prompt,
+      model,
+      num_steps: Number(process.env.FLUXIMAGE_NUM_STEPS || 6),
+      width: 1024,
+      height: 1024,
+    };
+  };
+
+  let lastError = 'Unknown FLUXImage error';
+
+  const safeEndpointList = endpointList.length
+    ? endpointList
+    : ['https://gateway.pixazo.ai/flux-1-schnell/v1/getData'];
+
+  for (const endpoint of safeEndpointList) {
+    for (const model of modelList) {
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Ocp-Apim-Subscription-Key': apiKey,
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(buildPayload(model)),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          lastError = `FLUXImage API error (${res.status}) on ${endpoint} model ${model || 'default'}: ${errText}`;
+          continue;
+        }
+
+        const payload = await res.json();
+        const imageUrl = extractImageUrl(payload);
+        if (imageUrl) {
+          return { imageUrl, error: '' };
+        }
+
+        const pollingUrl = typeof payload.polling_url === 'string' ? payload.polling_url : '';
+        const requestId = typeof payload.request_id === 'string' ? payload.request_id : '';
+        if (pollingUrl || requestId) {
+          const statusUrl = pollingUrl || `https://gateway.pixazo.ai/v2/requests/status/${requestId}`;
+          const maxPolls = Number(process.env.FLUXIMAGE_POLL_MAX || 6);
+          const pollDelay = Number(process.env.FLUXIMAGE_POLL_DELAY_MS || 2500);
+
+          for (let i = 0; i < maxPolls; i++) {
+            await new Promise((resolve) => setTimeout(resolve, pollDelay));
+            const statusRes = await fetch(statusUrl, {
+              headers: {
+                'Ocp-Apim-Subscription-Key': apiKey,
+                Authorization: `Bearer ${apiKey}`,
+              },
+            });
+
+            if (!statusRes.ok) {
+              const statusErr = await statusRes.text();
+              lastError = `FLUXImage polling failed (${statusRes.status}) on ${endpoint}: ${statusErr}`;
+              break;
+            }
+
+            const statusPayload = await statusRes.json();
+            const statusImage = extractImageUrl(statusPayload);
+            if (statusImage) {
+              return { imageUrl: statusImage, error: '' };
+            }
+
+            const status = String(statusPayload.status || '').toUpperCase();
+            if (status === 'FAILED' || status === 'ERROR') {
+              lastError = `FLUXImage status ${status} on ${endpoint}: ${statusPayload.error || 'Unknown error'}`;
+              break;
+            }
+          }
+        }
+
+        lastError = `FLUXImage API returned no image URL on ${endpoint} model ${model || 'default'}`;
+      } catch (err) {
+        lastError = `FLUXImage request failed on ${endpoint} model ${model || 'default'}: ${err.message}`;
+      }
+    }
+  }
+
+  return { imageUrl: '', error: lastError };
+}
+
+// Download a remote image and convert to a data URL so frontend rendering does not depend on hotlink/CORS policy.
+async function toDataUrlIfPossible(imageUrl) {
+  if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) return '';
+  try {
+    const res = await fetch(imageUrl);
+    if (!res.ok) return '';
+    const contentType = res.headers.get('content-type') || 'image/png';
+    const buffer = Buffer.from(await res.arrayBuffer());
+    // Keep payload bounded to avoid oversized API responses.
+    if (buffer.length > 8 * 1024 * 1024) return '';
+    return `data:${contentType};base64,${buffer.toString('base64')}`;
+  } catch {
+    return '';
+  }
+}
+
+// Persist generated image bytes to backend/uploads/generated and return a backend-served URL.
+async function cacheImageLocally(imageUrl) {
+  if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) return '';
+  try {
+    const res = await fetch(imageUrl);
+    if (!res.ok) return '';
+
+    const contentType = res.headers.get('content-type') || 'image/png';
+    const ext = contentType.includes('jpeg') || contentType.includes('jpg')
+      ? 'jpg'
+      : contentType.includes('webp')
+        ? 'webp'
+        : 'png';
+
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (!bytes.length) return '';
+
+    const uploadsDir = path.resolve(process.cwd(), 'uploads', 'generated');
+    await fs.mkdir(uploadsDir, { recursive: true });
+
+    const fileName = `flux-${Date.now()}-${Math.floor(Math.random() * 1e6)}.${ext}`;
+    const filePath = path.join(uploadsDir, fileName);
+    await fs.writeFile(filePath, bytes);
+
+    const backendPublicUrl = process.env.BACKEND_PUBLIC_URL || 'http://localhost:5000';
+    return `${backendPublicUrl}/uploads/generated/${fileName}`;
+  } catch {
+    return '';
+  }
+}
 
 // Retrieve top K similar text chunks from DB using vector similarity search
 export async function getTopChunks(embedding, k = 10, userId = null, documentId = null) {
@@ -59,26 +243,23 @@ export async function getTopChunks(embedding, k = 10, userId = null, documentId 
   const client = await pool.connect();
   try {
     let query, params;
-    
+
     if (documentId) {
-      // Filter by specific document using the document's title
-      query = `SELECT id, chunk_text, title FROM public.w_embeddings 
+      query = `SELECT id, chunk_text, title FROM public.w_embeddings
                WHERE title = (SELECT title FROM public.w_embeddings WHERE id = $3)
                ORDER BY embedding <-> $1::vector LIMIT $2`;
       params = [vec, k, documentId];
     } else if (userId) {
-      // Filter by user_id if provided
-      query = `SELECT id, chunk_text, title FROM public.w_embeddings 
+      query = `SELECT id, chunk_text, title FROM public.w_embeddings
                WHERE user_id = $3
                ORDER BY embedding <-> $1::vector LIMIT $2`;
       params = [vec, k, userId];
     } else {
-      // Get all chunks if no user filter
-      query = `SELECT id, chunk_text, title FROM public.w_embeddings 
+      query = `SELECT id, chunk_text, title FROM public.w_embeddings
                ORDER BY embedding <-> $1::vector LIMIT $2`;
       params = [vec, k];
     }
-    
+
     const { rows } = await client.query(query, params);
     return rows;
   } finally {
@@ -120,7 +301,7 @@ Context:
 ${trimmedContext}
 `;
 
-return retryWithBackoff(async () => {
+  return retryWithBackoff(async () => {
     const res = await fetch(
       'https://api.groq.com/openai/v1/chat/completions',
       {
@@ -132,10 +313,9 @@ return retryWithBackoff(async () => {
         body: JSON.stringify({
           model: 'llama-3.1-8b-instant',
           messages: [{ role: 'user', content: prompt }],
-          temperature: 0.2,
+          temperature: 0.7,
           max_tokens: 2000,
-          // This tells Groq to return the JSON directly
-          response_format: { type: "json_object" }, 
+          response_format: { type: 'json_object' },
         }),
       }
     );
@@ -149,23 +329,20 @@ return retryWithBackoff(async () => {
     const rawContent = data.choices[0].message.content;
 
     try {
-      // Direct parse because of json_object mode
       const parsed = JSON.parse(rawContent);
       return parsed.questions;
     } catch (parseError) {
-      console.error("JSON Parsing failed. Attempting regex recovery...", parseError);
-      // Fallback: Try to find the JSON block if the model added prefix text
+      console.error('JSON Parsing failed. Attempting regex recovery...', parseError);
       const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]).questions;
       }
-      throw new Error("Could not parse AI response into valid JSON");
+      throw new Error('Could not parse AI response into valid JSON');
     }
   });
 }
 
-
-// Generic chat completion function for any prompt
+// Generic chat completion — base function reused by toolGenAI and aiMindmapNode
 export async function getChatCompletion(
   prompt,
   model = 'llama-3.1-8b-instant',
@@ -205,7 +382,8 @@ export async function getChatCompletion(
   });
 }
 
-// AI function to generate tool for learning playground. 
+// AI function for the learning playground — delegates to getChatCompletion with a larger model.
+// Kept as a separate export so call-sites remain unchanged.
 export async function toolGenAI(
   prompt,
   model = 'llama-3.3-70b-versatile',
@@ -213,11 +391,67 @@ export async function toolGenAI(
   maxTokens = 1000,
   options = {}
 ) {
+  return getChatCompletion(prompt, model, temperature, maxTokens, options);
+}
+
+// Handles aiMindmapNode logic.
+export async function aiMindmapNode({ question, correctAnswer, context, sourceLink = '' }) {
+  const prompt = `
+You are generating a corrective study mindmap node. End with one source link on its own line at the end(not Wikipedia)
+
+The student misunderstood this question:
+"${question}"
+
+Correct understanding:
+"${correctAnswer}"
+
+Using the reference material, write a short corrective explanation that:
+- Identifies the exact misunderstanding
+- Shows why that thinking breaks
+- Replaces it with the correct idea
+
+Constraints:
+- Talk directly to the student as if you were speaking to them, not in third person.
+- Max 8 short lines
+- Each line max 18 words
+- Plain text only
+- No bullets or numbering
+- No filler or repetition
+- Use simple vocabulary
+- End with one source link on its own line (not Wikipedia)
+
+Reference material:
+${context}
+
+Source link:
+${sourceLink}
+`;
+
+  // Reuses getChatCompletion instead of duplicating the fetch block
+  return getChatCompletion(prompt, 'llama-3.1-8b-instant', 0.1, 140);
+}
+
+
+/**
+ * Describes a rendered PDF page image using Groq Vision (llama-4-scout).
+ * @param {string} base64Png - Base64-encoded PNG of the page
+ * @returns {Promise<string>} - Detailed text description of all visual content
+ */
+export async function describeImage(base64Png) {
   if (!GROQ_KEY) {
     throw new Error('GROQ_API is not set in the server environment');
   }
 
-  const { forceJson = false } = options;
+  const prompt = `You are analysing a university lecture slide or academic document page.
+Describe ALL of the following that you can see:
+- All visible text (headings, bullet points, labels, annotations)
+- Diagrams, flowcharts, graphs, or charts — describe structure and key labels
+- Mathematical equations or formulas — write them out in plain text
+- Tables — describe columns, rows, and key values
+- Code snippets — transcribe them exactly
+- Any arrows, relationships, or visual logic shown
+
+Be thorough and specific. This description will be used to generate exam questions, so accuracy matters.`;
 
   return retryWithBackoff(async () => {
     const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -227,17 +461,27 @@ export async function toolGenAI(
         Authorization: `Bearer ${GROQ_KEY}`,
       },
       body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature,
-        max_tokens: maxTokens,
-        ...(forceJson ? { response_format: { type: 'json_object' } } : {}),
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              {
+                type: 'image_url',
+                image_url: { url: `data:image/png;base64,${base64Png}` },
+              },
+            ],
+          },
+        ],
+        temperature: 0.1,
+        max_tokens: 1024,
       }),
     });
 
     if (!res.ok) {
       const errText = await res.text();
-      throw new Error(`Groq API error (${res.status}): ${errText}`);
+      throw new Error(`Groq Vision API error (${res.status}): ${errText}`);
     }
 
     const data = await res.json();
@@ -250,9 +494,30 @@ export async function toolGenAI(
 // PHASE 1 — small JSON-only call; planner picks toolType + writes its own htmlDesignBrief.
 // PHASE 2 — plain-text HTML-only call. No JSON wrapping → no Groq json_validate_failed errors.
 
-export async function generateLearningTool(userId, prompt) {
+export async function generateLearningTool(userId, prompt, context, options = {}) {
   const promptText = String(prompt || '').trim();
   if (!promptText) throw new Error('prompt is required');
+
+  console.log('ML ENGINE generateLearningTool context type:', typeof context, 'isArray:', Array.isArray(context), 'length:', context?.length);
+
+  let contextString = '';
+  if (Array.isArray(context) && context.length > 0) {
+    contextString = `\n\nSTUDENT'S RECENT MISTAKES TO FOCUS ON:\n`;
+    context.forEach((q, i) => {
+       contextString += `Q${i+1}: ${q.prompt}\n(Student answered: ${q.userAnswer}, Correct answer: ${q.correctAnswer})\n`;
+    });
+    contextString += `\nINSTRUCTION: Ensure the content of the generated tool specifically targets and corrects these mistakes.`;
+  }
+
+  // Add metacognitive insights if provided (optional)
+  if (options.metacognitiveAnalysis) {
+    const ma = options.metacognitiveAnalysis;
+    contextString += `\n\nMETACOGNITIVE INSIGHTS (for Vela's context):\n`;
+    contextString += `- Knowledge Gaps: ${ma.knowledgeGaps}\n`;
+    contextString += `- Pattern identified: ${ma.patternSpecificity}\n`;
+    contextString += `- Student approach: ${ma.behavioralInsight}\n`;
+    contextString += `\nINSTRUCTION: Adjust the difficulty and explanation style to match these insights.`;
+  }
 
   // ── helper ─────────────────────────────────────────────────────────────────
   const safeParse = (text) => {
@@ -271,21 +536,19 @@ export async function generateLearningTool(userId, prompt) {
 You are an educational tool planner. Given a user's learning request, decide the BEST tool format and produce a
 structured content plan.
 
-USER REQUEST: "${promptText}"
+USER REQUEST: "${promptText}"${contextString}
 
 Return ONLY valid JSON — no markdown, no extra text:
 {
   "toolType": "the single best format for this request — you may use any of these or invent your own if it fits better:
-  flashcards | quiz | timeline | diagram | comparison-table | flowchart | mnemonic | story | memory-game | study-guide | 
-  formula-visualizer | concept-map | checklist | drag-and-drop-sort | drag-and-drop-match | word-scramble | fill-in-the-blank | 
+  flashcards | quiz | timeline | diagram | comparison-table | flowchart | mnemonic | story | memory-game | study-guide |
+  formula-visualizer | concept-map | checklist | drag-and-drop-sort | drag-and-drop-match | word-scramble | fill-in-the-blank |
   crossword | matching-pairs | ordering-activity | annotation | simulation | calculator | converter | cheat-sheet | reference-card |
-   lesson | tutorial | debate | pros-cons | case-study",
+   lesson | tutorial | debate | pros-cons | case-study | image",
   "title": "clear title for this tool",
   "description": "2 sentences explaining what this tool teaches and how",
-  "ui": "best layout keyword: cards | list | board | graph | steps | grid | interactive | visual | game | table | document",
-  "htmlDesignBrief": "3–5 specific sentences describing exactly what the HTML app should look like and how it should behave.
-   Reference the toolType, key interactions, layout, and any animations or game mechanics. This will be used directly as a build
-  instruction — be precise.",
+  "ui": "best layout keyword: cards | list | board | graph | steps | grid | interactive | visual | game | table | document | image",
+  "htmlDesignBrief": "3–5 specific sentences describing exactly what the HTML app should look like and how it should behave. Reference the toolType, key interactions, layout, and any animations or game mechanics. This will be used directly as a build instruction — be precise.",
   "items": [
     {
       "id": "1",
@@ -297,6 +560,9 @@ Return ONLY valid JSON — no markdown, no extra text:
 }
 
 Rules:
+- If the user asks for a realistic picture, photograph, complex illustration, or anatomical drawing (like the human body, animal, landscape), you MUST set toolType to "image".
+- If the user asks for a mindmap, mind map, or concept map, you MUST set toolType to "mindmap".
+- If the user asks for a flowchart, structural diagram, set toolType to "diagram" or "flowchart".
 - items array must have 12–18 entries, each substantive and specific to the request
 - htmlDesignBrief must describe the SPECIFIC tool being built, not be generic — if it is a word scramble,
  describe the scrambled letters mechanic; if a crossword, describe the grid; if a calculator, describe the inputs and formula; etc.
@@ -331,6 +597,56 @@ Rules:
   const items       = plan.items.slice(0, 18);
   const itemsJson   = JSON.stringify(items);
 
+  // ── IMAGE SHORT-CIRCUIT (Bypass HTML Generation) ─────────────────────────
+  console.log('AI PLANNER SELECTED TOOL TYPE:', toolType);
+  if (toolType === 'image' || toolType === 'illustration' || toolType === 'picture') {
+    // Build a descriptive prompt and generate through the backend FLUXImage API.
+    const imagePrompt = `A highly detailed, professional educational illustration of: ${promptText}. ${description}. Style: textbook diagram, clear, high resolution.`;
+    const fluxResult = await generateFluxImage(imagePrompt.slice(0, 500));
+    const localImageUrl = fluxResult.imageUrl ? await cacheImageLocally(fluxResult.imageUrl) : '';
+    const imageDataUrl = fluxResult.imageUrl ? await toDataUrlIfPossible(fluxResult.imageUrl) : '';
+
+    return {
+      toolType: 'image',
+      title,
+      description,
+      render: 'native',
+      ui: 'image',
+      data: {
+        imagePrompt: imagePrompt.slice(0, 500),
+        imageUrl: fluxResult.imageUrl || '',
+        localImageUrl,
+        imageDataUrl,
+        imageError: fluxResult.error || '',
+        items: []
+      }
+    };
+  }
+
+  // ── MINDMAP SHORT-CIRCUIT (Return ReactFlow nodes/edges instead of HTML) ──
+  if (toolType === 'mindmap' || toolType === 'mind-map' || toolType === 'concept-map' || toolType === 'mind map') {
+    // Build a root node + one child per item so the frontend can render it with ReactFlow
+    const nodes = [
+      { id: 'root', label: title, description: description, sourceLink: '' },
+      ...items.map((item, i) => ({
+        id: `n${i}`,
+        label: String(item.front || item.title || item.question || `Topic ${i + 1}`).slice(0, 120),
+        description: String(item.back || item.content || item.answer || '').slice(0, 400),
+        sourceLink: '',
+      }))
+    ];
+    const edges = items.map((_, i) => ({ from: 'root', to: `n${i}` }));
+
+    return {
+      toolType: 'mindmap',
+      title,
+      description,
+      render: 'native',
+      ui: 'mindmap',
+      data: { nodes, edges, items: [] }
+    };
+  }
+
   // ── PHASE 2 — build HTML (plain text, up to 32 768 tokens) ────────────────
 
   // Fixed design-system theme injected into every generated tool
@@ -361,7 +677,6 @@ Rules:
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body { background: var(--background); color: var(--foreground); font-family: var(--font-sans); }
-  /* ── Layout shell ── */
   #app { display: flex; flex-direction: column; min-height: 100vh; }
   #app-header { background: var(--card); border-bottom: 1px solid var(--border); padding: 1rem 1.5rem; display: flex; flex-direction: column; gap: 0.25rem; }
   #app-header h1 { font-size: 1.25rem; font-weight: 700; color: var(--primary); }
@@ -369,10 +684,8 @@ Rules:
   #app-progress  { font-size: 0.75rem; color: var(--muted-foreground); text-align: right; }
   #app-main { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
   #app-footer { background: var(--card); border-top: 1px solid var(--border); padding: 0.75rem 1.5rem; display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; }
-  /* ── Cards ── */
   .card { background: var(--card); color: var(--card-foreground); border-radius: var(--radius); border: 1px solid var(--border); padding: 1.25rem; }
   .card:hover { border-color: var(--primary); }
-  /* ── Buttons ── */
   .btn { border: none; border-radius: var(--radius); padding: 0.5rem 1.25rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s, background 0.15s; font-size: 0.9rem; }
   .btn-primary { background: var(--primary); color: var(--primary-foreground); }
   .btn-primary:hover { opacity: 0.85; }
@@ -381,10 +694,8 @@ Rules:
   .btn-ghost { background: transparent; color: var(--muted-foreground); border: 1px solid var(--border); }
   .btn-ghost:hover { background: var(--muted); color: var(--foreground); }
   .btn-destructive { background: var(--destructive); color: var(--destructive-foreground); }
-  /* ── Inputs ── */
   input, select, textarea { background: var(--input); color: var(--foreground); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.75rem; outline: none; width: 100%; }
   input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 2px var(--ring); }
-  /* ── Utility ── */
   .muted { color: var(--muted-foreground); }
   .badge { background: var(--secondary); color: var(--secondary-foreground); border-radius: 9999px; padding: 0.125rem 0.6rem; font-size: 0.75rem; display: inline-block; }
   .correct { background: oklch(0.35 0.10 155); color: oklch(0.9 0.05 155); }
@@ -392,7 +703,6 @@ Rules:
   .divider { width: 100%; height: 1px; background: var(--border); }
 `;
 
-  // Conditional mechanic hints injected only when relevant
   const mechanicHints = [
     toolType.includes('drag') && `- Use the HTML5 Drag and Drop API: draggable="true" on source elements, dragstart sets dataTransfer.setData('text/plain', id), dragover calls e.preventDefault(), drop calls e.preventDefault() then reads dataTransfer.getData('text/plain').`,
     (toolType.includes('quiz') || toolType.includes('fill')) && `- Show instant per-question feedback (green correct / red incorrect). Display a final score screen with retry button.`,
@@ -400,6 +710,7 @@ Rules:
     toolType.includes('flash') && `- CSS flip animation: transform rotateY(180deg) on click, using transform-style: preserve-3d and backface-visibility: hidden on front/back faces.`,
     toolType.includes('timeline') && `- Alternating left/right layout on desktop, single column on mobile. Vertical connecting line with coloured dots at each node.`,
     (toolType.includes('calculator') || toolType.includes('converter') || toolType.includes('formula')) && `- Live computation: update result as the user types. Show step-by-step working where relevant.`,
+    (toolType.includes('diagram') || toolType.includes('flowchart') || toolType.includes('concept') || toolType.includes('map')) && `- Embed Mermaid.js via CDN (<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs'; mermaid.initialize({ startOnLoad: true, theme: 'dark', background: 'transparent' });</script>) and render a highly detailed diagram representing the learning concepts using <pre class="mermaid">...</pre>. CRITICAL: The mermaid syntax MUST be 100% valid. ALWAYS wrap node text labels in double quotes (e.g., A["Label with (parens)"]). DO NOT use spaces or special characters in node IDs.`,
   ].filter(Boolean).join('\n');
 
   const buildPrompt = `
@@ -485,65 +796,8 @@ ${TOOL_THEME_CSS}
 }
 
 
-
-// Handles aiMindmapNode logic.
-export async function aiMindmapNode({ question, correctAnswer, context, sourceLink = '' }) {
-  const prompt = `
-You are generating a corrective study mindmap node. End with one source link on its own line at the end(not Wikipedia)
-
-The student misunderstood this question:
-"${question}"
-
-Correct understanding:
-"${correctAnswer}"
-
-Using the reference material, write a short corrective explanation that:
-- Identifies the exact misunderstanding
-- Shows why that thinking breaks
-- Replaces it with the correct idea
-
-Constraints:
-- Talk directly to the student as if you were speaking to them, not in third person.
-- Max 8 short lines
-- Each line max 18 words
-- Plain text only
-- No bullets or numbering
-- No filler or repetition
-- Use simple vocabulary
-- End with one source link on its own line (not Wikipedia)
-
-Reference material:
-${context}
-
-Source link:
-${sourceLink}
-`;
-
-  return retryWithBackoff(async () => {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${GROQ_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-        max_tokens: 140,
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(err);
-    }
-    const data = await res.json();
-    return data.choices[0].message.content.trim();
-  });
-}
-
-
-// Meta cognitive analysis function that takes quiz attempt data and produces insights on error types, confidence calibration, and knowledge gaps.
+// Meta cognitive analysis function that takes quiz attempt data and produces insights
+// on error types, confidence calibration, and knowledge gaps.
 export async function generateMetacognitiveAnalysis(quizData) {
   const questions = Array.isArray(quizData?.quiz)
     ? quizData.quiz
@@ -565,11 +819,6 @@ export async function generateMetacognitiveAnalysis(quizData) {
   let underconfidentCount = 0;
   let calibrationScore = 0;
 
-  // error type classification (1–5 confidence scale)
-  // ≥4 + wrong  → conceptual misunderstanding (held a false belief)
-  // ≤2 + wrong  → recall failure (knew they didn't know)
-  //  3 + wrong  → careless/uncertain error
-  //  no data    → unclassified
   const errorTypeProfile = {
     conceptualMisunderstanding: 0,
     recallFailure: 0,
@@ -585,7 +834,6 @@ export async function generateMetacognitiveAnalysis(quizData) {
       if (conf <= 2 && q.isCorrect) underconfidentCount++;
     });
 
-    // Incorrect questions breakdown
     incorrectQuestions.forEach((q) => {
       const conf = q?.confidence;
       if (conf == null) {
@@ -598,14 +846,12 @@ export async function generateMetacognitiveAnalysis(quizData) {
         errorTypeProfile.carelessError++;
       }
     });
-    
-    // Calibrated: correct when confident (≥4), incorrect when unsure (≤2)
+
     const calibrated = questions.filter((q) => {
       const conf = q?.confidence;
       if (conf == null) return false;
       return (conf >= 4) === Boolean(q.isCorrect);
     }).length;
-    // Divide by questions that actually have confidence data, not all questions
     calibrationScore = questionsWithConfidence.length > 0
       ? Math.round((calibrated / questionsWithConfidence.length) * 100)
       : 0;
@@ -660,27 +906,27 @@ export async function generateMetacognitiveAnalysis(quizData) {
   if (GROQ_KEY && totalQuestions > 0) {
     try {
       const questionSummary = questions
-        .slice(0, 15)
+        .slice(0, 30)
         .map((q, i) => {
           const status = q?.isCorrect ? 'Correct' : 'Incorrect';
           const conf = q?.confidence != null ? ` (confidence: ${q.confidence}/5)` : '';
-          return `Q${i + 1}: "${String(q?.prompt || '').slice(0, 100)}" — ${status}${conf}`;
+          const wrongAnswerInfo = !q?.isCorrect && q?.userAnswer && q?.correctAnswer 
+            ? `\n    - User answered: "${q.userAnswer}"\n    - Correct answer: "${q.correctAnswer}"` 
+            : '';
+          return `Q${i + 1}: "${String(q?.prompt || '').slice(0, 150)}" — ${status}${conf}${wrongAnswerInfo}`;
         })
         .join('\n');
 
       const confidenceLine = hasConfidenceData
-        ? `Overconfident (high confidence + wrong): ${overconfidentCount}\nUnderconfident (low confidence + correct):
-         ${underconfidentCount}\nCalibration score: ${calibrationScore}% (out of ${questionsWithConfidence.length} rated questions)`
+        ? `Overconfident (high confidence + wrong): ${overconfidentCount}\nUnderconfident (low confidence + correct): ${underconfidentCount}\nCalibration score: ${calibrationScore}% (out of ${questionsWithConfidence.length} rated questions)`
         : 'No confidence data available.';
 
       const errorProfileLine = hasConfidenceData
-        ? `Error profile — Conceptual misunderstandings: ${errorTypeProfile.conceptualMisunderstanding},
-         Recall failures: ${errorTypeProfile.recallFailure}, Careless errors: ${errorTypeProfile.carelessError}${errorTypeProfile.unclassified ? `,
-           Unclassified: ${errorTypeProfile.unclassified}` : ''}`
+        ? `Error profile — Conceptual misunderstandings: ${errorTypeProfile.conceptualMisunderstanding}, Recall failures: ${errorTypeProfile.recallFailure}, Careless errors: ${errorTypeProfile.carelessError}${errorTypeProfile.unclassified ? `, Unclassified: ${errorTypeProfile.unclassified}` : ''}`
         : '';
 
-      const aiPrompt = `You are a metacognitive learning analyst. Based on the data below, write SPECIFIC and 
-      PERSONALISED feedback for this student. Avoid generic advice — reference the actual questions and patterns.
+      const aiPrompt = `You are Vela, an elite AI learning companion. Your goal is to provide a "Mind's Mirror" — a deep, reflective analysis of this student's learning patterns. Based on the data below, write SPECIFIC and PERSONALISED feedback. Avoid generic advice.
+CRITICAL INSTRUCTION: For any incorrect answers, explicitly analyze the delta between the User's answer and the Correct answer to determine their exact misunderstanding.
 
 Score: ${correctCount}/${totalQuestions} (${scorePercentage}%)
 ${confidenceLine}
@@ -700,10 +946,18 @@ Return ONLY valid JSON with this exact structure:
   "knowledgeGaps": "the specific concepts or topic areas they need to address",
   "reflectionPrompts": ["specific prompt 1", "specific prompt 2", "specific prompt 3"],
   "studyStrategies": "2–3 concrete, targeted strategies matching their exact weaknesses",
-  "encouragement": "one personalised, honest sentence of encouragement"
+  "encouragement": "one personalised, honest sentence of encouragement",
+  "recommendedTools": [
+    {
+      "toolType": "flashcards | quiz | timeline | diagram | flowchart | mnemonic | etc",
+      "title": "Short catchy title",
+      "description": "1 sentence on how this helps their specific gap",
+      "prompt": "The exact prompt Vela should use to build this tool"
+    }
+  ]
 }`;
 
-      const raw = await getChatCompletion(aiPrompt, 'llama-3.1-8b-instant', 0.3, 900, { forceJson: true });
+      const raw = await getChatCompletion(aiPrompt, 'llama-3.3-70b-versatile', 0.3, 1500, { forceJson: true });
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') aiAnalysis = parsed;
     } catch (err) {
@@ -713,14 +967,11 @@ Return ONLY valid JSON with this exact structure:
 
   // --- Fallback rule-based strings ---
   const fallbackPatternSpecificity = incorrectQuestions.length
-    ? `Mistakes concentrated across ${incorrectQuestions.length} question${incorrectQuestions.length > 1 ? 's' : ''}${mostProblematicType ? `,
-       especially around "${mostProblematicType}"` : ''}. Look for recurring cues in those prompts.`
+    ? `Mistakes concentrated across ${incorrectQuestions.length} question${incorrectQuestions.length > 1 ? 's' : ''}${mostProblematicType ? `, especially around "${mostProblematicType}"` : ''}. Look for recurring cues in those prompts.`
     : 'No major error pattern detected in this quiz attempt.';
 
   const fallbackConfidenceMismatch = hasConfidenceData
-    ? `${overconfidentCount} overconfident answer${overconfidentCount !== 1 ? 's' : ''}
-     (high confidence, wrong) and ${underconfidentCount} underconfident answer${underconfidentCount !== 1 ? 's' : ''}
-      (low confidence, correct). Calibration: ${calibrationScore}%.`
+    ? `${overconfidentCount} overconfident answer${overconfidentCount !== 1 ? 's' : ''} (high confidence, wrong) and ${underconfidentCount} underconfident answer${underconfidentCount !== 1 ? 's' : ''} (low confidence, correct). Calibration: ${calibrationScore}%.`
     : null;
 
   const fallbackBehavioralInsight =
@@ -749,7 +1000,15 @@ Return ONLY valid JSON with this exact structure:
     confidenceLevel: scorePercentage >= 80 ? 'High' : scorePercentage >= 60 ? 'Medium' : 'Low',
     encouragement:
       aiAnalysis?.encouragement ||
-      'You are improving — targeted revision on weak areas will produce fast gains.',
+      'I am here to help you improve — targeted revision on weak areas will produce fast gains.',
+    recommendedTools: aiAnalysis?.recommendedTools || [
+      {
+        toolType: 'flashcards',
+        title: 'Gap Reinforcement',
+        description: 'Targeted flashcards for your recent mistakes.',
+        prompt: `Generate flashcards focusing on ${inferredKnowledgeGaps || 'the concepts missed in the recent quiz'}.`
+      }
+    ],
     scorePercentage,
     totalQuestions,
     correctCount,

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Brain, TrendingUp, Target, Lightbulb, MessageCircle, Award, AlertTriangle, Activity, BarChart3, PieChart } from 'lucide-react';
+import { Brain, TrendingUp, Target, Lightbulb, MessageCircle, Award, AlertTriangle, Activity, BarChart3, PieChart, Zap, PlayCircle } from 'lucide-react';
+import Vela from './Vela';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import {
   Chart as ChartJS,
@@ -32,19 +34,70 @@ ChartJS.register(
   Filler
 );
 
+const ANALYSIS_CACHE_TTL_MS = 60 * 60 * 1000;
+
+const getAnalysisCacheKey = (userId, quizId) => `metacognitive_analysis_${userId}_${quizId}`;
+
+const readAnalysisCache = (cacheKey) => {
+  try {
+    const raw = sessionStorage.getItem(cacheKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.analysis || typeof parsed.fetchedAt !== 'number') {
+      sessionStorage.removeItem(cacheKey);
+      return null;
+    }
+    return parsed;
+  } catch {
+    sessionStorage.removeItem(cacheKey);
+    return null;
+  }
+};
+
+const writeAnalysisCache = (cacheKey, analysis) => {
+  try {
+    sessionStorage.setItem(
+      cacheKey,
+      JSON.stringify({
+        analysis,
+        fetchedAt: Date.now(),
+      })
+    );
+  } catch {
+    // Ignore storage write failures.
+  }
+};
+
 // Handles MetacognitiveAnalysis logic.
 export default function MetacognitiveAnalysis({ quizId }) {
-  const { session } = useAuth();
+  const { user, session } = useAuth();
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Handles fetchAnalysis logic.
     const fetchAnalysis = async () => {
       if (!quizId || !session?.access_token) return;
 
-      setLoading(true);
+      const cacheKey = getAnalysisCacheKey(user?.id || 'anonymous', quizId);
+      const cached = readAnalysisCache(cacheKey);
+      const cacheIsFresh = Boolean(cached && Date.now() - cached.fetchedAt < ANALYSIS_CACHE_TTL_MS);
+
+      if (cached?.analysis) {
+        setAnalysis(cached.analysis);
+        setLoading(false);
+      }
+
+      if (cacheIsFresh) {
+        setError(null);
+        return;
+      }
+
+      if (!cached?.analysis) {
+        setLoading(true);
+      }
       setError(null);
 
       try {
@@ -68,6 +121,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
         const data = await response.json();
         console.log('Metacognitive analysis data:', data.analysis);
         setAnalysis(data.analysis);
+        writeAnalysisCache(cacheKey, data.analysis);
       } catch (err) {
         console.error('Error fetching metacognitive analysis:', err);
         setError("Unable to load learning insights. Please try again");
@@ -77,7 +131,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
     };
 
     fetchAnalysis();
-  }, [quizId, session?.access_token]);
+  }, [quizId, session?.access_token, user?.id]);
 
   if (loading) {
     return (
@@ -139,10 +193,10 @@ export default function MetacognitiveAnalysis({ quizId }) {
       <div className="bg-gradient-to-r from-[var(--primary)]/10 to-[var(--accent)] rounded-xl p-6 border border-[var(--border)]">
         <div className="flex items-start justify-between">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Brain className="w-6 h-6 text-[var(--primary)]" />
+            <div className="flex items-center gap-3 mb-2">
+              <Vela size={48} />
               <h2 className="text-2xl font-bold text-[var(--foreground)]">
-                Your minds mirror: Metacognitive Analysis
+                Vela's Mind's Mirror
               </h2>
             </div>
             <p className="text-sm text-[var(--muted-foreground)]">
@@ -402,6 +456,60 @@ export default function MetacognitiveAnalysis({ quizId }) {
               <div className="mt-3 px-3 py-2 bg-amber-100 dark:bg-amber-900/30 rounded text-xs text-amber-700 dark:text-amber-300">
                 💡 Hidden misconceptions may need addressing
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Proactive Tools - VELA'S RECOMMENDATIONS */}
+      {analysis.recommendedTools && analysis.recommendedTools.length > 0 && (
+        <div className="bg-gradient-to-br from-[var(--primary)]/10 via-[var(--accent)]/5 to-transparent rounded-xl p-8 border-2 border-[var(--primary)] shadow-xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+            <Zap className="w-32 h-32 text-[var(--primary)]" />
+          </div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="bg-[var(--primary)] p-3 rounded-xl shadow-lg shadow-[var(--primary)]/20">
+                <Zap className="w-6 h-6 text-[var(--primary-foreground)]" />
+              </div>
+              <div>
+                <h3 className="font-bold text-2xl text-[var(--foreground)]">Vela's Action Plan</h3>
+                <p className="text-[var(--muted-foreground)]">I've designed these specific tools to target your knowledge gaps</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {analysis.recommendedTools.map((tool, idx) => (
+                <div key={idx} className="bg-[var(--card)] p-5 rounded-xl border border-[var(--border)] hover:border-[var(--primary)] transition-all group">
+                  <div className="flex items-start justify-between mb-3">
+                    <span className="px-3 py-1 bg-[var(--primary)]/10 text-[var(--primary)] text-xs font-bold rounded-full uppercase tracking-wider">
+                      {tool.toolType}
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-lg text-[var(--foreground)] mb-2 group-hover:text-[var(--primary)] transition-colors">
+                    {tool.title}
+                  </h4>
+                  <p className="text-sm text-[var(--muted-foreground)] mb-6 line-clamp-2">
+                    {tool.description}
+                  </p>
+                  <button 
+                    onClick={() => {
+                      navigate('/Learningplayground', { 
+                        state: { 
+                          initialPrompt: tool.prompt,
+                          analysis: analysis,
+                          quizResults: analysis.algorithmicMetrics?.questionClassification?.typeBreakdown
+                        } 
+                      });
+                    }}
+                    className="w-full py-3 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-lg font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
+                  >
+                    <PlayCircle className="w-4 h-4" />
+                    Launch in Playground
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>

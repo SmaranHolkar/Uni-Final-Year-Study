@@ -6,7 +6,8 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, '../../uploads');
+// From src/features/documents/ we go up 3 levels to reach backend/
+const uploadsDir = path.join(__dirname, '../../../uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }

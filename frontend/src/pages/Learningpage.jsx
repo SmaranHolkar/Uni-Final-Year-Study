@@ -1,6 +1,7 @@
 // Hosts the learning flow page with sidebar and multi-step form.
 import React from 'react';
 import '../App.css';
+import { DotGrid } from '../components/Reveal.jsx';
 
 import MultiStepForm from '../components/Mainlearningcontainer.jsx';
 
@@ -8,11 +9,12 @@ import MultiStepForm from '../components/Mainlearningcontainer.jsx';
 export default function Learningpage() {
   return (
     <>
-     
-
-      <main className="main-content">
-        <MultiStepForm />
-      </main>
+      <div style={{ position: 'relative', minHeight: '100vh', background: 'var(--background)' }}>
+        <DotGrid />
+        <main className="main-content" style={{ position: 'relative', zIndex: 10 }}>
+          <MultiStepForm />
+        </main>
+      </div>
     </>
   );
 }

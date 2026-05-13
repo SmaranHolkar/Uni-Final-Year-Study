@@ -1,4 +1,4 @@
-import { getEmbedding, getTopChunks, getChatCompletion } from '../utils/aiUtils.js';
+import { getEmbedding, getTopChunks, getChatCompletion } from '../ai/ml.engine.js';
 
 // Generate a related topic node from the document for mind map expansion
 export async function generateSimilarTopic(req, res) {
@@ -10,7 +10,6 @@ export async function generateSimilarTopic(req, res) {
       return res.status(400).json({ error: 'topic is required' });
     }
 
-    // Find relevant document context using the topic as the query
     const embedding = await getEmbedding(topic);
     const chunks = await getTopChunks(embedding, 3, userId);
 
@@ -57,7 +56,6 @@ export async function generateMCQForTopic(req, res) {
       return res.status(400).json({ error: 'topic is required' });
     }
 
-    // Find relevant document context
     const embedding = await getEmbedding(topic);
     const chunks = await getTopChunks(embedding, 3, userId);
 

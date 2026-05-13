@@ -15,8 +15,43 @@ import { useAuth } from '../AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Compass, Bell } from 'lucide-react';
 import Vela from '../components/Vela.jsx';
+import { Reveal, DotGrid } from '../components/Reveal.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
+
+const SUGGESTIONS_CACHE_TTL_MS = 15 * 60 * 1000;
+
+const getSuggestionsCacheKey = (userId) => `dashboard_suggestions_${userId}`;
+
+const readSuggestionsCache = (cacheKey) => {
+  try {
+    const raw = sessionStorage.getItem(cacheKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.data || typeof parsed.fetchedAt !== 'number') {
+      sessionStorage.removeItem(cacheKey);
+      return null;
+    }
+    return parsed;
+  } catch {
+    sessionStorage.removeItem(cacheKey);
+    return null;
+  }
+};
+
+const writeSuggestionsCache = (cacheKey, data) => {
+  try {
+    sessionStorage.setItem(
+      cacheKey,
+      JSON.stringify({
+        data,
+        fetchedAt: Date.now(),
+      })
+    );
+  } catch {
+    // Ignore storage write failures to avoid blocking UI updates.
+  }
+};
 
 // Handles Dashboard logic.
 export default function Dashboard() {
@@ -29,6 +64,16 @@ export default function Dashboard() {
 
 useEffect(() => {
     if (!user?.id || !session?.access_token) return
+
+    const cacheKey = getSuggestionsCacheKey(user.id)
+    const cachedSuggestions = readSuggestionsCache(cacheKey)
+    const cacheIsFresh = Boolean(
+      cachedSuggestions && Date.now() - cachedSuggestions.fetchedAt < SUGGESTIONS_CACHE_TTL_MS
+    )
+
+    if (cachedSuggestions?.data) {
+      setSuggestions(cachedSuggestions.data)
+    }
     
     // Fetch quiz history from backend API using access token for authentication
     const fetchQuizHistory = async () => {
@@ -77,13 +122,16 @@ useEffect(() => {
         const data = await res.json();
         console.log('Suggestions fetched:', data);
         setSuggestions(data);
+        writeSuggestionsCache(cacheKey, data);
       } catch (err) {
         console.error("Failed to fetch suggestions:", err);
       }
     };
     
     fetchQuizHistory();
-    fetchSuggestions();
+    if (!cacheIsFresh) {
+      fetchSuggestions();
+    }
   }, [user?.id, session?.access_token])
 
   // Handles handleViewQuiz logic.
@@ -156,6 +204,7 @@ useEffect(() => {
   const { masteredCount, totalTopics } = calculateTopicsMastered()
   const streak = calculateStreak()
   const averageScore = calculateAverageScore()
+  const solidCardBg = 'color-mix(in srgb, var(--background) 90%, var(--foreground) 10%)'
 
 
   if (!user) {
@@ -294,7 +343,9 @@ useEffect(() => {
 
 
   return (
-    <main className="main-content min-h-screen" style={{ background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'var(--font-sans)' }}>
+    <main className="main-content min-h-screen relative" style={{ background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'var(--font-sans)' }}>
+      <DotGrid />
+      
       {/* Header */}
       <header 
         className="sticky top-0 z-20 backdrop-blur-lg border-b"
@@ -305,19 +356,23 @@ useEffect(() => {
         }}
       >
         <div className="px-8 sm:px-10 lg:px-12 py-6 flex flex-wrap gap-4 justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold mb-1" style={{ color: 'var(--foreground)' }}>
-              {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Your'} Dashboard
-            </h1>
-            <p className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>
-              Welcome back, let's keep up the momentum! 
-            </p>
-          </div>
+          <Reveal>
+            <div>
+              <h1 className="text-3xl font-bold mb-1" style={{ color: 'var(--foreground)' }}>
+                {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Your'} Dashboard
+              </h1>
+              <p className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                Welcome back, let's keep up the momentum! 
+              </p>
+            </div>
+          </Reveal>
           <div className="flex items-center space-x-4">
             <Link
               to="/Learningpage"
-              className="px-4 py-2 rounded-lg font-medium transition-all hover:opacity-90 flex items-center gap-2"
-              style={{ background: 'var(--primary)', color: 'var(--primary-foreground)', textDecoration: 'none' }}
+              className="group inline-flex items-center gap-2 px-6 py-3 font-mono font-bold text-[14px] transition-all duration-200 uppercase tracking-widest rounded-lg"
+              style={{ background: 'var(--primary)', color: 'var(--primary-foreground)', textDecoration: 'none', border: '1px solid var(--primary)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--primary)"; }}
+              onMouseLeave={e => { e.currentTarget.style.background = "var(--primary)"; e.currentTarget.style.color = "var(--primary-foreground)"; }}
             >
               <span>+</span> New Session
             </Link>
@@ -341,94 +396,105 @@ useEffect(() => {
         </div>
       </header>
 
-      <div className="px-4 sm:px-6 lg:px-8 py-8 w-full">
+      <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-8 w-full max-w-7xl mx-auto">
 
         {/* Cards Section - 3 cards in a row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
           {/* Study Streak Card */}
-          <div
-            className="rounded-xl p-6 border transition-all cursor-pointer hover:-translate-y-1"
-            style={{
-              background: 'var(--card)',
-              borderColor: 'var(--border)',
-              boxShadow: 'var(--shadow)',
-              borderLeft: `4px solid var(--chart-5)`
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
-                  Study Streak
-                </p>
-                <p className="text-3xl font-bold mt-2" style={{ color: 'var(--card-foreground)' }}>
-                  {streak} {streak === 1 ? 'Day' : 'Days'}
-                </p>
-                <p className="text-sm mt-2 font-medium" style={{ color: 'var(--chart-4)' }}>
-                  {streak === 0 ? 'Start your streak today!' : streak >= 7 ? '🚀 On fire!' : 'Keep it up!'}
-                </p>
+          <Reveal delay={0.05} className="h-full">
+            <div
+              className="rounded-xl p-6 border transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg h-full flex flex-col"
+              style={{
+                background: solidCardBg,
+                borderColor: 'var(--border)',
+                boxShadow: 'var(--shadow)',
+                borderLeft: `4px solid var(--chart-5)`
+              }}
+            >
+              <div className="flex items-center justify-between h-full">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
+                    Study Streak
+                  </p>
+                  <p className="text-3xl font-bold mt-2" style={{ color: 'var(--card-foreground)' }}>
+                    {streak} {streak === 1 ? 'Day' : 'Days'}
+                  </p>
+                  <p className="text-sm mt-2 font-medium" style={{ color: 'var(--chart-4)' }}>
+                    {streak === 0 ? 'Start your streak today!' : streak >= 7 ? '🚀 On fire!' : 'Keep it up!'}
+                  </p>
+                </div>
+                <div className="text-4xl opacity-20">🔥</div>
               </div>
-              <div className="text-4xl opacity-20">🔥</div>
             </div>
-          </div>
+          </Reveal>
 
           {/* Topics Mastered Card */}
-          <div
-            className="rounded-xl p-6 border transition-all cursor-pointer hover:-translate-y-1"
-            style={{
-              background: 'var(--card)',
-              borderColor: 'var(--border)',
-              boxShadow: 'var(--shadow)',
-              borderLeft: `4px solid var(--chart-4)`
-            }}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
-                  Topics Mastered
-                </p>
-                <p className="text-3xl font-bold mt-2" style={{ color: 'var(--card-foreground)' }}>
-                  {masteredCount}<span className="text-lg" style={{ color: 'var(--muted-foreground)' }}>/{totalTopics}</span>
-                </p>
-                <p className="text-xs mt-2 font-medium" style={{ color: 'var(--muted-foreground)' }}>
-                  100% score required
-                </p>
+          <Reveal delay={0.1} className="h-full">
+            <div
+              className="rounded-xl p-6 border transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg h-full flex flex-col"
+              style={{
+                background: solidCardBg,
+                borderColor: 'var(--border)',
+                boxShadow: 'var(--shadow)',
+                borderLeft: `4px solid var(--chart-4)`
+              }}
+            >
+              <div className="flex items-center justify-between h-full">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
+                    Topics Mastered
+                  </p>
+                  <p className="text-3xl font-bold mt-2" style={{ color: 'var(--card-foreground)' }}>
+                    {masteredCount}<span className="text-lg" style={{ color: 'var(--muted-foreground)' }}>/{totalTopics}</span>
+                  </p>
+                  <p className="text-xs mt-2 font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                    100% score required
+                  </p>
+                </div>
+                <div className="text-4xl opacity-20">🎯</div>
               </div>
-              <div className="text-4xl opacity-20">🎯</div>
             </div>
-          </div>
+          </Reveal>
 
           {/* Average Score Card */}
-          <div
-            className="rounded-xl p-6 border transition-all cursor-pointer hover:-translate-y-1"
-            style={{
-              background: 'var(--card)',
-              borderColor: 'var(--border)',
-              boxShadow: 'var(--shadow)',
-              borderLeft: `4px solid var(--chart-2)`
-            }}
-          >
-            <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)' }}>
-              Average Score
-            </p>
-            {quizzes.length === 0 ? (
-              <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>No quizzes yet</p>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-3xl font-bold" style={{ color: 'var(--card-foreground)' }}>
-                  {averageScore}<span className="text-lg" style={{ color: 'var(--muted-foreground)' }}>%</span>
-                </p>
-                <div className="relative h-2 rounded-full overflow-hidden" style={{ background: 'var(--muted)' }}>
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${averageScore}%`, background: averageScore >= 80 ? 'var(--chart-4)' : averageScore >= 60 ? '#d4a853' : 'var(--chart-3)' }}
-                  />
+          <Reveal delay={0.15} className="h-full">
+            <div
+              className="rounded-xl p-6 border transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg h-full flex flex-col justify-between"
+              style={{
+                background: solidCardBg,
+                borderColor: 'var(--border)',
+                boxShadow: 'var(--shadow)',
+                borderLeft: `4px solid var(--chart-2)`
+              }}
+            >
+              <div className="flex items-center justify-between h-full">
+                <div className="w-full">
+                  <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--muted-foreground)' }}>
+                    Average Score
+                  </p>
+                  {quizzes.length === 0 ? (
+                    <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>No quizzes yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-3xl font-bold" style={{ color: 'var(--card-foreground)' }}>
+                        {averageScore}<span className="text-lg" style={{ color: 'var(--muted-foreground)' }}>%</span>
+                      </p>
+                      <div className="relative h-2 rounded-full overflow-hidden" style={{ background: 'var(--muted)' }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${averageScore}%`, background: averageScore >= 80 ? 'var(--chart-4)' : averageScore >= 60 ? '#d4a853' : 'var(--chart-3)' }}
+                        />
+                      </div>
+                      <p className="text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                        across {quizzes.length} {quizzes.length === 1 ? 'quiz' : 'quizzes'}
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
-                  across {quizzes.length} {quizzes.length === 1 ? 'quiz' : 'quizzes'}
-                </p>
+                <div className="text-4xl opacity-20 pl-4">📊</div>
               </div>
-            )}
-          </div>
+            </div>
+          </Reveal>
         </div>
 
         {/* Main Content Grid - Left: Progress + Quiz History stacked, Right: Suggestions */}
@@ -436,126 +502,137 @@ useEffect(() => {
           {/* Left Column - Progress Chart and Quiz History stacked */}
           <div className="lg:col-span-2 space-y-6">
             {/* Progress Chart */}
-            <div 
-              className="rounded-xl p-6 border"
-              style={{ background: 'var(--card)', borderColor: 'var(--border)', boxShadow: 'var(--shadow)' }}
-            >
-              <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--foreground)' }}>Quizzes per Week</h2>
-              <div className="relative h-48 w-full">
-                <Line options={chartOptions} data={chartData} />
+            <Reveal delay={0.2}>
+              <div 
+                className="rounded-xl p-6 border"
+                style={{ background: solidCardBg, borderColor: 'var(--border)', boxShadow: 'var(--shadow)' }}
+              >
+                <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--foreground)' }}>Quizzes per Week</h2>
+                <div className="relative h-48 w-full">
+                  <Line options={chartOptions} data={chartData} />
+                </div>
               </div>
-            </div>
+            </Reveal>
 
             {/* Quiz History */}
-          <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] overflow-hidden" style={{ boxShadow: 'var(--shadow)' }}>
-            <div className="px-6 py-4 border-b border-[var(--border)]">
-              <h2 className="text-lg font-bold text-[var(--foreground)]">Recent Quizzes</h2>
-            </div>
-            {loading && <p className="text-[var(--muted-foreground)] px-6 py-4">Loading...</p>}
-            {error && <p className="text-red-500 px-6 py-4">Error: {error}</p>}
-            {!loading && (!quizzes || quizzes.length === 0) && (
-              <p className="text-[var(--muted-foreground)] px-6 py-4">No quizzes yet</p>
-            )}
-            {!loading && quizzes.length > 0 && (
-              <div className="overflow-auto max-h-[300px]">
-                <table className="w-full text-left border-collapse text-sm">
-                  <thead className="bg-[var(--muted)] text-[var(--muted-foreground)] text-xs uppercase tracking-wider sticky top-0">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold">Title</th>
-                      <th className="px-4 py-3 font-semibold">Date</th>
-                      <th className="px-4 py-3 font-semibold text-center">Score</th>
-                      <th className="px-4 py-3 font-semibold text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border)]">
-                    {quizzes.slice(0, 5).map((quiz) => {
-                      const correctCount = Array.isArray(quiz.quiz) ? quiz.quiz.filter(q => q.isCorrect).length : 0;
-                      const totalCount = Array.isArray(quiz.quiz) ? quiz.quiz.length : 0;
-                      const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
-                      
-                      return (
-                        <tr key={quiz.id} className="hover:bg-[var(--muted)]/50 transition-colors">
-                          <td className="px-4 py-3">
-                            <span className="font-medium text-[var(--foreground)] line-clamp-1">{quiz.title}</span>
-                          </td>
-                          <td className="px-4 py-3 text-[var(--muted-foreground)] text-xs">
-                            {new Date(quiz.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                              score >= 80 ? 'bg-green-500/20 text-green-500' : 
-                              score >= 60 ? 'bg-yellow-500/20 text-yellow-500' : 
-                              'bg-red-500/20 text-red-500'
-                            }`}>
-                              {score}%
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <button 
-                              onClick={() => handleViewQuiz(quiz)}
-                              className="text-xs px-3 py-1 rounded-lg font-medium transition-all hover:scale-105"
-                              style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
-                            >
-                              View
-                            </button>
-                          </td>
+            <Reveal delay={0.25}>
+              <div className="rounded-xl border border-[var(--border)] overflow-hidden" style={{ background: solidCardBg, boxShadow: 'var(--shadow)' }}>
+                <div className="px-6 py-4 border-b border-[var(--border)]">
+                  <h2 className="text-lg font-bold text-[var(--foreground)]">Recent Quizzes</h2>
+                </div>
+                {loading && <p className="text-[var(--muted-foreground)] px-6 py-4">Loading...</p>}
+                {error && <p className="text-red-500 px-6 py-4">Error: {error}</p>}
+                {!loading && (!quizzes || quizzes.length === 0) && (
+                  <p className="text-[var(--muted-foreground)] px-6 py-4">No quizzes yet</p>
+                )}
+                {!loading && quizzes.length > 0 && (
+                  <div className="overflow-auto max-h-[300px]">
+                    <table className="w-full text-left border-collapse text-sm">
+                      <thead className="bg-[var(--muted)] text-[var(--muted-foreground)] text-xs uppercase tracking-wider sticky top-0">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold">Title</th>
+                          <th className="px-4 py-3 font-semibold">Date</th>
+                          <th className="px-4 py-3 font-semibold text-center">Score</th>
+                          <th className="px-4 py-3 font-semibold text-right">Action</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {quizzes.slice(0, 5).map((quiz) => {
+                          const correctCount = Array.isArray(quiz.quiz) ? quiz.quiz.filter(q => q.isCorrect).length : 0;
+                          const totalCount = Array.isArray(quiz.quiz) ? quiz.quiz.length : 0;
+                          const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+                          
+                          return (
+                            <tr key={quiz.id} className="hover:bg-[var(--muted)]/50 transition-colors">
+                              <td className="px-4 py-3">
+                                <span className="font-medium text-[var(--foreground)] line-clamp-1">{quiz.title}</span>
+                              </td>
+                              <td className="px-4 py-3 text-[var(--muted-foreground)] text-xs">
+                                {new Date(quiz.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                                  score >= 80 ? 'bg-green-500/20 text-green-500' : 
+                                  score >= 60 ? 'bg-yellow-500/20 text-yellow-500' : 
+                                  'bg-red-500/20 text-red-500'
+                                }`}>
+                                  {score}%
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <button 
+                                  onClick={() => handleViewQuiz(quiz)}
+                                  className="text-xs px-3 py-1 rounded-lg font-medium transition-all hover:scale-105"
+                                  style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                                >
+                                  View
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </Reveal>
           </div>
 
           {/* Right Column - Learning Suggestions */}
-          {suggestions?.suggestions?.urgentAreas?.[0] ? (
-            <div className="rounded-xl p-6 border h-fit"
-              style={{ background: `var(--primary)`, color: 'var(--background)', borderColor: 'var(--border)' }}
-            >
-                <div className="flex items-center gap-3 mb-4">
-                  <div>
-                    <h3 className="text-lg font-bold uppercase tracking-wider opacity-90">
-                     <Vela /> Vela's Suggestions
-                    </h3>
-                </div>
-            </div>
-              
-              {/* Top 3 Suggestions List with Descriptions */}
-              <div className="space-y-4 mb-4">
-                {[0, 1, 2].map((index) => {
-                  const topicName = suggestions.analysisData.lowestScoringAreas[index];
-                  const urgentArea = suggestions.suggestions.urgentAreas[index];
-                  const studyAction = suggestions.suggestions.studyPlan[index];
-                  
-                  return (
-                    <div key={index} className="opacity-90 border-b border-white/20 pb-3 last:border-0 last:pb-0">
-                      <p className="font-bold mb-2 text-sm">
-                        {index + 1}. {topicName || urgentArea || 'General Review'}
-                      </p>
-                      <p className="text-xs opacity-80 italic leading-relaxed">
-                        {studyAction || 'Review fundamentals and practice problems'}
-                      </p>
-                    </div>
-                  );
-                })}
+          <Reveal delay={0.3}>
+            {suggestions?.suggestions?.urgentAreas?.[0] ? (
+              <div className="rounded-xl p-6 border h-fit transition-all hover:shadow-[0_0_20px_rgba(0,229,255,0.15)]"
+                style={{ 
+                  background: 'color-mix(in srgb, var(--primary) 8%, var(--card))', 
+                  color: 'var(--foreground)', 
+                  borderColor: 'var(--primary)',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+                }}
+              >
+                  <div className="flex items-center gap-3 mb-4">
+                    <div>
+                      <h3 className="text-lg font-bold uppercase tracking-wider opacity-90 flex items-center gap-3">
+                       <Vela size={40} /> Vela's Suggestions
+                      </h3>
+                  </div>
               </div>
+                
+                {/* Top 3 Suggestions List with Descriptions */}
+                <div className="space-y-4 mb-4">
+                  {[0, 1, 2].map((index) => {
+                    const topicName = suggestions.analysisData.lowestScoringAreas[index];
+                    const urgentArea = suggestions.suggestions.urgentAreas[index];
+                    const studyAction = suggestions.suggestions.studyPlan[index];
+                    
+                    return (
+                      <div key={index} className="border-b border-[var(--border)] pb-3 last:border-0 last:pb-0">
+                        <p className="font-bold mb-2 text-sm">
+                          {index + 1}. {topicName || urgentArea || 'General Review'}
+                        </p>
+                        <p className="text-xs opacity-80 italic leading-relaxed">
+                          {studyAction || 'Review fundamentals and practice problems'}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
 
-              {/* Score Progress Bar */}
-              <div className="flex items-center gap-3 pt-3 border-t border-white/20">
-                <div className="flex-1 h-2 bg-white/20 rounded-full">
-                  <div className="h-full bg-white/80 rounded-full" 
-                    style={{ width: `${suggestions.analysisData.averageScore}%` }}></div>
+                {/* Score Progress Bar */}
+                <div className="flex items-center gap-3 pt-3 border-t border-[var(--border)]">
+                  <div className="flex-1 h-2 bg-[var(--muted)] rounded-full">
+                    <div className="h-full bg-[var(--primary)] rounded-full" 
+                      style={{ width: `${suggestions.analysisData.averageScore}%` }}></div>
+                  </div>
+                  <span className="text-sm font-bold">{suggestions.analysisData.averageScore}%</span>
                 </div>
-                <span className="text-sm font-bold">{suggestions.analysisData.averageScore}%</span>
               </div>
-            </div>
-          ) : (
-            <div className="rounded-xl p-6 border bg-gray-100 border-gray-300 opacity-50 h-fit" style={{ color: 'var(--foreground)' }}>
-              <p className="text-sm">Loading suggestions...</p>
-            </div>
-          )}
+            ) : (
+              <div className="rounded-xl p-6 border opacity-50 h-fit" style={{ background: solidCardBg, borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                <p className="text-sm">Loading suggestions...</p>
+              </div>
+            )}
+          </Reveal>
         </div>
       </div>
       

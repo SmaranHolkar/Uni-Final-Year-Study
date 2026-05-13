@@ -3,6 +3,7 @@ import { useAuth } from '../AuthContext';
 import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Key, LogOut, Edit2, Save, X, Trash2, UserX } from 'lucide-react';
+import { Reveal, DotGrid } from '../components/Reveal.jsx';
 
 // Handles Profile logic.
 export default function Profile() {
@@ -155,6 +156,8 @@ export default function Profile() {
     }
   };
 
+  const solidCardBg = 'color-mix(in srgb, var(--background) 90%, var(--foreground) 10%)';
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
@@ -178,7 +181,9 @@ export default function Profile() {
   }
 
   return (
-    <main className="main-content min-h-screen" style={{ background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'var(--font-sans)' }}>
+    <main className="main-content min-h-screen relative" style={{ background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'var(--font-sans)' }}>
+      <DotGrid />
+      
       {/* Header */}
       <header 
         className="sticky top-0 z-20 backdrop-blur-lg border-b"
@@ -189,14 +194,16 @@ export default function Profile() {
         }}
       >
         <div className="px-8 sm:px-10 lg:px-12 py-6 flex flex-wrap gap-4 justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold mb-1" style={{ color: 'var(--foreground)' }}>
-              My Profile
-            </h1>
-            <p className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>
-              Manage your account settings and preferences
-            </p>
-          </div>
+          <Reveal>
+            <div>
+              <h1 className="text-3xl font-bold mb-1" style={{ color: 'var(--foreground)' }}>
+                My Profile
+              </h1>
+              <p className="text-sm font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                Manage your account settings and preferences
+              </p>
+            </div>
+          </Reveal>
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all hover:opacity-80 text-sm font-medium"
@@ -211,174 +218,179 @@ export default function Profile() {
         </div>
       </header>
 
-      <div className="px-4 sm:px-6 lg:px-8 py-8 w-full">
+      <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-8 w-full max-w-2xl mx-auto">
         {/* Profile Card */}
-        <div className="rounded-xl shadow-lg p-8" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-          {/* Avatar Section */}
-          <div className="flex justify-center mb-8">
-            <div 
-              className="w-28 h-28 rounded-full flex items-center justify-center ring-4 shadow-lg"
-              style={{ 
-                ringColor: 'var(--border)'
-              }}
-            >
-              <span className="text-5xl font-bold text-white">
+        <Reveal delay={0.1}>
+          <div className="rounded-xl shadow-lg p-8" style={{ background: solidCardBg, border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+            {/* Avatar Section */}
+            <div className="flex justify-center mb-8">
+              <div 
+                className="w-28 h-28 rounded-full flex items-center justify-center ring-4 shadow-lg font-bold text-5xl text-white"
+                style={{ 
+                  background: 'var(--primary)',
+                  ringColor: 'var(--primary)'
+                }}
+              >
                 {user.user_metadata?.full_name ? user.user_metadata.full_name[0].toUpperCase() : user.email[0].toUpperCase()}
-              </span>
+              </div>
             </div>
-          </div>
 
-          {/* Profile Info */}
-          <div className="space-y-6">
-            {/* Full Name */}
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
-                <User size={16} />
-                Full Name
-              </label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  name="fullName"
-                  value={profile.fullName}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2.5 rounded-lg outline-none transition-all"
-                  style={{ 
-                    background: 'var(--background)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--foreground)'
-                  }}
-                  placeholder="Enter your full name"
-                />
-              ) : (
+            {/* Profile Info */}
+            <div className="space-y-6">
+              {/* Full Name */}
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
+                  <User size={16} />
+                  Full Name
+                </label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    name="fullName"
+                    value={profile.fullName}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 rounded-lg outline-none transition-all"
+                    style={{ 
+                      background: 'var(--background)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--foreground)'
+                    }}
+                    placeholder="Enter your full name"
+                  />
+                ) : (
+                  <p className="py-2.5 px-4 rounded-lg" style={{ 
+                    color: 'var(--muted-foreground)',
+                    background: 'var(--muted)',
+                  }}>
+                    {profile.fullName || 'Not set'}
+                  </p>
+                )}
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
+                  <Mail size={16} />
+                  Email Address
+                </label>
                 <p className="py-2.5 px-4 rounded-lg" style={{ 
                   color: 'var(--muted-foreground)',
                   background: 'var(--muted)',
                 }}>
-                  {profile.fullName || 'Not set'}
+                  {profile.email}
                 </p>
-              )}
+                <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                  Email cannot be changed
+                </p>
+              </div>
+
+              {/* User ID */}
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
+                  <Key size={16} />
+                  User ID
+                </label>
+                <p className="py-2.5 px-4 rounded-lg font-mono text-sm break-all" style={{ 
+                  color: 'var(--muted-foreground)',
+                  background: 'var(--muted)',
+                }}>
+                  {user.id}
+                </p>
+              </div>
             </div>
 
-            {/* Email */}
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
-                <Mail size={16} />
-                Email Address
-              </label>
-              <p className="py-2.5 px-4 rounded-lg" style={{ 
-                color: 'var(--muted-foreground)',
-                background: 'var(--muted)',
-              }}>
-                {profile.email}
-              </p>
-              <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                Email cannot be changed
-              </p>
-            </div>
-
-            {/* User ID */}
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium mb-2" style={{ color: 'var(--foreground)' }}>
-                <Key size={16} />
-                User ID
-              </label>
-              <p className="py-2.5 px-4 rounded-lg font-mono text-sm break-all" style={{ 
-                color: 'var(--muted-foreground)',
-                background: 'var(--muted)',
-              }}>
-                {user.id}
-              </p>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-4 mt-8 pt-6" style={{ borderTop: '1px solid var(--border)' }}>
-            {isEditing ? (
-              <>
+            {/* Action Buttons */}
+            <div className="flex gap-4 mt-8 pt-6" style={{ borderTop: '1px solid var(--border)' }}>
+              {isEditing ? (
+                <>
+                  <button
+                    onClick={handleSaveProfile}
+                    disabled={loading}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-all hover:opacity-90 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ 
+                      background: 'var(--primary)',
+                      color: 'var(--primary-foreground)'
+                    }}
+                  >
+                    <Save size={18} />
+                    {loading ? 'Saving...' : 'Save Changes'}
+                  </button>
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-all hover:opacity-90 font-medium"
+                    style={{ 
+                      background: 'var(--muted)',
+                      color: 'var(--foreground)'
+                    }}
+                  >
+                    <X size={18} />
+                    Cancel
+                  </button>
+                </>
+              ) : (
                 <button
-                  onClick={handleSaveProfile}
-                  disabled={loading}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-all hover:opacity-90 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => setIsEditing(true)}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-all hover:opacity-90 font-medium"
                   style={{ 
                     background: 'var(--primary)',
                     color: 'var(--primary-foreground)'
                   }}
                 >
-                  <Save size={18} />
-                  {loading ? 'Saving...' : 'Save Changes'}
+                  <Edit2 size={18} />
+                  Edit Profile
                 </button>
-                <button
-                  onClick={() => setIsEditing(false)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-all hover:opacity-90 font-medium"
-                  style={{ 
-                    background: 'var(--muted)',
-                    color: 'var(--foreground)'
-                  }}
-                >
-                  <X size={18} />
-                  Cancel
-                </button>
-              </>
-            ) : (
+              )}
+            </div>
+          </div>
+        </Reveal>
+
+        {/* Danger Zone */}
+        <Reveal delay={0.2}>
+          <div
+            className="mt-8 rounded-xl p-6"
+            style={{ background: solidCardBg, border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
+          >
+            <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--foreground)' }}>
+              ⚠️ Danger Zone
+            </h2>
+            <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+              These actions are permanent and cannot be undone.
+            </p>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
-                onClick={() => setIsEditing(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-all hover:opacity-90 font-medium"
-                style={{ 
-                  background: 'var(--primary)',
-                  color: 'var(--primary-foreground)'
+                type="button"
+                onClick={handleDeleteData}
+                disabled={isDeletingData || isDeletingAccount}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-all hover:opacity-90"
+                style={{
+                  borderColor: 'var(--destructive)',
+                  color: 'var(--destructive)',
+                  background: 'var(--background)',
+                  opacity: isDeletingData || isDeletingAccount ? 0.6 : 1,
+                  cursor: isDeletingData || isDeletingAccount ? 'not-allowed' : 'pointer'
                 }}
               >
-                <Edit2 size={18} />
-                Edit Profile
+                <Trash2 size={16} />
+                {isDeletingData ? 'Deleting Data...' : 'Delete Data'}
               </button>
-            )}
+              <button
+                type="button"
+                onClick={handleDeleteAccount}
+                disabled={isDeletingData || isDeletingAccount}
+                className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all hover:opacity-90"
+                style={{
+                  background: 'var(--destructive)',
+                  color: 'var(--destructive-foreground)',
+                  opacity: isDeletingData || isDeletingAccount ? 0.6 : 1,
+                  cursor: isDeletingData || isDeletingAccount ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <UserX size={16} />
+                {isDeletingAccount ? 'Deleting Account...' : 'Delete Account'}
+              </button>
+            </div>
           </div>
-        </div>
-        <div
-          className="mt-8 rounded-xl p-5"
-          style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}
-        >
-          <h2 className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
-            Danger Zone
-          </h2>
-          <p className="mt-1 text-xs" style={{ color: 'var(--muted-foreground)' }}>
-            These actions are sensitive and should be used carefully.
-          </p>
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={handleDeleteData}
-              disabled={isDeletingData || isDeletingAccount}
-              className="flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition-all hover:opacity-90"
-              style={{
-                borderColor: 'var(--destructive)',
-                color: 'var(--destructive)',
-                background: 'var(--background)',
-                opacity: isDeletingData || isDeletingAccount ? 0.6 : 1,
-                cursor: isDeletingData || isDeletingAccount ? 'not-allowed' : 'pointer'
-              }}
-            >
-              <Trash2 size={16} />
-              {isDeletingData ? 'Deleting Data...' : 'Delete Data'}
-            </button>
-            <button
-              type="button"
-              onClick={handleDeleteAccount}
-              disabled={isDeletingData || isDeletingAccount}
-              className="flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-all hover:opacity-90"
-              style={{
-                background: 'var(--destructive)',
-                color: 'var(--destructive-foreground)',
-                opacity: isDeletingData || isDeletingAccount ? 0.6 : 1,
-                cursor: isDeletingData || isDeletingAccount ? 'not-allowed' : 'pointer'
-              }}
-            >
-              <UserX size={16} />
-              {isDeletingAccount ? 'Deleting Account...' : 'Delete Account'}
-            </button>
-          </div>
-        </div>
+        </Reveal>
       </div>
     </main>
   );

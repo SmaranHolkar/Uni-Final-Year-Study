@@ -1,9 +1,7 @@
 import fs from 'fs';
-import pool from '../utils/dbPool.js';
-import { getEmbedding } from '../utils/aiUtils.js';
-import { extractTextFromFile, chunkText } from '../services/documentService.js';
-
-
+import pool from '../../shared/config/dbPool.js';
+import { getEmbedding, describeImage } from '../ai/ml.engine.js';
+import { extractTextFromFile, chunkText, extractPageImages } from './document.service.js';
 
 /*  PROCESS & STORE DOCUMENT   */
 
@@ -14,7 +12,6 @@ export async function processAndStoreDocument(req, res) {
 
   try {
     /*  VALIDATION  */
-
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
@@ -37,24 +34,50 @@ export async function processAndStoreDocument(req, res) {
     );
 
     if (parseInt(duplicateCheck.rows[0].count) > 0) {
-      return res.status(409).json({ 
+      return res.status(409).json({
         error: 'Document already exists',
         message: `A document with the title "${title}" has already been uploaded. Please use a different title or delete the existing document first.`
       });
     }
 
     /*  EXTRACT TEXT  */
-    const text = await extractTextFromFile(
-      req.file.path,
-      req.file.mimetype
-    );
+    let text = await extractTextFromFile(req.file.path, req.file.mimetype);
 
     if (!text || text.trim().length < 50) {
       throw new Error('Document contains insufficient readable text');
     }
 
-    /*  CHUNKING  */
+    /*  IMAGE ENRICHMENT (PDF only) — non-fatal  */
+    let imagesDescribed = 0;
+    if (req.file.mimetype === 'application/pdf') {
+      try {
+        const pageImages = await extractPageImages(req.file.path);
+        if (pageImages.length > 0) {
+          console.log(`[VISION] Found ${pageImages.length} image-containing page(s) in "${title}"`);
+          const descriptions = [];
+          for (const { pageNum, base64 } of pageImages) {
+            try {
+              const desc = await describeImage(base64);
+              descriptions.push(`[Page ${pageNum} Visual Content]:\n${desc}`);
+              imagesDescribed++;
+              console.log(`[VISION] Described page ${pageNum} (${desc.length} chars)`);
+            } catch (visionErr) {
+              console.warn(`[VISION] Could not describe page ${pageNum}:`, visionErr.message);
+            }
+          }
+          if (descriptions.length) {
+            text += '\n\n' + descriptions.join('\n\n');
+          }
+        } else {
+          console.log(`[VISION] No image-containing pages found in "${title}" — text-only document`);
+        }
+      } catch (imgErr) {
+        // Image enrichment failure must never block the upload
+        console.warn('[VISION] Image extraction failed, continuing with text-only:', imgErr.message);
+      }
+    }
 
+    /*  CHUNKING  */
     const MAX_CHUNKS = 500;
     const chunks = chunkText(text, 1000, 100).slice(0, MAX_CHUNKS);
 
@@ -85,26 +108,18 @@ export async function processAndStoreDocument(req, res) {
           (title, chunk_text, embedding, user_id, created_at)
           VALUES ($1, $2, $3::vector, $4, NOW())
           `,
-          [
-            title,
-            chunks[i],
-            `[${embedding.join(',')}]`,
-            userId
-          ]
+          [title, chunks[i], `[${embedding.join(',')}]`, userId]
         );
 
         storedChunks++;
 
-        } catch (err) {
-          failedChunks.push({
-            index: i,
-            error: err.message
-          });
-        }
+      } catch (err) {
+        failedChunks.push({ index: i, error: err.message });
+      }
     }
     await client.query('COMMIT');
+
     /*  RESPONSE  */
-    // Get the ID of the first inserted embedding to return as documentId
     const idResult = await client.query(
       'SELECT id FROM public.w_embeddings WHERE title = $1 AND user_id = $2 LIMIT 1',
       [title, userId]
@@ -113,44 +128,31 @@ export async function processAndStoreDocument(req, res) {
 
     res.json({
       success: true,
-      document: {
-        id: documentId,
-        title,
-        originalName: req.file.originalname,
-        userId
-      },
+      document: { id: documentId, title, originalName: req.file.originalname, userId },
       stats: {
         textLength: text.length,
         totalChunks: chunks.length,
         storedChunks,
-        failedChunks: failedChunks.length
+        failedChunks: failedChunks.length,
+        imagesDescribed,
       },
       failures: failedChunks.length ? failedChunks : undefined
     });
 
   } catch (error) {
     await client.query('ROLLBACK');
-
     console.error(' Document processing failed:', error.message);
-
-    res.status(500).json({
-      error: 'Failed to process document',
-      details: error.message
-    });
+    res.status(500).json({ error: 'Failed to process document', details: error.message });
 
   } finally {
     client.release();
-
-    // Always remove uploaded file
     if (uploadedFilePath) {
       fs.unlink(uploadedFilePath, () => {});
     }
   }
 }
 
-
-/*  DELETE DOCUMENT EMBEDDINGS       */
-
+/*  DELETE DOCUMENT EMBEDDINGS  */
 
 // Handles deleteDocumentEmbeddings logic.
 export async function deleteDocumentEmbeddings(req, res) {
@@ -174,16 +176,10 @@ export async function deleteDocumentEmbeddings(req, res) {
       });
     }
 
-    res.json({
-      success: true,
-      deletedCount: result.rowCount
-    });
+    res.json({ success: true, deletedCount: result.rowCount });
 
   } catch (error) {
     console.error('Delete failed:', error.message);
-
-    res.status(500).json({
-      error: 'Failed to delete embeddings'
-    });
+    res.status(500).json({ error: 'Failed to delete embeddings' });
   }
 }

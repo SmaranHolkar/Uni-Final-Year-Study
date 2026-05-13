@@ -22,6 +22,7 @@ import Learningplayground from './pages/Learningplayground.jsx';
 import PublicPageBackground from './components/PublicPageBackground.jsx';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import Marketplace from './pages/Marketplace';
 
 // Renders routes and switches nav/sidebar based on authentication state.
 function AppContent() {
@@ -52,6 +53,7 @@ function AppContent() {
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/learningpage" element={<PrivateRoute><Learn /></PrivateRoute>} />
         <Route path="/Learningplayground" element={<PrivateRoute><Learningplayground /></PrivateRoute>} />
+        <Route path="/marketplace" element={<PrivateRoute><Marketplace /></PrivateRoute>} />
         <Route path="/history" element={<PrivateRoute><History /></PrivateRoute>} />
         <Route path="/Profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
         <Route path="/quiz/:quizId" element={<PrivateRoute><QuizDetail /></PrivateRoute>} />

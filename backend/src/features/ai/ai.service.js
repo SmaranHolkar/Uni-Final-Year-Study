@@ -1,5 +1,5 @@
-import sql from '../db.js';
-import { getChatCompletion } from '../utils/aiUtils.js';
+import sql from '../../shared/config/db.js';
+import { getChatCompletion } from './ml.engine.js';
 
 /**
  * Fetches the last 10 quiz attempts for a user.
@@ -92,9 +92,7 @@ export async function analyzeQuizPerformance(quizHistory) {
   };
 }
 
-
-  // Generates an AI-powered study suggestion plan for a user.
- 
+// Generates an AI-powered study suggestion plan for a user.
 export async function generateStudySuggestions(userId) {
   try {
     console.log(`[SUGGESTIONS] Starting for userId: ${userId}`);
@@ -168,9 +166,7 @@ export async function generateStudySuggestions(userId) {
   }
 }
 
-
-  // Persists AI-generated suggestions to the database.
-
+// Persists AI-generated suggestions to the database.
 export async function saveSuggestions(userId, data) {
   try {
     await sql`

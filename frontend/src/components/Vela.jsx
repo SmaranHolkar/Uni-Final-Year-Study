@@ -1,82 +1,79 @@
-// Renders the animated Vela branding star and its CSS keyframes.
 import React from 'react';
 
-const velaStyles = `
-  @keyframes velaGlow {
-    0%, 100% {
-      filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.4)) drop-shadow(0 0 16px rgba(59, 130, 246, 0.2));
-      transform: scale(1) translateY(0px);
-    }
-    50% {
-      filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.7)) drop-shadow(0 0 30px rgba(59, 130, 246, 0.4));
-      transform: scale(1.05) translateY(-3px);
-    }
-  }
+/**
+ * Vela Mascot - Expressive Dot Matrix Face
+ * Hardcoded colors for testing visibility.
+ */
+export default function Vela({ size = 60, loading = false, className = '' }) {
+  // Electric Cyan fallback
+  const primaryColor = '#00E5FF'; 
 
-  @keyframes velaShimmer {
-    0%, 100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.85;
-    }
-  }
+  return (
+    <div className={`vela-face-wrapper ${className}`} style={{ 
+      width: size, 
+      height: size, 
+      display: 'inline-flex', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      background: 'transparent'
+    }}>
+      <svg 
+        viewBox="0 0 100 100" 
+        width={size} 
+        height={size}
+        style={{ overflow: 'visible', display: 'block' }}
+      >
+        <g>
+          {/* 9x9 Background Grid */}
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(r => 
+            [0, 1, 2, 3, 4, 5, 6, 7, 8].map(c => (
+              <circle key={`${r}-${c}`} cx={10 + c * 10} cy={10 + r * 10} r="2.5" fill={primaryColor} opacity="0.15" />
+            ))
+          )}
+        </g>
 
-  .vela-pulsing-star-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-  }
+        <g style={{ 
+          animation: loading ? 'velaPulse 1.5s infinite ease-in-out' : 'none',
+          transformOrigin: '50% 50%'
+        }}>
+          {/* Eyebrows */}
+          <circle cx="20" cy="25" r="3.8" fill={primaryColor} />
+          <circle cx="30" cy="22" r="3.8" fill={primaryColor} />
+          <circle cx="40" cy="25" r="3.8" fill={primaryColor} />
+          <circle cx="60" cy="25" r="3.8" fill={primaryColor} />
+          <circle cx="70" cy="22" r="3.8" fill={primaryColor} />
+          <circle cx="80" cy="25" r="3.8" fill={primaryColor} />
 
-  .vela-star-halo {
-    position: absolute;
-    width: 75px;
-    height: 75px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, transparent 70%);
-    animation: velaGlow 3s ease-in-out infinite;
-    filter: blur(8px);
-    z-index: 0;
-  }
+          {/* Eyes */}
+          <g style={{ 
+            animation: 'velaBlink 4s infinite', 
+            transformOrigin: '50% 42%' 
+          }}>
+            <circle cx="30" cy="42" r="6.5" fill={primaryColor} />
+            <circle cx="70" cy="42" r="6.5" fill={primaryColor} />
+          </g>
 
-  .vela-pulsing-star {
-    animation: velaGlow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite, velaShimmer 3s ease-in-out infinite;
-    position: relative;
-    z-index: 1;
-    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
-  }
+          {/* Mouth */}
+          <circle cx="30" cy="72" r="3.8" fill={primaryColor} />
+          <circle cx="40" cy="77" r="3.8" fill={primaryColor} />
+          <circle cx="50" cy="77" r="3.8" fill={primaryColor} />
+          <circle cx="60" cy="77" r="3.8" fill={primaryColor} />
+          <circle cx="70" cy="72" r="3.8" fill={primaryColor} />
+        </g>
 
-  .vela-pulsing-star polygon {
-    filter: drop-shadow(0 0 4px rgba(59, 130, 246, 0.3));
-  }
-`;
-
-// Renders the animated Vela star graphic with inline CSS effects.
-export default function Vela() {
-    return (
-        <>
-            <style>{velaStyles}</style>
-            <div className="vela-pulsing-star-container">
-                <div className="vela-star-halo"></div>
-                <svg
-                    className="vela-pulsing-star"
-                    viewBox="0 0 100 100"
-                    width="60"
-                    height="60"
-                >
-                    <defs>
-                        <linearGradient id="starGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" style={{stopColor: '#3b82f6', stopOpacity: 1}} />
-                            <stop offset="100%" style={{stopColor: '#1e40af', stopOpacity: 1}} />
-                        </linearGradient>
-                    </defs>
-                    <polygon
-                        points="50,10 61,40 92,40 67,60 78,90 50,70 22,90 33,60 8,40 39,40"
-                        fill="url(#starGradient)"
-                    />
-                </svg>
-            </div>
-        </>
-    );
+        <defs>
+          <style>{`
+            @keyframes velaBlink {
+              0%, 45%, 55%, 100% { transform: scaleY(1); }
+              50% { transform: scaleY(0.1); }
+            }
+            @keyframes velaPulse {
+              0%, 100% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.05); opacity: 0.8; }
+            }
+          `}</style>
+        </defs>
+      </svg>
+    </div>
+  );
 }

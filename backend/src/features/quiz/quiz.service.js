@@ -1,9 +1,9 @@
-import pool from '../utils/dbPool.js';
-import { getEmbedding } from '../utils/aiUtils.js';
+import pool from '../../shared/config/dbPool.js';
+import { getEmbedding } from '../ai/ml.engine.js';
 
 // Handles generateEmbeddingText logic.
 function generateEmbeddingText(quizResults, mindmapNodes) {
-  let text = '';  
+  let text = '';
 
   if (Array.isArray(quizResults)) {
     text += quizResults
@@ -52,8 +52,7 @@ export async function saveQuizMindmap({ userId, title, quizResults, mindmapNodes
   }
 }
 
- // Retrieves all quiz + mindmap records for a user.
-
+// Retrieves all quiz + mindmap records for a user.
 export async function getUserQuizzesMindmaps(userId) {
   const client = await pool.connect();
   try {
@@ -70,8 +69,7 @@ export async function getUserQuizzesMindmaps(userId) {
   }
 }
 
-//Retrieves a single quiz record by ID, scoped to a user.
- 
+// Retrieves a single quiz record by ID, scoped to a user.
 export async function getQuizById(quizId, userId) {
   const client = await pool.connect();
   try {
@@ -91,7 +89,6 @@ export async function getQuizById(quizId, userId) {
 export async function shareQuizMindmap({ senderId, recipientEmail, quizMindmapId }) {
   const client = await pool.connect();
   try {
-    // Resolve recipient by email
     const userResult = await client.query(
       `SELECT id FROM auth.users WHERE email = $1`,
       [recipientEmail.toLowerCase().trim()]
@@ -109,7 +106,6 @@ export async function shareQuizMindmap({ senderId, recipientEmail, quizMindmapId
       throw err;
     }
 
-    // Verify sender owns the quiz
     const ownerResult = await client.query(
       `SELECT id FROM public.quizzes_mindmaps WHERE id = $1 AND user_id = $2`,
       [quizMindmapId, senderId]
@@ -121,8 +117,8 @@ export async function shareQuizMindmap({ senderId, recipientEmail, quizMindmapId
     }
 
     const insertResult = await client.query(
-      `INSERT INTO public.shared_mindmaps (sender_id, recipient_id, quiz_mindmap_id, created_at)
-       VALUES ($1, $2, $3, NOW()) RETURNING id`,
+      `INSERT INTO public.shared_assets (sender_id, recipient_id, asset_id, asset_type, created_at)
+       VALUES ($1, $2, $3, 'quiz', NOW()) RETURNING id`,
       [senderId, recipientId, quizMindmapId]
     );
     return { id: insertResult.rows[0].id, recipientId };
@@ -139,10 +135,10 @@ export async function getSharedWithMe(recipientId) {
       `SELECT sm.id AS share_id, sm.created_at AS shared_at,
               qm.id AS quiz_id, qm.title, qm.quiz, qm.mindmap, qm.created_at,
               au.email AS sender_email
-       FROM public.shared_mindmaps sm
-       JOIN public.quizzes_mindmaps qm ON qm.id = sm.quiz_mindmap_id
+       FROM public.shared_assets sm
+       JOIN public.quizzes_mindmaps qm ON qm.id = sm.asset_id
        JOIN auth.users au ON au.id = sm.sender_id
-       WHERE sm.recipient_id = $1
+       WHERE sm.recipient_id = $1 AND sm.asset_type = 'quiz'
        ORDER BY sm.created_at DESC`,
       [recipientId]
     );

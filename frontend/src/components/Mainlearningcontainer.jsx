@@ -1,13 +1,12 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import StepOne from "./slides/StepOne.jsx";
 import StepTwo from "./slides/Steptwo.jsx";
-import StepThree from "./slides/StepThree.jsx"; // We'll create this next
 
 // Handles MultiStepForm logic.
 export default function MultiStepForm() {
   const [step, setStep] = useState(1);
-  const [mindmapData, setMindmapData] = useState(null);
-  const [quizResults, setQuizResults] = useState(null);
+  const navigate = useNavigate();
 
   // This function gets called when Step 1 finishes (document upload)
   const handleDocumentUpload = () => {
@@ -16,9 +15,8 @@ export default function MultiStepForm() {
 
   // This function gets called when Step 2 finishes
   const handleQuizFinish = (data, results) => {
-    setMindmapData(data); // Save the mindmap JSON
-    setQuizResults(results); // Save the quiz results
-    setStep(3);           // Move to the next slide
+    // Navigate to Learning Playground, passing the quiz results and wrong questions (if they exist in data)
+    navigate("/Learningplayground", { state: { quizResults: results, mindmapData: data } });
   };
 
   return (
@@ -26,17 +24,6 @@ export default function MultiStepForm() {
       {step === 1 && <StepOne onNext={handleDocumentUpload} />}
       
       {step === 2 && <StepTwo onNext={handleQuizFinish} />}
-      
-      
-      {step === 3 && (
-      <div className="h-screen w-full">  
-        <StepThree 
-          data={mindmapData} 
-          onRetake={() => setStep(2)}
-          quizResults={quizResults}
-        />
-        </div>
-      )}
     </div>
   );
 }

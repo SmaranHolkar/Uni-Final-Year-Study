@@ -8,7 +8,6 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 // Handles deriveRestUrlFromAnonKey logic.
 function deriveRestUrlFromAnonKey(anonKey) {
   try {
-    // Ensure we have a JWT-like token: three dot-separated parts.
     if (typeof anonKey !== 'string') return null;
     const parts = anonKey.split('.');
     if (parts.length !== 3) return null;
@@ -16,12 +15,10 @@ function deriveRestUrlFromAnonKey(anonKey) {
     const payload = parts[1];
     if (!payload) return null;
 
-    // Basic validation for base64url characters to avoid malformed input.
     if (!/^[A-Za-z0-9\-_]+$/.test(payload)) {
       return null;
     }
 
-    // Normalize from base64url to base64 and add required padding.
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
     const padded = normalized + '='.repeat((4 - (normalized.length % 4 || 4)) % 4);
 

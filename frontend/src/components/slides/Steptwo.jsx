@@ -1,10 +1,14 @@
 import React, { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import Vela from "../Vela.jsx";
 import { useAuth } from "../../AuthContext";
 import { supabase } from "../../supabaseClient";
 
 // Handles StepTwo logic.
 export default function StepTwo({ onNext }) {
-  const { currentDocumentId } = useAuth();
+  const { currentDocumentId, currentDocumentTitle } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState([]);
@@ -14,9 +18,14 @@ export default function StepTwo({ onNext }) {
   const [showScore, setShowScore] = useState(false);
   const [mindmapData, setMindmapData] = useState(undefined);
   const [quizResults, setQuizResults] = useState([]);
-  const quizStartTime = useRef(Date.now());
-  const answerTimestamps = useRef({}); // i → timestamp of first answer
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [saveStatus, setSaveStatus] = useState(null);
+  
+  const questionEnterTime = useRef(Date.now());
+  const timeSpentOnQuestion = useRef([]); // cumulative time per question
+  
   const answerChangeCounts = useRef({}); // i → how many times answer was changed
+  const answerTimestamps = useRef({}); // i -> time spent before FIRST answer
   const fetchInProgressRef = useRef(false); // Prevent duplicate requests
 
   // helpers go HERE
@@ -79,6 +88,8 @@ export default function StepTwo({ onNext }) {
       }
       setQuestions(data.questions || []);
       setAnswers(Array((data.questions || []).length).fill(null));
+      timeSpentOnQuestion.current = Array((data.questions || []).length).fill(0);
+      questionEnterTime.current = Date.now();
     } catch (e) {
       console.error("Quiz loading error:", e);
       setErrorMessage('Unable to load quiz. Please try again');
@@ -93,11 +104,22 @@ export default function StepTwo({ onNext }) {
   }, []);
 
   // Handles selectAnswer logic.
+  // Function to accurately update time spent on the current question
+  const updateTimeSpent = () => {
+    const now = Date.now();
+    const elapsed = now - questionEnterTime.current;
+    if (typeof timeSpentOnQuestion.current[currentQuestionIndex] !== 'number') {
+      timeSpentOnQuestion.current[currentQuestionIndex] = 0;
+    }
+    timeSpentOnQuestion.current[currentQuestionIndex] += elapsed;
+    questionEnterTime.current = now;
+  };
+
   const selectAnswer = (i, c) => {
     const copy = [...answers];
-    // Track first-answer timestamp and change count
     if (answerTimestamps.current[i] === undefined) {
-      answerTimestamps.current[i] = Date.now();
+      updateTimeSpent(); // add elapsed time so far
+      answerTimestamps.current[i] = timeSpentOnQuestion.current[i];
     } else {
       answerChangeCounts.current[i] = (answerChangeCounts.current[i] || 0) + 1;
     }
@@ -105,8 +127,22 @@ export default function StepTwo({ onNext }) {
     setAnswers(copy);
   };
 
-  // Handles handleFinish logic.
+  const handleNext = () => {
+    if (answers[currentQuestionIndex] === null) {
+      alert("Please select an answer to continue.");
+      return;
+    }
+    updateTimeSpent();
+    setCurrentQuestionIndex(prev => prev + 1);
+  };
+
+  const handlePrev = () => {
+    updateTimeSpent();
+    setCurrentQuestionIndex(prev => prev - 1);
+  };
+
   const handleFinish = async () => {
+    updateTimeSpent();
     const wrongQs = questions.filter((q, i) => {
       const correct = getCorrectAnswer(q);
         const selected = answers[i];
@@ -155,15 +191,14 @@ export default function StepTwo({ onNext }) {
     });
 
     // Construct quiz results object
-    const finishTime = Date.now();
-    const totalElapsed = (finishTime - quizStartTime.current) / 1000; // seconds
+    const totalElapsed = timeSpentOnQuestion.current.reduce((a, b) => a + b, 0) / 1000; // sum of all time spent in seconds
     const avgTimePerQ = totalElapsed / questions.length;
 
     const quizResults = questions.map((q, i) => {
-      // Time from quiz start to first answer (seconds)
-      const firstAnswerTime = answerTimestamps.current[i]
-        ? (answerTimestamps.current[i] - quizStartTime.current) / 1000
-        : totalElapsed; // answered at the very end (or not at all)
+      // Time spent before the FIRST answer
+      const firstAnswerTime = answerTimestamps.current[i] !== undefined 
+        ? answerTimestamps.current[i] / 1000
+        : timeSpentOnQuestion.current[i] / 1000;
       const changes = answerChangeCounts.current[i] || 0;
 
       // Confidence on 1–5 scale:
@@ -199,119 +234,335 @@ export default function StepTwo({ onNext }) {
     setShowScore(true);
     setQuizResults(quizResults);
 
-    // Save mindmap (or null) and let user click Next.
+    // Save perfect score state if no wrong questions
     if (wrongQs.length === 0) {
-      // perfect score so StepThree can show the perfect UI
       setMindmapData({ _perfect: true });
-      return;
-    }
-
-    setFetchingMindmap(true);
-    try {
-      // Get auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        console.error('No auth token for mindmap generation');
-        setMindmapData({ _failed: true });
-        setFetchingMindmap(false);
-        return;
-      }
-
-      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const res = await fetch(`${API_BASE}/api/generate-mindmap?token=${encodeURIComponent(session.access_token)}`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
-        credentials: 'include',
-        body: JSON.stringify({ wrongQuestions: wrongQs })
-      });
-
-      const data = await res.json();
-      setMindmapData(data.mindmap);
-      
-    } catch (err) {
-      console.error("Mindmap failed", err);
-      // mark failure so StepThree can show an error instead of an empty "perfect" screen
-      setMindmapData({ _failed: true });
-    } finally {
-      setFetchingMindmap(false);
+    } else {
+      setMindmapData({ wrongQuestions: wrongQs });
     }
   };
 
+  const handleGoToMindsMirror = async () => {
+    setSaveStatus('Saving quiz...');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      if (!accessToken) throw new Error("No session");
 
-  if (loading) return <div>Loading Quiz...</div>;
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const res = await axios.post(
+        `${API_BASE}/api/save-quiz-mindmap?token=${encodeURIComponent(accessToken)}`,
+        {
+          userId: session.user?.id,
+          title: currentDocumentTitle || `Quiz - ${new Date().toLocaleDateString()}`,
+          quizResults: quizResults || [],
+          mindmapNodes: { nodes: [], edges: [] } // Mindmap is not generated yet, it generates on demand in minds mirror or learning playground
+        },
+        { headers: { Authorization: `Bearer ${accessToken}` }, withCredentials: true }
+      );
+      
+      const quizId = res.data.data?.id || res.data.id;
+      if (quizId) {
+        navigate(`/quiz/${quizId}`);
+      } else {
+        throw new Error("No quiz ID returned");
+      }
+    } catch (err) {
+      console.error("Failed to save quiz for Mind's Mirror:", err);
+      setSaveStatus('Failed to open Mind\'s Mirror. Please try again.');
+    }
+  };
+
+  if (loading) return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      minHeight: '60vh', gap: '1.5rem', color: 'var(--foreground)',
+    }}>
+      <Vela size={80} loading={true} />
+      <p style={{ fontWeight: 600, fontSize: '1.1rem' }}>Vela is generating your quiz…</p>
+    </div>
+  );
+
   if (!questions.length) {
     return <div>{errorMessage || 'No questions found.'}</div>;
   }
-  //Shows quiz questions
-  return (
-    <div>
-      <h1>Quiz</h1>
-      {questions.map((q, i) => (
-        <div key={i} style={{marginBottom: 20}}>
-          <strong>Q{i+1}.</strong> {q.prompt}
-          {(q.choices || []).map((c, idx) => (
-             <label key={`${i}-${idx}`} style={{display:'block', margin: '5px 0'}}>
-               <input
-                 type="radio"
-                 name={`q${i}`}
-                 value={c}
-                 checked={answers[i] === c}
-                 onChange={(e) => selectAnswer(i, e.target.value)}
-               />
-               {c}
-             </label>
+
+  // ── Mindmap loading overlay ──────────────────────────────────────────────────
+  const mindmapSteps = [
+    { label: 'Analysing your incorrect answers', icon: '🔍' },
+    { label: 'Searching your study documents', icon: '📄' },
+    { label: 'Generating corrective explanations', icon: '🧠' },
+    { label: 'Building your mindmap', icon: '🗺️' },
+  ];
+
+  const MindmapLoader = () => (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div style={{
+        background: 'var(--card)', border: '1px solid var(--border)',
+        borderRadius: '1.5rem', padding: '2.5rem 3rem',
+        maxWidth: '480px', width: '90%', textAlign: 'center',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+      }}>
+        {/* Animating face */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <Vela size={100} loading={true} />
+        </div>
+        <h2 style={{ margin: '0 0 0.4rem', fontSize: '1.3rem', fontWeight: 700, color: 'var(--foreground)' }}>
+          Building Your Mindmap
+        </h2>
+        <p style={{ margin: '0 0 2rem', fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
+          This takes 30–60 seconds — we're crafting personalised review nodes for each mistake.
+        </p>
+
+        {/* Step list */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left', marginBottom: '2rem' }}>
+          {mindmapSteps.map((step, idx) => (
+            <div key={idx} style={{
+              display: 'flex', alignItems: 'center', gap: '0.75rem',
+              padding: '0.6rem 0.9rem', borderRadius: '0.6rem',
+              background: 'var(--background)', border: '1px solid var(--border)',
+              animation: `mmFadeIn 0.4s ease ${idx * 0.35}s both`,
+            }}>
+              <span style={{ fontSize: '1.2rem' }}>{step.icon}</span>
+              <span style={{ fontSize: '0.875rem', color: 'var(--foreground)', flex: 1 }}>{step.label}</span>
+              <span style={{
+                width: '14px', height: '14px', borderRadius: '50%',
+                border: '2px solid var(--primary)', borderTopColor: 'transparent',
+                animation: `mmSpin 0.9s linear ${idx * 0.35}s infinite`,
+                flexShrink: 0,
+              }} />
+            </div>
           ))}
         </div>
-      ))}
-   {/* Show score when finished */}
-      {showScore && (
-        <div style={{ margin: '10px 0', padding: '12px', background: 'var(--muted)', borderRadius: 6 }}>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>
-            You scored {score} / {questions.length}
+
+        {/* Progress bar */}
+        <div style={{ background: 'var(--muted)', borderRadius: '999px', height: '6px', overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', borderRadius: '999px',
+            background: 'linear-gradient(90deg, var(--primary), oklch(0.75 0.15 220))',
+            animation: 'mmProgress 40s linear forwards',
+          }} />
+        </div>
+
+        <style>{`
+          @keyframes mmPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+          @keyframes mmSpin  { to{transform:rotate(360deg)} }
+          @keyframes mmFadeIn{ from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
+          @keyframes mmProgress{ from{width:0%} to{width:95%} }
+        `}</style>
+      </div>
+    </div>
+  );
+
+  //Shows quiz questions
+  const q = questions[currentQuestionIndex];
+  
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+      {fetchingMindmap && <MindmapLoader />}
+
+      {!showScore ? (
+        <div style={{ flex: 1, padding: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+          {/* Progress Indicator */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+            <span style={{ fontWeight: 600, color: 'var(--muted-foreground)' }}>
+              Question {currentQuestionIndex + 1} of {questions.length}
+            </span>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {questions.map((_, idx) => (
+                <div 
+                  key={idx}
+                  style={{
+                    width: '30px', 
+                    height: '4px', 
+                    borderRadius: '2px',
+                    background: idx === currentQuestionIndex 
+                      ? 'var(--primary)' 
+                      : answers[idx] 
+                        ? 'var(--primary)' 
+                        : 'var(--muted)'
+                  }}
+                />
+              ))}
+            </div>
           </div>
-          <div style={{ display: 'grid', gap: 10 }}>
+
+          {/* Question Card */}
+          <div style={{ background: 'var(--card)', padding: '30px', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', marginBottom: '30px' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '24px', lineHeight: 1.5 }}>
+              {q.prompt}
+            </h2>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {(q.choices || []).map((c, idx) => (
+                <label 
+                  key={idx} 
+                  style={{
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    padding: '16px', 
+                    border: `2px solid ${answers[currentQuestionIndex] === c ? 'var(--primary)' : 'var(--border)'}`, 
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    background: answers[currentQuestionIndex] === c ? 'color-mix(in srgb, var(--primary) 10%, transparent)' : 'transparent',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name={`q${currentQuestionIndex}`}
+                    value={c}
+                    checked={answers[currentQuestionIndex] === c}
+                    onChange={(e) => selectAnswer(currentQuestionIndex, e.target.value)}
+                    style={{ marginRight: '16px', transform: 'scale(1.2)' }}
+                  />
+                  <span style={{ fontSize: '1rem', fontWeight: 500 }}>{c}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <button 
+              onClick={handlePrev} 
+              disabled={currentQuestionIndex === 0}
+              style={{
+                padding: '12px 24px', 
+                borderRadius: '8px', 
+                fontWeight: 600,
+                opacity: currentQuestionIndex === 0 ? 0.5 : 1,
+                cursor: currentQuestionIndex === 0 ? 'not-allowed' : 'pointer',
+                background: 'var(--muted)',
+                color: 'var(--foreground)',
+                border: 'none'
+              }}
+            >
+              Previous
+            </button>
+
+            {currentQuestionIndex < questions.length - 1 ? (
+              <button 
+                onClick={handleNext}
+                style={{
+                  padding: '12px 32px', 
+                  borderRadius: '8px', 
+                  fontWeight: 600,
+                  background: 'var(--primary)',
+                  color: 'var(--primary-foreground)',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                Next Question
+              </button>
+            ) : (
+              <button 
+                onClick={handleFinish}
+                style={{
+                  padding: '12px 32px', 
+                  borderRadius: '8px', 
+                  fontWeight: 600,
+                  background: '#10b981',
+                  color: 'white',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                Finish Quiz
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '10px' }}>Quiz Complete!</h2>
+            <div style={{ fontSize: '1.25rem', color: 'var(--muted-foreground)' }}>
+              You scored <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{score}</span> out of {questions.length}
+            </div>
+          </div>
+
+          {saveStatus && (
+             <div style={{ textAlign: 'center', marginBottom: '20px', color: saveStatus.includes('Failed') ? 'var(--destructive)' : 'var(--primary)', fontWeight: 600 }}>
+               {saveStatus}
+             </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginBottom: '40px', flexWrap: 'wrap' }}>
+            <button 
+              onClick={handleGoToMindsMirror} 
+              style={{
+                padding: '14px 28px', 
+                background: 'var(--primary)', 
+                color:'var(--primary-foreground)', 
+                borderRadius: '12px',
+                fontWeight: 700,
+                fontSize: '1.1rem',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              Go to Mind's Mirror ✨
+            </button>
+            {mindmapData !== undefined && (
+              <button 
+                onClick={() => onNext(mindmapData, quizResults)} 
+                style={{
+                  padding: '14px 28px', 
+                  background: 'transparent', 
+                  color: 'var(--foreground)', 
+                  border: '2px solid var(--border)',
+                  borderRadius: '12px',
+                  fontWeight: 700,
+                  fontSize: '1.1rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Go to Learning Playground →
+              </button>
+            )}
+          </div>
+
+          {/* Results List */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '8px' }}>Detailed Review</h3>
             {quizResults.map((result, idx) => (
               <div
                 key={result.id ?? idx}
                 style={{
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  padding: 10,
+                  border: `2px solid ${result.isCorrect ? 'var(--chart-2)' : 'var(--destructive)'}`,
+                  borderRadius: '12px',
+                  padding: '20px',
                   background: 'var(--card)'
                 }}
               >
-                <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                <div style={{ fontWeight: 600, marginBottom: '12px', fontSize: '1.1rem' }}>
                   Q{idx + 1}. {result.prompt}
                 </div>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 14 }}>
-                  <span style={{ color: result.isCorrect ? 'var(--chart-2)' : 'var(--destructive)' }}>
-                    Your Answer: {result.userAnswer ?? 'No answer'}
-                  </span>
-                  <span style={{ color: 'var(--primary)' }}>
-                    Correct Answer: {result.correctAnswer ?? 'Not available'}
-                  </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px' }}>
+                  <div style={{ color: result.isCorrect ? 'var(--chart-2)' : 'var(--destructive)', fontWeight: 500 }}>
+                    <span style={{ opacity: 0.8, color: 'var(--muted-foreground)' }}>Your Answer:</span> {result.userAnswer ?? 'No answer'}
+                  </div>
+                  {!result.isCorrect && (
+                    <div style={{ color: 'var(--chart-2)', fontWeight: 500 }}>
+                      <span style={{ opacity: 0.8, color: 'var(--muted-foreground)' }}>Correct Answer:</span> {result.correctAnswer ?? 'Not available'}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         </div>
       )}
-
-      <div style={{display: 'flex', gap: 10, marginTop: 8}}>
-        <button onClick={handleFinish} disabled={fetchingMindmap} style={{padding: '10px 20px', background: '#3b82f6', color:'white', borderRadius: 15}}>
-          {fetchingMindmap ? 'Creating Mindmap please wait...' : 'Finish Quiz'}
-        </button>
-      {/* Button to go to the mindmap */}
-        {mindmapData !== undefined && (
-          <button onClick={() => onNext(mindmapData, quizResults)} style={{padding: '10px 20px', background: '#10b981', color:'white', borderRadius: 4}}>
-            Mindmap created press here to view.
-          </button>
-        )}
-      </div>
-
     </div>
   );
 }
+

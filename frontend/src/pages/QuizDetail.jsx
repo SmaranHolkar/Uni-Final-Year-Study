@@ -18,6 +18,7 @@ import { useAuth } from '../AuthContext'
 import { supabase } from '../supabaseClient'
 import '../App.css'
 import MetacognitiveAnalysis from '../components/MetacognitiveAnalysis'
+import Vela from '../components/Vela'
 
 // Custom node component
 const CustomNode = ({ data, isSelected, onClick }) => {
@@ -45,7 +46,7 @@ function QuizDetail() {
   const { quizId } = useParams()
   const navigate = useNavigate()
   const { session } = useAuth()
-  const [activeTab, setActiveTab] = useState('metacognitive') // Default to Learning Insights
+  const [activeTab, setActiveTab] = useState('metacognitive') // Default to Learning Insights (overridden for shared)
   const [quizData, setQuizData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -57,6 +58,7 @@ function QuizDetail() {
   const [shareEmail, setShareEmail] = useState('')
   const [shareStatus, setShareStatus] = useState('idle')
   const [shareError, setShareError] = useState('')
+  const [generatingMindmap, setGeneratingMindmap] = useState(false)
 
   // Fetch quiz details
   useEffect(() => {
@@ -67,6 +69,10 @@ function QuizDetail() {
         if (savedData) {
           const parsed = JSON.parse(savedData)
           setQuizData(parsed)
+          // If this is a shared mindmap, default to the mindmap tab
+          if (parsed.isShared) {
+            setActiveTab('mindmap')
+          }
         }
         setLoading(false)
       } catch (err) {
@@ -200,7 +206,7 @@ function QuizDetail() {
       const { data: { session: freshSession } } = await supabase.auth.getSession()
       const accessToken = freshSession?.access_token || session?.access_token
       if (!accessToken) {
-        alert('Session expired. Please refresh and log in again.')
+        alert('Something went wrong. Please try again.')
         setNodeActionLoading(false)
         return
       }
@@ -255,7 +261,7 @@ function QuizDetail() {
       setEdges(eds => [...eds, newEdge])
     } catch (err) {
       console.error('Failed to generate similar topic:', err)
-      alert('Failed to generate similar topic')
+      alert('Something went wrong. Please try again.')
     } finally {
       setNodeActionLoading(false)
     }
@@ -270,7 +276,7 @@ function QuizDetail() {
       const { data: { session: freshSession } } = await supabase.auth.getSession()
       const accessToken = freshSession?.access_token || session?.access_token
       if (!accessToken) {
-        setShareError('Session expired. Please refresh and log in again.')
+        setShareError('Something went wrong. Please try again.')
         setShareStatus('error')
         return
       }
@@ -282,8 +288,8 @@ function QuizDetail() {
       )
       if (res.data.success) setShareStatus('success')
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to share. Please try again.'
-      setShareError(msg)
+      console.error('Share error:', err)
+      setShareError('Something went wrong. Please try again.')
       setShareStatus('error')
     }
   }
@@ -298,7 +304,7 @@ function QuizDetail() {
       const { data: { session: freshSession } } = await supabase.auth.getSession()
       const accessToken = freshSession?.access_token || session?.access_token
       if (!accessToken) {
-        alert('Session expired. Please refresh and log in again.')
+        alert('Something went wrong. Please try again.')
         setNodeActionLoading(false)
         return
       }
@@ -320,9 +326,63 @@ function QuizDetail() {
       setSelectedAnswer(null)
     } catch (err) {
       console.error('Failed to generate MCQ:', err)
-      alert('Failed to generate MCQ')
+      alert('Something went wrong. Please try again.')
     } finally {
       setNodeActionLoading(false)
+    }
+  }
+
+  // Handle generating the initial mindmap if it doesn't exist
+  const handleGenerateMindmap = async () => {
+    const wrongQs = quizQuestions.filter(q => !q.isCorrect)
+    if (wrongQs.length === 0) {
+      alert("Perfect score! No review topics needed.")
+      return
+    }
+
+    setGeneratingMindmap(true)
+    try {
+      const { data: { session: freshSession } } = await supabase.auth.getSession()
+      const accessToken = freshSession?.access_token || session?.access_token
+      if (!accessToken) {
+        alert('Something went wrong. Please try again.')
+        setGeneratingMindmap(false)
+        return
+      }
+
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+      const res = await axios.post(
+        `${API_BASE}/api/generate-mindmap?token=${encodeURIComponent(accessToken)}`,
+        { wrongQuestions: wrongQs },
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          withCredentials: true,
+        }
+      )
+
+      if (res.data.mindmap) {
+        // Save to database
+        await axios.post(
+          `${API_BASE}/api/save-quiz-mindmap?token=${encodeURIComponent(accessToken)}`,
+          {
+            userId: session.user?.id,
+            title: quizData.title,
+            quizResults: quizQuestions,
+            mindmapNodes: res.data.mindmap
+          },
+          { headers: { Authorization: `Bearer ${accessToken}` }, withCredentials: true }
+        )
+
+        // Update local state
+        const updatedQuizData = { ...quizData, mindmap: res.data.mindmap }
+        setQuizData(updatedQuizData)
+        sessionStorage.setItem(`quiz_${quizId}`, JSON.stringify(updatedQuizData))
+      }
+    } catch (err) {
+      console.error('Failed to generate mindmap:', err)
+      alert('Something went wrong. Please try again.')
+    } finally {
+      setGeneratingMindmap(false)
     }
   }
 
@@ -356,28 +416,37 @@ function QuizDetail() {
 
       {/* Tabs */}
       <div className="border-b border-[var(--border)] px-6 bg-[var(--background)] flex gap-8">
+        {!quizData.isShared && (
+          <button
+            onClick={() => setActiveTab('metacognitive')}
+            className={`py-4 font-medium transition-colors ${
+              activeTab === 'metacognitive'
+                ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            Mind's Mirror
+          </button>
+        )}
+        {!quizData.isShared && (
+          <button
+            onClick={() => setActiveTab('quiz')}
+            className={`py-4 font-medium transition-colors ${
+              activeTab === 'quiz'
+                ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+          >
+            Quiz Results
+          </button>
+        )}
         <button
-          onClick={() => setActiveTab('metacognitive')}
-          className={`py-4 font-medium transition-colors ${
-            activeTab === 'metacognitive'
-              ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
-              : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-          }`}
-        >
-          Learning Insights
-        </button>
-        <button
-          onClick={() => setActiveTab('quiz')}
-          className={`py-4 font-medium transition-colors ${
-            activeTab === 'quiz'
-              ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
-              : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-          }`}
-        >
-          Quiz Results
-        </button>
-        <button
-          onClick={() => setActiveTab('mindmap')}
+          onClick={() => {
+            setActiveTab('mindmap')
+            if (!quizData.isShared && nodes.length === 0 && !generatingMindmap && quizQuestions.filter(q => !q.isCorrect).length > 0) {
+              handleGenerateMindmap()
+            }
+          }}
           className={`py-4 font-medium transition-colors ${
             activeTab === 'mindmap'
               ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
@@ -385,16 +454,6 @@ function QuizDetail() {
           }`}
         >
           Review Mindmap
-        </button>
-        <button
-          onClick={() => setActiveTab('playground')}
-          className={`py-4 font-medium transition-colors ${
-            activeTab === 'playground'
-              ? 'border-b-2 border-[var(--primary)] text-[var(--primary)]'
-              : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-          }`}
-        >
-          Playground
         </button>
       </div>
 
@@ -483,22 +542,58 @@ function QuizDetail() {
               </button>
             </div>
 
-            <ReactFlow
-              nodes={nodes.map(node => ({
-                ...node,
-                selected: node.id === selectedNodeId
-              }))}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onNodeClick={handleNodeClick}
-              onPaneClick={() => setSelectedNodeId(null)}
-              fitView
-            >
-              <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-              <Controls />
-              <MiniMap />
-            </ReactFlow>
+            {nodes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                {generatingMindmap ? (
+                  <div className="flex flex-col items-center gap-4 bg-white/50 backdrop-blur-sm p-8 rounded-2xl border border-blue-100 shadow-xl">
+                    <Vela size={100} loading={true} />
+                    <div className="text-center">
+                      <p className="text-slate-800 font-bold text-lg">Vela is building your map...</p>
+                      <p className="text-sm text-slate-500">Searching your notes & crafting explanations</p>
+                    </div>
+                    <div className="w-48 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-blue-600 animate-[progress_30s_linear_forwards]" style={{ width: '0%' }}></div>
+                    </div>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Phase: AI Synthesis</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="bg-white p-8 rounded-2xl border border-slate-100 text-center max-w-md shadow-xl flex flex-col items-center gap-4">
+                      <Vela size={80} />
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-xl mb-2">Ready to Review?</h3>
+                        <p className="text-slate-600 text-sm mb-6 leading-relaxed">
+                          Vela can build a custom mindmap to help you understand where you went wrong and how to fix it.
+                        </p>
+                        <button
+                          onClick={handleGenerateMindmap}
+                          className="w-full bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 hover:-translate-y-0.5 active:translate-y-0"
+                        >
+                          Generate Review Map ✨
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            ) : (
+              <ReactFlow
+                nodes={nodes.map(node => ({
+                  ...node,
+                  selected: node.id === selectedNodeId
+                }))}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onNodeClick={handleNodeClick}
+                onPaneClick={() => setSelectedNodeId(null)}
+                fitView
+              >
+                <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
+                <Controls />
+                <MiniMap />
+              </ReactFlow>
+            )}
 
             {/* Node Details Panel */}
             {selectedNodeId && nodes.find(n => n.id === selectedNodeId) && (
@@ -630,7 +725,7 @@ function QuizDetail() {
                   {selectedAnswer && (
                     <p className={`mt-3 text-sm font-medium ${selectedAnswer === mcq.answer ? 'text-green-700' : 'text-red-600'}`}>
                       {selectedAnswer === mcq.answer
-                        ? '🎉 Correct!'
+                        ? 'Correct!'
                         : `Incorrect. The correct answer is ${mcq.answer}.`}
                     </p>
                   )}
@@ -651,19 +746,8 @@ function QuizDetail() {
           <MetacognitiveAnalysis quizId={quizId} />
         )}
 
-        {activeTab === 'playground' && (
-          <div className="bg-[var(--card)] p-6 rounded shadow">
-            <h2 className="text-2xl font-bold text-[var(--foreground)] mb-4">Learning Playground</h2>
-            <p className="text-[var(--muted-foreground)] mb-6">
-              Take control of your learning by building and experimenting with interactive tools tailored to your recent sessions.
-            </p>
-            <div className="bg-[var(--muted)] p-8 rounded border border-[var(--border)] text-center">
-              <p className="text-[var(--muted-foreground)]">
-                Playground coming soon...
-              </p>
-            </div>
-          </div>
-        )}
+
+        
       </main>
     </main>
   )
