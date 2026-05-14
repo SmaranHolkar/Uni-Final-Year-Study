@@ -25,7 +25,8 @@ const __dirname = path.dirname(__filename);
 
 const allowedOrigins = [
   'https://uni-final-year-study.onrender.com',  // Production frontend
-  'https://hydruslearn.com*',
+  'https://hydruslearn.com',
+  'https://www.hydruslearn.com',
   'http://localhost:5173',  // Local Vite dev server
   'http://localhost:3000'   // Alternative dev port
 ];
