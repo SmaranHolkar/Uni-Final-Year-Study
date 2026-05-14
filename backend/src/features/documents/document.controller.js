@@ -47,6 +47,28 @@ export async function processAndStoreDocument(req, res) {
       throw new Error('Document contains insufficient readable text');
     }
 
+    /*  CHECK FOR CONTENT DUPLICATES (by first 500 chars of extracted text)  */
+    const newTextPrefix = text.trim().slice(0, 500);
+    const contentDuplicateCheck = await client.query(
+      `SELECT title
+       FROM public.w_embeddings
+       WHERE user_id = $1
+         AND id IN (
+           SELECT MIN(id) FROM public.w_embeddings WHERE user_id = $1 GROUP BY title
+         )
+         AND LEFT(TRIM(chunk_text), 500) = $2
+       LIMIT 1`,
+      [userId, newTextPrefix]
+    );
+
+    if (contentDuplicateCheck.rows.length > 0) {
+      const existingTitle = contentDuplicateCheck.rows[0].title;
+      return res.status(409).json({
+        error: 'Document already exists',
+        message: `This document's content matches an existing document titled "${existingTitle}". Please delete the existing document first or upload different content.`
+      });
+    }
+
     /*  IMAGE ENRICHMENT (PDF only) — non-fatal  */
     let imagesDescribed = 0;
     if (req.file.mimetype === 'application/pdf') {

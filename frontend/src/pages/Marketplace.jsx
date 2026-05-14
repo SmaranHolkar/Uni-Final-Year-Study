@@ -178,8 +178,26 @@ function Marketplace() {
 
       if (res.ok) {
         alert(`✅ Forked "${tool.title}" into your history!`)
+        return
+      }
+
+      let payload = null
+      try {
+        payload = await res.json()
+      } catch {
+        payload = null
+      }
+
+      if (res.status === 409) {
+        alert(`ℹ️ ${payload?.error || 'This tool is already in your saved collection.'}`)
+        return
+      }
+
+      if (res.status === 403) {
+        alert(`ℹ️ ${payload?.error || 'You cannot fork this tool.'}`)
+        return
       } else {
-        alert(`❌ Something went wrong. Please try again.`)
+        alert(`❌ ${payload?.error || 'Something went wrong. Please try again.'}`)
       }
     } catch (err) {
       console.error('Failed to save tool:', err)

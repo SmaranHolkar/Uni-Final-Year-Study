@@ -363,7 +363,12 @@ function Learningplayground() {
         }
 
         if (list.length === 0) {
-          setSuggestions(defaultSuggestions)
+          // No quiz history — tell the user to do a quiz
+          if (data?.message || (!urgentAreas.length && !studyPlan.length)) {
+            setSuggestions([])
+          } else {
+            setSuggestions(defaultSuggestions)
+          }
           return
         }
 
@@ -1391,6 +1396,17 @@ function Learningplayground() {
               </p>
               
             </div>
+
+            {suggestions.length === 0 && user?.id && (
+              <p style={{
+                fontSize: '0.95rem',
+                color: 'var(--muted-foreground)',
+                textAlign: 'center',
+                padding: '0.5rem 0',
+              }}>
+                Please do a quiz first so I can suggest what to study next!
+              </p>
+            )}
 
             {suggestions.length > 0 && (
               <div style={{ width: '100%' }}>

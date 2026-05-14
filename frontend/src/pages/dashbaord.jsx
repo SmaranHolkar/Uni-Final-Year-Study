@@ -627,6 +627,14 @@ useEffect(() => {
                   <span className="text-sm font-bold">{suggestions.analysisData.averageScore}%</span>
                 </div>
               </div>
+            ) : suggestions?.message ? (
+              <div className="rounded-xl p-6 border opacity-80 h-fit" style={{ background: solidCardBg, borderColor: 'var(--border)', color: 'var(--foreground)' }}>
+                <div className="flex items-center gap-3 mb-4">
+                  <Vela size={40} />
+                  <h3 className="text-lg font-bold uppercase tracking-wider opacity-90">Vela's Suggestions</h3>
+                </div>
+                <p className="text-sm text-[var(--muted-foreground)] italic">{suggestions.message}</p>
+              </div>
             ) : (
               <div className="rounded-xl p-6 border opacity-50 h-fit" style={{ background: solidCardBg, borderColor: 'var(--border)', color: 'var(--foreground)' }}>
                 <p className="text-sm">Loading suggestions...</p>

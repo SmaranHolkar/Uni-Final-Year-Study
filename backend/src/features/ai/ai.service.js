@@ -5,13 +5,20 @@ import { getChatCompletion } from './ml.engine.js';
  * Fetches the last 10 quiz attempts for a user.
  */
 // Handles getUserQuizHistory logic.
+// Only returns quizzes whose source document still exists in w_embeddings,
+// so suggestions don't reference deleted study material.
 export async function getUserQuizHistory(userId) {
   try {
     return await sql`
-      SELECT id, user_id, title, quiz, mindmap, created_at 
-      FROM quizzes_mindmaps 
-      WHERE user_id = ${userId}
-      ORDER BY created_at DESC
+      SELECT qm.id, qm.user_id, qm.title, qm.quiz, qm.mindmap, qm.created_at
+      FROM quizzes_mindmaps qm
+      WHERE qm.user_id = ${userId}
+        AND EXISTS (
+          SELECT 1 FROM w_embeddings we
+          WHERE we.user_id = ${userId}
+            AND we.title = qm.title
+        )
+      ORDER BY qm.created_at DESC
       LIMIT 10
     `;
   } catch (err) {
