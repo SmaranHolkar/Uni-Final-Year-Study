@@ -1,11 +1,13 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import StepOne from "./slides/StepOne.jsx";
 import StepTwo from "./slides/Steptwo.jsx";
 
 // Handles MultiStepForm logic.
 export default function MultiStepForm() {
-  const [step, setStep] = useState(1);
+  const location = useLocation();
+  const retakePayload = location.state?.retakePayload || null;
+  const [step, setStep] = useState(retakePayload ? 2 : 1);
   const navigate = useNavigate();
 
   // This function gets called when Step 1 finishes (document upload)
@@ -23,7 +25,7 @@ export default function MultiStepForm() {
     <div style={styles.container}>
       {step === 1 && <StepOne onNext={handleDocumentUpload} />}
       
-      {step === 2 && <StepTwo onNext={handleQuizFinish} />}
+      {step === 2 && <StepTwo onNext={handleQuizFinish} retakePayload={retakePayload} />}
     </div>
   );
 }
@@ -32,9 +34,9 @@ const styles = {
   container: {
     width: "100%",
     padding: "40px",
-    border: "1px solid var(--border)",
-    borderRadius: "8px",
-    background: "var(--card)",
+    border: "none",
+    borderRadius: "0",
+    background: "transparent",
     color: "var(--card-foreground)",
     minHeight: "60vh"
   }

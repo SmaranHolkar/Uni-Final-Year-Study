@@ -10,31 +10,37 @@ export default async function requireAuth(req, res, next) {
       return res.status(500).json({ error: 'Supabase client not configured' });
     }
     
-    // Log all headers for debugging
+    // Log all headers for debugging — never log the token value itself
     console.log('Request headers:', {
-      authorization: req.headers.authorization ? `${req.headers.authorization.substring(0, 30)}...` : 'MISSING',
+      authorization: req.headers.authorization ? 'Bearer [redacted]' : 'MISSING',
       'content-type': req.headers['content-type'],
       origin: req.headers.origin
     });
     
-    // Try to get token from header first, then query param as fallback
+    // Accept token from Authorization header only.
+    // Query-param tokens are intentionally not supported: they appear in
+    // server logs, browser history, CDN access logs, and Referer headers.
     let token = null;
     const auth = req.headers.authorization || '';
     
     if (auth.startsWith('Bearer ')) {
       token = auth.split(' ')[1];
-    } else if (req.query.token) {
-      // Fallback: check query parameter
-      console.log('Using token from query parameter (header missing)');
-      token = req.query.token;
     }
     
     if (!token) {
-      console.error('Missing Authorization header and no query token. Received auth header:', auth.substring(0, 30));
+      console.error('Missing Authorization header. Received auth header:', auth ? '[present but malformed]' : '[missing]');
       return res.status(401).json({ error: 'Unauthorized: Missing authentication token' });
     }
 
-    const { data, error } = await client.auth.getUser(token);
+    let authResult;
+    try {
+      authResult = await client.auth.getUser(token);
+    } catch (authErr) {
+      console.error('Supabase getUser exception:', authErr.message);
+      return res.status(401).json({ error: 'Unauthorized: Token verification failed' });
+    }
+
+    const { data, error } = authResult || {};
     
     if (error || !data?.user) {
       console.error('Invalid token or user not found:', error?.message || 'No user data');
@@ -46,6 +52,25 @@ export default async function requireAuth(req, res, next) {
     return next();
   } catch (err) {
     console.error('Auth middleware error:', err?.message ?? err);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(401).json({ error: 'Unauthorized' });
   }
+}
+
+export async function optionalAuth(req, res, next) {
+  try {
+    const client = supabaseAdmin || supabase;
+    const auth = req.headers.authorization || '';
+    if (client && auth.startsWith('Bearer ')) {
+      const token = auth.split(' ')[1];
+      if (token) {
+        const { data } = await client.auth.getUser(token);
+        if (data?.user) {
+          req.user = data.user;
+        }
+      }
+    }
+  } catch {
+    // Soft failure for optional auth
+  }
+  return next();
 }

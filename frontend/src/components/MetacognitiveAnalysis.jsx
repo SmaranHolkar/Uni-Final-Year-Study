@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Brain, TrendingUp, Target, Lightbulb, MessageCircle, Award, AlertTriangle, Activity, BarChart3, PieChart, Zap, PlayCircle } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Brain, TrendingUp, Target, Lightbulb, MessageCircle, Award, AlertTriangle, Activity, BarChart3, PieChart, Zap, PlayCircle, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import Vela from './Vela';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
@@ -18,6 +18,7 @@ import {
   Filler
 } from 'chart.js';
 import { Doughnut, Bar, Radar, Pie } from 'react-chartjs-2';
+import { Skeleton } from './Skeleton';
 
 // Register ChartJS components
 ChartJS.register(
@@ -68,6 +69,185 @@ const writeAnalysisCache = (cacheKey, analysis) => {
   }
 };
 
+/* â”€â”€ Animated SVG Score Ring â”€â”€ */
+function ScoreRing({ score, size = 120, strokeWidth = 10 }) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const target = circumference - (score / 100) * circumference;
+
+  const getColor = (s) => {
+    if (s >= 80) return '#4ade80';
+    if (s >= 60) return '#fbbf24';
+    return '#f87171';
+  };
+
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="transform -rotate-90">
+        <circle
+          className="meta-ring-track"
+          cx={size / 2} cy={size / 2} r={radius}
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          className="meta-ring-fill"
+          cx={size / 2} cy={size / 2} r={radius}
+          strokeWidth={strokeWidth}
+          stroke={getColor(score)}
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference}
+          style={{
+            '--ring-circumference': circumference,
+            '--ring-target': target,
+          }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center meta-ring-text">
+        <span className="text-3xl font-bold text-[var(--foreground)]">{score}%</span>
+      </div>
+    </div>
+  );
+}
+
+/* â”€â”€ Custom Accordion â”€â”€ */
+function Accordion({ title, icon: Icon, iconColor, children, defaultOpen = false, accentBorder = false, transparent = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const bodyRef = useRef(null);
+  const [maxH, setMaxH] = useState(defaultOpen ? 'none' : '0px');
+
+  useEffect(() => {
+    if (!bodyRef.current) return;
+    if (open) {
+      setMaxH(`${bodyRef.current.scrollHeight}px`);
+      // After transition, remove max-height so content can resize
+      const timer = setTimeout(() => setMaxH('none'), 360);
+      return () => clearTimeout(timer);
+    } else {
+      // First set explicit height, then collapse
+      setMaxH(`${bodyRef.current.scrollHeight}px`);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setMaxH('0px'));
+      });
+    }
+  }, [open]);
+
+  const wrapperClasses = transparent
+    ? 'rounded-lg'
+    : `bg-[var(--card)] rounded-lg border ${accentBorder ? 'border-[var(--primary)]/30' : 'border-[var(--border)]'} meta-card`;
+
+  return (
+    <div className={wrapperClasses}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between p-5 text-left cursor-pointer hover:bg-[var(--muted)]/10 transition-colors rounded-lg"
+      >
+        <div className="flex items-center gap-3">
+          {Icon && <Icon className={`w-5 h-5 ${iconColor || 'text-[var(--primary)]'}`} />}
+          <span className="font-semibold text-lg text-[var(--foreground)]">{title}</span>
+        </div>
+        <ChevronDown
+          className="meta-chevron w-5 h-5 text-[var(--muted-foreground)]"
+          data-open={String(open)}
+        />
+      </button>
+      <div
+        ref={bodyRef}
+        className="meta-accordion-body"
+        data-open={String(open)}
+        style={{ maxHeight: maxH }}
+      >
+        <div className="px-5 pb-5">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+/* â”€â”€ Reflection Stepper â”€â”€ */
+function ReflectionStepper({ prompts }) {
+  const [current, setCurrent] = useState(0);
+  if (!prompts || prompts.length === 0) return null;
+
+  const prev = () => setCurrent(c => Math.max(0, c - 1));
+  const next = () => setCurrent(c => Math.min(prompts.length - 1, c + 1));
+
+  return (
+    <div className="space-y-4">
+      {/* Card */}
+      <div className="relative bg-gradient-to-br from-[var(--primary)]/8 to-[var(--accent)]/8 rounded-lg p-6 border border-[var(--primary)]/20 min-h-[120px] flex items-center">
+        <div className="absolute top-3 right-3 text-xs text-[var(--muted-foreground)] font-mono">
+          {current + 1} / {prompts.length}
+        </div>
+        <p className="text-[var(--foreground)] font-medium text-base leading-relaxed pr-8" key={current}>
+          {prompts[current]}
+        </p>
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={prev}
+          disabled={current === 0}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all meta-btn-press"
+        >
+          <ChevronLeft className="w-4 h-4" /> Previous
+        </button>
+
+        {/* Dots */}
+        <div className="flex items-center gap-2">
+          {prompts.map((_, i) => (
+            <button
+              type="button"
+              key={i}
+              onClick={() => setCurrent(i)}
+              className={`meta-dot ${i === current ? 'active' : ''}`}
+              aria-label={`Go to reflection ${i + 1}`}
+            />
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={next}
+          disabled={current === prompts.length - 1}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/20 disabled:opacity-30 disabled:cursor-not-allowed transition-all meta-btn-press"
+        >
+          Next <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* â”€â”€ Doughnut Center Label Plugin â”€â”€ */
+const doughnutCenterPlugin = {
+  id: 'doughnutCenterLabel',
+  afterDraw(chart) {
+    const { ctx, chartArea: { top, bottom, left, right } } = chart;
+    const centerX = (left + right) / 2;
+    const centerY = (top + bottom) / 2;
+    const datasets = chart.data.datasets[0].data;
+    const total = datasets.reduce((a, b) => a + b, 0);
+    if (total === 0) return;
+    const pct = Math.round((datasets[0] / total) * 100);
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 22px "DM Sans", sans-serif';
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || '#CDD1D6';
+    ctx.fillText(`${pct}%`, centerX, centerY - 6);
+    ctx.font = '12px "DM Sans", sans-serif';
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#6E7580';
+    ctx.fillText('correct', centerX, centerY + 14);
+    ctx.restore();
+  }
+};
+
 // Handles MetacognitiveAnalysis logic.
 export default function MetacognitiveAnalysis({ quizId }) {
   const { user, session } = useAuth();
@@ -103,7 +283,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
       try {
         const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
         const response = await fetch(
-          `${API_BASE}/api/metacognitive-analysis/${quizId}?token=${encodeURIComponent(session.access_token)}`,
+          `${API_BASE}/api/metacognitive-analysis/${quizId}`,
           {
             method: 'GET',
             headers: {
@@ -119,7 +299,6 @@ export default function MetacognitiveAnalysis({ quizId }) {
         }
 
         const data = await response.json();
-        console.log('Metacognitive analysis data:', data.analysis);
         setAnalysis(data.analysis);
         writeAnalysisCache(cacheKey, data.analysis);
       } catch (err) {
@@ -135,10 +314,33 @@ export default function MetacognitiveAnalysis({ quizId }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary)]"></div>
-          <p className="text-[var(--muted-foreground)]">Generating your learning insights...</p>
+      <div className="space-y-6" aria-hidden>
+        <div className="rounded-xl p-6 border border-[var(--border)]">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Skeleton rounded="999px" style={{ width: '3rem', height: '3rem' }} />
+              <div className="space-y-2">
+                <Skeleton style={{ width: '12rem', height: '1.1rem' }} />
+                <Skeleton style={{ width: '16rem', height: '0.75rem' }} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Skeleton style={{ width: '5rem', height: '0.7rem' }} />
+              <Skeleton style={{ width: '4rem', height: '2rem' }} />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="rounded-lg p-6 border border-[var(--border)]">
+            <Skeleton style={{ width: '10rem', height: '1rem' }} />
+            <Skeleton className="mt-4" rounded="999px" style={{ width: '12rem', height: '12rem', margin: '1rem auto 0' }} />
+          </div>
+          <div className="rounded-lg p-6 border border-[var(--border)] space-y-3">
+            <Skeleton style={{ width: '9rem', height: '1rem' }} />
+            <Skeleton style={{ width: '100%', height: '0.8rem' }} />
+            <Skeleton style={{ width: '94%', height: '0.8rem' }} />
+            <Skeleton style={{ width: '86%', height: '0.8rem' }} />
+          </div>
         </div>
       </div>
     );
@@ -179,19 +381,25 @@ export default function MetacognitiveAnalysis({ quizId }) {
 
   // Handles getScoreColor logic.
   const getScoreColor = (score) => {
-    if (score >= 80) return 'text-[var(--chart-2)]';
-    if (score >= 60) return 'text-[var(--chart-3)]';
-    return 'text-[var(--chart-5)]';
+    if (score >= 80) return 'text-green-400';
+    if (score >= 60) return 'text-amber-400';
+    return 'text-red-400';
   };
 
-  console.log('Rendering with analysis:', analysis);
+  const confidencePercent =
+    analysis.confidenceLevel?.toLowerCase() === 'high' ? 85 :
+    analysis.confidenceLevel?.toLowerCase() === 'medium' ? 60 : 35;
+
+  // Helper: stagger delay for each rendered section
+  let staggerIdx = 0;
+  const stagger = () => ({ animationDelay: `${(staggerIdx++) * 0.07}s` });
 
   return (
     <div className="space-y-6">
       
-      {/* Header with Score Overview */}
-      <div className="bg-gradient-to-r from-[var(--primary)]/10 to-[var(--accent)] rounded-xl p-6 border border-[var(--border)]">
-        <div className="flex items-start justify-between">
+      {/* â”€â”€ Header with Animated Score Ring â”€â”€ */}
+      <div className="meta-stagger-item bg-gradient-to-r from-[var(--primary)]/10 to-[var(--accent)] rounded-xl p-6 border border-[var(--border)] meta-card" style={stagger()}>
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <Vela size={48} />
@@ -203,28 +411,26 @@ export default function MetacognitiveAnalysis({ quizId }) {
               Understanding your learning process helps you learn better
             </p>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-[var(--muted-foreground)]">Your Score</p>
-            <p className={`text-4xl font-bold ${getScoreColor(analysis.scorePercentage)}`}>
-              {analysis.scorePercentage}%
-            </p>
-            <p className="text-xs text-[var(--muted-foreground)]">
+          <div className="flex flex-col items-center">
+            <ScoreRing score={analysis.scorePercentage} size={110} strokeWidth={9} />
+            <p className="text-xs text-[var(--muted-foreground)] mt-1">
               {analysis.correctCount}/{analysis.totalQuestions} correct
             </p>
           </div>
         </div>
       </div>
 
-      {/* Score Visualization and Confidence Level */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Score Doughnut Chart */}
-        <div className="bg-[var(--card)] rounded-lg p-6 border border-[var(--border)]">
+      {/* â”€â”€ Score Doughnut + Confidence Level â”€â”€ */}
+      <div className="meta-stagger-item grid grid-cols-1 lg:grid-cols-2 gap-6" style={stagger()}>
+        {/* Score Doughnut Chart with Center Label */}
+        <div className="bg-[var(--card)] rounded-lg p-6 border border-[var(--border)] meta-card">
           <div className="flex items-center gap-3 mb-4">
             <PieChart className="w-5 h-5 text-[var(--primary)]" />
             <h3 className="font-semibold text-lg text-[var(--foreground)]">Score Breakdown</h3>
           </div>
           <div className="flex items-center justify-center h-64">
             <Doughnut
+              plugins={[doughnutCenterPlugin]}
               data={{
                 labels: ['Correct', 'Incorrect'],
                 datasets: [{
@@ -238,19 +444,24 @@ export default function MetacognitiveAnalysis({ quizId }) {
                     'rgba(239, 68, 68, 1)'
                   ],
                   borderWidth: 2,
+                  cutout: '68%',
                 }]
               }}
               options={{
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: {
+                  animateRotate: true,
+                  duration: 1200,
+                  easing: 'easeOutQuart',
+                },
                 plugins: {
                   legend: {
                     position: 'bottom',
                     labels: {
                       color: 'rgb(156, 163, 175)',
-                      font: {
-                        size: 12
-                      }
+                      font: { size: 12 },
+                      padding: 16,
                     }
                   },
                   tooltip: {
@@ -270,8 +481,8 @@ export default function MetacognitiveAnalysis({ quizId }) {
           </div>
         </div>
 
-        {/* Confidence Level */}
-        <div className="bg-[var(--card)] rounded-lg p-6 border border-[var(--border)]">
+        {/* Confidence Level with animated gauge */}
+        <div className="bg-[var(--card)] rounded-lg p-6 border border-[var(--border)] meta-card">
           <div className="flex items-center gap-3 mb-3">
             <Award className="w-5 h-5 text-[var(--primary)]" />
             <h3 className="font-semibold text-lg text-[var(--foreground)]">Confidence Level</h3>
@@ -283,7 +494,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
             <p className="text-sm text-[var(--muted-foreground)] text-center">
               Based on your response patterns and accuracy
             </p>
-            {/* Confidence Gauge Visualization */}
+            {/* Animated Confidence Gauge */}
             <div className="w-full max-w-xs">
               <div className="relative pt-1">
                 <div className="flex mb-2 items-center justify-between text-xs">
@@ -293,13 +504,8 @@ export default function MetacognitiveAnalysis({ quizId }) {
                 </div>
                 <div className="overflow-hidden h-3 text-xs flex rounded-full bg-[var(--muted)]">
                   <div 
-                    style={{ 
-                      width: `${
-                        analysis.confidenceLevel?.toLowerCase() === 'high' ? '100%' : 
-                        analysis.confidenceLevel?.toLowerCase() === 'medium' ? '60%' : '30%'
-                      }` 
-                    }}
-                    className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-500 ${
+                    style={{ width: `${confidencePercent}%` }}
+                    className={`meta-bar-fill shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
                       analysis.confidenceLevel?.toLowerCase() === 'high' ? 'bg-green-500' : 
                       analysis.confidenceLevel?.toLowerCase() === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
                     }`}
@@ -311,8 +517,8 @@ export default function MetacognitiveAnalysis({ quizId }) {
         </div>
       </div>
 
-      {/* Learning Dimensions Radar Chart */}
-      <div className="bg-[var(--card)] rounded-lg p-6 border border-[var(--border)] shadow-sm">
+      {/* â”€â”€ Learning Profile Radar â”€â”€ */}
+      <div className="meta-stagger-item bg-[var(--card)] rounded-lg p-6 border border-[var(--border)] meta-card" style={stagger()}>
         <div className="flex items-center gap-3 mb-4">
           <TrendingUp className="w-5 h-5 text-[var(--chart-1)]" />
           <h3 className="font-semibold text-lg text-[var(--foreground)]">Learning Profile</h3>
@@ -326,24 +532,29 @@ export default function MetacognitiveAnalysis({ quizId }) {
                   label: 'Your Performance',
                   data: [
                     analysis.scorePercentage,
-                    analysis.confidenceLevel?.toLowerCase() === 'high' ? 85 : 
-                    analysis.confidenceLevel?.toLowerCase() === 'medium' ? 60 : 35,
+                    confidencePercent,
                     analysis.totalQuestions >= 10 ? 75 : 50,
                     100 - (analysis.totalQuestions > 0 ? ((analysis.totalQuestions - analysis.correctCount) / analysis.totalQuestions * 30) : 0),
                     analysis.scorePercentage > 70 ? analysis.scorePercentage : analysis.scorePercentage + 10
                   ],
-                  backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                  backgroundColor: 'rgba(99, 102, 241, 0.15)',
                   borderColor: 'rgba(99, 102, 241, 1)',
                   borderWidth: 2,
                   pointBackgroundColor: 'rgba(99, 102, 241, 1)',
                   pointBorderColor: '#fff',
                   pointHoverBackgroundColor: '#fff',
-                  pointHoverBorderColor: 'rgba(99, 102, 241, 1)'
+                  pointHoverBorderColor: 'rgba(99, 102, 241, 1)',
+                  pointRadius: 5,
+                  pointHoverRadius: 7,
                 }]
               }}
               options={{
                 responsive: true,
                 maintainAspectRatio: false,
+                animation: {
+                  duration: 1400,
+                  easing: 'easeOutQuart',
+                },
                 scales: {
                   r: {
                     beginAtZero: true,
@@ -354,49 +565,45 @@ export default function MetacognitiveAnalysis({ quizId }) {
                       stepSize: 20
                     },
                     grid: {
-                      color: 'rgba(156, 163, 175, 0.2)'
+                      color: 'rgba(156, 163, 175, 0.15)'
                     },
                     pointLabels: {
                       color: 'rgb(156, 163, 175)',
-                      font: {
-                        size: 12
-                      }
+                      font: { size: 12 }
                     }
                   }
                 },
                 plugins: {
-                  legend: {
-                    display: false
-                  }
+                  legend: { display: false }
                 }
               }}
             />
           </div>
           <div className="space-y-3">
+            {/* Accuracy bar */}
             <div className="bg-[var(--muted)]/30 p-4 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-[var(--muted-foreground)]">Accuracy</span>
                 <span className="text-lg font-bold text-[var(--foreground)]">{analysis.scorePercentage}%</span>
               </div>
               <div className="w-full bg-[var(--muted)] rounded-full h-2">
-                <div className="bg-green-500 h-2 rounded-full" style={{width: `${analysis.scorePercentage}%`}}></div>
+                <div className="bg-green-500 h-2 rounded-full meta-bar-fill" style={{width: `${analysis.scorePercentage}%`}}></div>
               </div>
             </div>
+            {/* Confidence bar */}
             <div className="bg-[var(--muted)]/30 p-4 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-[var(--muted-foreground)]">Confidence</span>
                 <span className="text-lg font-bold text-[var(--foreground)]">{analysis.confidenceLevel || 'Medium'}</span>
               </div>
               <div className="w-full bg-[var(--muted)] rounded-full h-2">
-                <div className={`h-2 rounded-full ${
+                <div className={`h-2 rounded-full meta-bar-fill ${
                   analysis.confidenceLevel?.toLowerCase() === 'high' ? 'bg-green-500' : 
                   analysis.confidenceLevel?.toLowerCase() === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
-                }`} style={{width: `${
-                  analysis.confidenceLevel?.toLowerCase() === 'high' ? '85%' : 
-                  analysis.confidenceLevel?.toLowerCase() === 'medium' ? '60%' : '35%'
-                }`}}></div>
+                }`} style={{width: `${confidencePercent}%`}}></div>
               </div>
             </div>
+            {/* Questions count */}
             <div className="bg-[var(--muted)]/30 p-4 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-[var(--muted-foreground)]">Questions Answered</span>
@@ -405,65 +612,62 @@ export default function MetacognitiveAnalysis({ quizId }) {
             </div>
           </div>
         </div>
-        {analysis.performanceSummary && (
-          <details className="mt-4">
-            <summary className="text-sm text-[var(--muted-foreground)] cursor-pointer hover:text-[var(--foreground)] transition-colors">View detailed summary</summary>
-            <p className="text-sm text-[var(--card-foreground)] mt-2 p-3 bg-[var(--muted)]/20 rounded">
-              {analysis.performanceSummary}
-            </p>
-          </details>
-        )}
       </div>
 
-      {/* Pattern Specificity - ELITE INSIGHT */}
+      {/* Detailed Performance Summary â€” separate section */}
+      {analysis.performanceSummary && (
+        <div className="meta-stagger-item" style={stagger()}>
+          <Accordion title="Detailed Summary" icon={BarChart3} defaultOpen={false}>
+            <p className="text-sm text-[var(--card-foreground)] leading-relaxed p-3 bg-[var(--muted)]/20 rounded">
+              {analysis.performanceSummary}
+            </p>
+          </Accordion>
+        </div>
+      )}
+
+      {/* â”€â”€ Cognitive Patterns â€” ELITE INSIGHT â”€â”€ */}
       {(analysis.patternSpecificity || analysis.learningPatterns) && (
-        <div className="bg-gradient-to-r from-[var(--primary)]/5 via-[var(--primary)]/10 to-[var(--primary)]/5 rounded-xl p-6 border-2 border-[var(--primary)]/30 shadow-lg">
-          <div className="flex items-center gap-3 mb-4">
-            <Target className="w-6 h-6 text-[var(--primary)]" />
-            <div>
-              <h3 className="font-bold text-xl text-[var(--foreground)]">Cognitive Patterns</h3>
-              <p className="text-xs text-[var(--muted-foreground)]">Key insights from your error patterns</p>
-            </div>
-          </div>
-          <details open>
-            <summary className="text-sm font-medium text-[var(--primary)] cursor-pointer mb-3">View Analysis</summary>
+        <div className="meta-stagger-item bg-gradient-to-r from-[var(--primary)]/5 via-[var(--primary)]/10 to-[var(--primary)]/5 rounded-xl border-2 border-[var(--primary)]/30 meta-card" style={stagger()}>
+          <Accordion
+            title="Cognitive Patterns"
+            icon={Target}
+            iconColor="text-[var(--primary)]"
+            defaultOpen={true}
+            transparent
+          >
+            <p className="text-xs text-[var(--muted-foreground)] mb-3">Key insights from your error patterns</p>
             <div className="bg-[var(--card)] rounded-lg p-4 border border-[var(--border)]">
               <p className="text-sm text-[var(--foreground)] leading-relaxed">
                 {analysis.patternSpecificity || analysis.learningPatterns}
               </p>
             </div>
-          </details>
+          </Accordion>
         </div>
       )}
 
-      {/* Confidence Mismatch Warning - ELITE INSIGHT */}
+      {/* â”€â”€ Confidence Mismatch Warning â€” ELITE INSIGHT â”€â”€ */}
       {analysis.confidenceMismatch && analysis.confidenceMismatch !== 'null' && (
-        <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 rounded-xl p-6 border-2 border-amber-500/40 shadow-lg">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 mt-1">
-              <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+        <div className="meta-stagger-item bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 rounded-xl border-2 border-amber-500/40 meta-card" style={stagger()}>
+          <Accordion
+            title="âš ï¸ Confidence Gap Alert"
+            icon={AlertTriangle}
+            iconColor="text-amber-600 dark:text-amber-400"
+            defaultOpen={true}
+            transparent
+          >
+            <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
+              {analysis.confidenceMismatch}
+            </p>
+            <div className="mt-3 px-3 py-2 bg-amber-100 dark:bg-amber-900/30 rounded text-xs text-amber-700 dark:text-amber-300">
+              ðŸ’¡ Hidden misconceptions may need addressing
             </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-lg text-amber-900 dark:text-amber-100 mb-2">
-                ⚠️ Confidence Gap Alert
-              </h3>
-              <details open>
-                <summary className="text-sm font-medium text-amber-700 dark:text-amber-300 cursor-pointer mb-2">View details</summary>
-                <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
-                  {analysis.confidenceMismatch}
-                </p>
-              </details>
-              <div className="mt-3 px-3 py-2 bg-amber-100 dark:bg-amber-900/30 rounded text-xs text-amber-700 dark:text-amber-300">
-                💡 Hidden misconceptions may need addressing
-              </div>
-            </div>
-          </div>
+          </Accordion>
         </div>
       )}
 
-      {/* Proactive Tools - VELA'S RECOMMENDATIONS */}
+      {/* â”€â”€ Proactive Tools â€” VELA'S RECOMMENDATIONS â”€â”€ */}
       {analysis.recommendedTools && analysis.recommendedTools.length > 0 && (
-        <div className="bg-gradient-to-br from-[var(--primary)]/10 via-[var(--accent)]/5 to-transparent rounded-xl p-8 border-2 border-[var(--primary)] shadow-xl relative overflow-hidden">
+        <div className="meta-stagger-item bg-gradient-to-br from-[var(--primary)]/10 via-[var(--accent)]/5 to-transparent rounded-xl p-8 border-2 border-[var(--primary)] relative overflow-hidden meta-card" style={stagger()}>
           <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
             <Zap className="w-32 h-32 text-[var(--primary)]" />
           </div>
@@ -481,7 +685,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {analysis.recommendedTools.map((tool, idx) => (
-                <div key={idx} className="bg-[var(--card)] p-5 rounded-xl border border-[var(--border)] hover:border-[var(--primary)] transition-all group">
+                <div key={idx} className="bg-[var(--card)] p-5 rounded-xl border border-[var(--border)] hover:border-[var(--primary)] transition-all duration-200 group meta-card">
                   <div className="flex items-start justify-between mb-3">
                     <span className="px-3 py-1 bg-[var(--primary)]/10 text-[var(--primary)] text-xs font-bold rounded-full uppercase tracking-wider">
                       {tool.toolType}
@@ -503,7 +707,7 @@ export default function MetacognitiveAnalysis({ quizId }) {
                         } 
                       });
                     }}
-                    className="w-full py-3 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-lg font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all"
+                    className="w-full py-3 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-lg font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all meta-btn-press"
                   >
                     <PlayCircle className="w-4 h-4" />
                     Launch in Playground
@@ -515,51 +719,54 @@ export default function MetacognitiveAnalysis({ quizId }) {
         </div>
       )}
 
-      {/* Behavioral Insight - ELITE INSIGHT */}
+      {/* â”€â”€ Behavioral Insight â€” ELITE INSIGHT â”€â”€ */}
       {analysis.behavioralInsight && (
-        <div className="bg-[var(--card)] rounded-xl p-6 border-2 border-[var(--chart-2)]/30 shadow-lg">
-          <div className="flex items-center gap-3 mb-4">
-            <Activity className="w-6 h-6 text-[var(--chart-2)]" />
-            <div>
-              <h3 className="font-bold text-xl text-[var(--foreground)]">Behavioral Patterns</h3>
-              <p className="text-xs text-[var(--muted-foreground)]">How you approach different question types</p>
-            </div>
-          </div>
-          <details open>
-            <summary className="text-sm font-medium text-[var(--chart-2)] cursor-pointer mb-3">View Insight</summary>
+        <div className="meta-stagger-item rounded-xl border-2 border-[var(--chart-2)]/30 meta-card" style={stagger()}>
+          <Accordion
+            title="Behavioral Patterns"
+            icon={Activity}
+            iconColor="text-[var(--chart-2)]"
+            defaultOpen={true}
+            transparent
+          >
+            <p className="text-xs text-[var(--muted-foreground)] mb-3">How you approach different question types</p>
             <div className="bg-gradient-to-r from-[var(--chart-2)]/5 to-[var(--chart-4)]/5 rounded-lg p-4 border border-[var(--chart-2)]/20">
               <p className="text-sm text-[var(--foreground)] leading-relaxed">
                 {analysis.behavioralInsight}
               </p>
             </div>
-          </details>
+          </Accordion>
         </div>
       )}
 
-      {/* Knowledge Gaps - Visual Tags */}
-      <div className="bg-[var(--card)] rounded-lg p-6 border border-[var(--border)] shadow-sm">
+      {/* â”€â”€ Knowledge Gaps â€” Interactive Tags with pulse â”€â”€ */}
+      <div className="meta-stagger-item bg-[var(--card)] rounded-lg p-6 border border-[var(--border)] meta-card" style={stagger()}>
         <div className="flex items-center gap-3 mb-4">
           <Lightbulb className="w-5 h-5 text-[var(--chart-3)]" />
           <h3 className="font-semibold text-lg text-[var(--foreground)]">Areas to Focus On</h3>
         </div>
         <div className="flex flex-wrap gap-2 mb-3">
           {(typeof analysis.knowledgeGaps === 'string' ? analysis.knowledgeGaps.split(/[,;.]/) : Array.isArray(analysis.knowledgeGaps) ? analysis.knowledgeGaps : []).filter(gap => gap && String(gap).trim().length > 3).slice(0, 8).map((gap, idx) => (
-            <span key={idx} className="px-4 py-2 bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-full text-sm font-medium border border-amber-500/30 flex items-center gap-2">
+            <span 
+              key={idx} 
+              className="meta-gap-tag px-4 py-2 bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-full text-sm font-medium border border-amber-500/30 flex items-center gap-2 cursor-default hover:bg-amber-500/20 hover:border-amber-500/50 transition-all duration-200"
+              style={{ animationDelay: `${idx * 150}ms` }}
+              title="Focus area identified from your quiz performance"
+            >
               <AlertTriangle className="w-4 h-4" />
               {String(gap).trim().replace(/^(you|your|the|and|but|or|needs?|should|may|might)/gi, '').trim()}
             </span>
           ))}
         </div>
-        <details>
-          <summary className="text-sm text-[var(--muted-foreground)] cursor-pointer hover:text-[var(--foreground)] transition-colors">View detailed analysis</summary>
-          <p className="text-sm text-[var(--card-foreground)] mt-2 p-3 bg-[var(--muted)]/20 rounded">
+        <Accordion title="Detailed Analysis" icon={Lightbulb} iconColor="text-[var(--chart-3)]" transparent>
+          <p className="text-sm text-[var(--card-foreground)] p-3 bg-[var(--muted)]/20 rounded">
             {typeof analysis.knowledgeGaps === 'string' ? analysis.knowledgeGaps : Array.isArray(analysis.knowledgeGaps) ? analysis.knowledgeGaps.join(', ') : ''}
           </p>
-        </details>
+        </Accordion>
       </div>
 
-      {/* Self-Reflection Prompts */}
-      <div className="bg-[var(--card)] rounded-lg p-6 border border-[var(--border)] shadow-sm">
+      {/* â”€â”€ Reflection Prompts â€” Sequential Stepper â”€â”€ */}
+      <div className="meta-stagger-item bg-[var(--card)] rounded-lg p-6 border border-[var(--border)] meta-card" style={stagger()}>
         <div className="flex items-center gap-3 mb-4">
           <MessageCircle className="w-5 h-5 text-[var(--chart-4)]" />
           <h3 className="font-semibold text-lg text-[var(--foreground)]">
@@ -569,330 +776,337 @@ export default function MetacognitiveAnalysis({ quizId }) {
         <p className="text-sm text-[var(--muted-foreground)] mb-4">
           Take a moment to reflect on these questions to improve your learning:
         </p>
-        <div className="space-y-3">
-          {analysis.reflectionPrompts?.map((prompt, idx) => (
-            <div
-              key={idx}
-              className="bg-[var(--muted)]/50 rounded-lg p-4 border-l-4 border-[var(--primary)]"
-            >
-              <p className="text-[var(--foreground)] font-medium">
-                {idx + 1}. {prompt}
-              </p>
-            </div>
-          ))}
-        </div>
+        <ReflectionStepper prompts={analysis.reflectionPrompts} />
       </div>
 
-      {/* Study Strategies - Visual Cards */}
-      <div className="bg-gradient-to-br from-[var(--primary)]/5 to-[var(--accent)] rounded-lg p-6 border border-[var(--border)] shadow-sm">
-        <div className="flex items-center gap-3 mb-4">
+      {/* â”€â”€ Study Strategies â€” Vertical Timeline â”€â”€ */}
+      <div className="meta-stagger-item bg-gradient-to-br from-[var(--primary)]/5 to-[var(--accent)] rounded-lg p-6 border border-[var(--border)] meta-card" style={stagger()}>
+        <div className="flex items-center gap-3 mb-6">
           <Brain className="w-5 h-5 text-[var(--primary)]" />
           <h3 className="font-semibold text-lg text-[var(--foreground)]">
             Personalized Study Strategies
           </h3>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-          {(typeof analysis.studyStrategies === 'string' ? analysis.studyStrategies.split(/\n+/) : Array.isArray(analysis.studyStrategies) ? analysis.studyStrategies : []).filter(s => s && String(s).trim().length > 10).slice(0, 6).map((strategy, idx) => (
-            <div key={idx} className="bg-[var(--card)] p-4 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] transition-colors">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[var(--primary)] font-bold text-sm">
-                  {idx + 1}
-                </div>
-                <p className="text-sm text-[var(--foreground)] flex-1">
-                  {String(strategy).replace(/^[•\-\d.]+\s*/, '').trim()}
+        <div className="space-y-0">
+          {(typeof analysis.studyStrategies === 'string' ? analysis.studyStrategies.split(/\n+/) : Array.isArray(analysis.studyStrategies) ? analysis.studyStrategies : []).filter(s => s && String(s).trim().length > 10).slice(0, 6).map((strategy, idx, arr) => (
+            <div key={idx} className="relative flex gap-4 pb-6 last:pb-0 group">
+              {/* Timeline connector line */}
+              {idx < arr.length - 1 && (
+                <div className="absolute left-[15px] top-[36px] bottom-0 w-[2px] bg-gradient-to-b from-[var(--primary)]/40 to-[var(--border)]" />
+              )}
+              {/* Step circle */}
+              <div className="relative z-10 flex-shrink-0 w-8 h-8 rounded-full bg-[var(--primary)]/15 border-2 border-[var(--primary)]/40 flex items-center justify-center text-[var(--primary)] font-bold text-xs group-hover:bg-[var(--primary)]/25 group-hover:border-[var(--primary)] transition-all duration-200">
+                {idx + 1}
+              </div>
+              {/* Strategy content */}
+              <div className="flex-1 bg-[var(--card)] p-4 rounded-lg border border-[var(--border)] group-hover:border-[var(--primary)]/40 transition-all duration-200">
+                <p className="text-sm text-[var(--foreground)]">
+                  {String(strategy).replace(/^[â€¢\-\d.]+\s*/, '').trim()}
                 </p>
               </div>
             </div>
           ))}
         </div>
-        <details>
-          <summary className="text-sm text-[var(--muted-foreground)] cursor-pointer hover:text-[var(--foreground)] transition-colors">View all strategies</summary>
-          <p className="text-sm text-[var(--card-foreground)] mt-2 p-3 bg-[var(--muted)]/20 rounded whitespace-pre-line">
+        <Accordion title="View All Strategies" icon={Brain} transparent>
+          <p className="text-sm text-[var(--card-foreground)] p-3 bg-[var(--muted)]/20 rounded whitespace-pre-line">
             {typeof analysis.studyStrategies === 'string' ? analysis.studyStrategies : Array.isArray(analysis.studyStrategies) ? analysis.studyStrategies.join('\n') : ''}
           </p>
-        </details>
+        </Accordion>
       </div>
 
-      {/* Algorithmic Metrics Panel - Shows the computational analysis underneath */}
+      {/* â”€â”€ Algorithmic Metrics Panel â”€â”€ */}
       {analysis.algorithmicMetrics && (
-        <details className="bg-[var(--muted)]/30 rounded-lg border border-[var(--border)]">
-          <summary className="cursor-pointer p-4 font-semibold text-[var(--foreground)] hover:bg-[var(--muted)]/50 transition-colors">
-            🔬 View Computational Analysis Details
-          </summary>
-          <div className="p-4 space-y-6 border-t border-[var(--border)]">
-            {/* Question Type Performance Chart */}
-            {analysis.algorithmicMetrics.questionClassification?.typeBreakdown && 
-             analysis.algorithmicMetrics.questionClassification.typeBreakdown.length > 0 && (
-              <div className="bg-[var(--card)] p-4 rounded-lg">
-                <div className="flex items-center gap-2 mb-4">
-                  <BarChart3 className="w-5 h-5 text-[var(--primary)]" />
-                  <h4 className="text-sm font-semibold text-[var(--foreground)]">Errors by Topic</h4>
-                </div>
-                <div className="h-64">
-                  <Bar
-                    data={{
-                      labels: analysis.algorithmicMetrics.questionClassification.typeBreakdown.map(t => t.type),
-                      datasets: [
-                        {
-                          label: 'Error Count',
-                          data: analysis.algorithmicMetrics.questionClassification.typeBreakdown.map(t => t.errorCount),
-                          backgroundColor: 'rgba(239, 68, 68, 0.7)',
-                          borderColor: 'rgba(239, 68, 68, 1)',
-                          borderWidth: 1,
-                        }
-                      ]
-                    }}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      scales: {
-                        x: {
-                          ticks: {
-                            color: 'rgb(156, 163, 175)',
-                            font: { size: 10 }
-                          },
-                          grid: {
-                            color: 'rgba(156, 163, 175, 0.1)'
-                          }
-                        },
-                        y: {
-                          beginAtZero: true,
-                          ticks: {
-                            color: 'rgb(156, 163, 175)',
-                            stepSize: 1
-                          },
-                          grid: {
-                            color: 'rgba(156, 163, 175, 0.1)'
-                          }
-                        }
-                      },
-                      plugins: {
-                        legend: {
-                          labels: {
-                            color: 'rgb(156, 163, 175)',
-                            font: { size: 11 }
-                          }
-                        }
-                      }
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Confidence Calibration Chart */}
-            {analysis.algorithmicMetrics.confidenceAnalysis?.hasConfidenceData && (
-              <div className="bg-[var(--card)] p-4 rounded-lg">
-                <div className="flex items-center gap-2 mb-4">
-                  <Activity className="w-5 h-5 text-[var(--chart-2)]" />
-                  <h4 className="text-sm font-semibold text-[var(--foreground)]">Confidence Calibration</h4>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="h-48">
-                    <Pie
+        <div className="meta-stagger-item" style={stagger()}>
+          <Accordion
+            title="ðŸ”¬ Computational Analysis Details"
+            icon={BarChart3}
+            defaultOpen={false}
+          >
+            <div className="space-y-6">
+              {/* Question Type Performance Chart */}
+              {analysis.algorithmicMetrics.questionClassification?.typeBreakdown && 
+               analysis.algorithmicMetrics.questionClassification.typeBreakdown.length > 0 && (
+                <div className="bg-[var(--card)] p-4 rounded-lg border border-[var(--border)]">
+                  <div className="flex items-center gap-2 mb-4">
+                    <BarChart3 className="w-5 h-5 text-[var(--primary)]" />
+                    <h4 className="text-sm font-semibold text-[var(--foreground)]">Errors by Topic</h4>
+                  </div>
+                  <div className="h-64">
+                    <Bar
                       data={{
-                        labels: ['Overconfident', 'Well Calibrated', 'Underconfident'],
-                        datasets: [{
-                          data: [
-                            analysis.algorithmicMetrics.confidenceAnalysis.overconfidentCount,
-                            analysis.totalQuestions - analysis.algorithmicMetrics.confidenceAnalysis.overconfidentCount - analysis.algorithmicMetrics.confidenceAnalysis.underconfidentCount,
-                            analysis.algorithmicMetrics.confidenceAnalysis.underconfidentCount
-                          ],
-                          backgroundColor: [
-                            'rgba(251, 191, 36, 0.8)',
-                            'rgba(34, 197, 94, 0.8)',
-                            'rgba(59, 130, 246, 0.8)'
-                          ],
-                          borderColor: [
-                            'rgba(251, 191, 36, 1)',
-                            'rgba(34, 197, 94, 1)',
-                            'rgba(59, 130, 246, 1)'
-                          ],
-                          borderWidth: 2,
-                        }]
+                        labels: analysis.algorithmicMetrics.questionClassification.typeBreakdown.map(t => t.type),
+                        datasets: [
+                          {
+                            label: 'Error Count',
+                            data: analysis.algorithmicMetrics.questionClassification.typeBreakdown.map(t => t.errorCount),
+                            backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                            borderColor: 'rgba(239, 68, 68, 1)',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                          }
+                        ]
                       }}
                       options={{
                         responsive: true,
                         maintainAspectRatio: false,
-                        plugins: {
-                          legend: {
-                            position: 'bottom',
-                            labels: {
+                        animation: {
+                          duration: 1000,
+                          easing: 'easeOutQuart',
+                        },
+                        scales: {
+                          x: {
+                            ticks: {
                               color: 'rgb(156, 163, 175)',
                               font: { size: 10 }
+                            },
+                            grid: {
+                              color: 'rgba(156, 163, 175, 0.1)'
+                            }
+                          },
+                          y: {
+                            beginAtZero: true,
+                            ticks: {
+                              color: 'rgb(156, 163, 175)',
+                              stepSize: 1
+                            },
+                            grid: {
+                              color: 'rgba(156, 163, 175, 0.1)'
+                            }
+                          }
+                        },
+                        plugins: {
+                          legend: {
+                            labels: {
+                              color: 'rgb(156, 163, 175)',
+                              font: { size: 11 }
                             }
                           }
                         }
                       }}
                     />
                   </div>
-                  <div className="flex flex-col justify-center space-y-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                      <span className="text-[var(--muted-foreground)]">Overconfident:</span>
-                      <span className="font-semibold text-[var(--foreground)]">
-                        {analysis.algorithmicMetrics.confidenceAnalysis.overconfidentCount}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                      <span className="text-[var(--muted-foreground)]">Underconfident:</span>
-                      <span className="font-semibold text-[var(--foreground)]">
-                        {analysis.algorithmicMetrics.confidenceAnalysis.underconfidentCount}
-                      </span>
-                    </div>
-                    <div className="mt-3 p-2 bg-[var(--muted)] rounded">
-                      <p className="text-xs text-[var(--muted-foreground)]">Calibration Score</p>
-                      <p className="text-lg font-bold text-[var(--chart-2)]">
-                        {analysis.algorithmicMetrics.confidenceAnalysis.calibrationScore}%
-                      </p>
-                    </div>
-                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Error Type Profile */}
-            {analysis.algorithmicMetrics.errorClustering?.errorTypeProfile && (
-              <div className="bg-[var(--card)] p-4 rounded-lg">
-                <div className="flex items-center gap-2 mb-4">
-                  <AlertTriangle className="w-5 h-5 text-[var(--destructive)]" />
-                  <h4 className="text-sm font-semibold text-[var(--foreground)]">Error Type Profile</h4>
-                </div>
-                {(() => {
-                  const ep = analysis.algorithmicMetrics.errorClustering.errorTypeProfile;
-                  const labels = ['Conceptual Misunderstanding', 'Recall Failure', 'Careless Error', 'Unclassified'];
-                  const values = [ep.conceptualMisunderstanding, ep.recallFailure, ep.carelessError, ep.unclassified];
-                  const colors = ['rgba(239,68,68,0.75)', 'rgba(59,130,246,0.75)', 'rgba(251,191,36,0.75)', 'rgba(156,163,175,0.75)'];
-                  return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="h-48">
-                        <Pie
-                          data={{
-                            labels,
-                            datasets: [{ data: values, backgroundColor: colors, borderWidth: 2 }]
-                          }}
-                          options={{
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                              legend: {
-                                position: 'bottom',
-                                labels: { color: 'rgb(156,163,175)', font: { size: 10 } }
+              {/* Confidence Calibration Chart */}
+              {analysis.algorithmicMetrics.confidenceAnalysis?.hasConfidenceData && (
+                <div className="bg-[var(--card)] p-4 rounded-lg border border-[var(--border)]">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Activity className="w-5 h-5 text-[var(--chart-2)]" />
+                    <h4 className="text-sm font-semibold text-[var(--foreground)]">Confidence Calibration</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="h-48">
+                      <Pie
+                        data={{
+                          labels: ['Overconfident', 'Well Calibrated', 'Underconfident'],
+                          datasets: [{
+                            data: [
+                              analysis.algorithmicMetrics.confidenceAnalysis.overconfidentCount,
+                              analysis.totalQuestions - analysis.algorithmicMetrics.confidenceAnalysis.overconfidentCount - analysis.algorithmicMetrics.confidenceAnalysis.underconfidentCount,
+                              analysis.algorithmicMetrics.confidenceAnalysis.underconfidentCount
+                            ],
+                            backgroundColor: [
+                              'rgba(251, 191, 36, 0.8)',
+                              'rgba(34, 197, 94, 0.8)',
+                              'rgba(59, 130, 246, 0.8)'
+                            ],
+                            borderColor: [
+                              'rgba(251, 191, 36, 1)',
+                              'rgba(34, 197, 94, 1)',
+                              'rgba(59, 130, 246, 1)'
+                            ],
+                            borderWidth: 2,
+                          }]
+                        }}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          animation: {
+                            duration: 1000,
+                            easing: 'easeOutQuart',
+                          },
+                          plugins: {
+                            legend: {
+                              position: 'bottom',
+                              labels: {
+                                color: 'rgb(156, 163, 175)',
+                                font: { size: 10 }
                               }
                             }
-                          }}
-                        />
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="flex flex-col justify-center space-y-2 text-sm">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                        <span className="text-[var(--muted-foreground)]">Overconfident:</span>
+                        <span className="font-semibold text-[var(--foreground)]">
+                          {analysis.algorithmicMetrics.confidenceAnalysis.overconfidentCount}
+                        </span>
                       </div>
-                      <div className="flex flex-col justify-center space-y-2 text-sm">
-                        {[
-                          { label: 'Conceptual', desc: 'High confidence + wrong', val: ep.conceptualMisunderstanding, color: 'text-red-500' },
-                          { label: 'Recall', desc: 'Low confidence + wrong', val: ep.recallFailure, color: 'text-blue-500' },
-                          { label: 'Careless', desc: 'Uncertain + wrong', val: ep.carelessError, color: 'text-amber-500' },
-                          { label: 'Unclassified', desc: 'No confidence data', val: ep.unclassified, color: 'text-gray-400' },
-                        ].map(({ label, desc, val, color }) => (
-                          <div key={label} className="flex items-center justify-between">
-                            <div>
-                              <span className={`font-semibold ${color}`}>{label}</span>
-                              <span className="text-xs text-[var(--muted-foreground)] ml-1">({desc})</span>
-                            </div>
-                            <span className="font-mono font-bold text-[var(--foreground)]">{val}</span>
-                          </div>
-                        ))}
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <span className="text-[var(--muted-foreground)]">Underconfident:</span>
+                        <span className="font-semibold text-[var(--foreground)]">
+                          {analysis.algorithmicMetrics.confidenceAnalysis.underconfidentCount}
+                        </span>
+                      </div>
+                      <div className="mt-3 p-2 bg-[var(--muted)] rounded">
+                        <p className="text-xs text-[var(--muted-foreground)]">Calibration Score</p>
+                        <p className="text-lg font-bold text-[var(--chart-2)]">
+                          {analysis.algorithmicMetrics.confidenceAnalysis.calibrationScore}%
+                        </p>
                       </div>
                     </div>
-                  );
-                })()}
-              </div>
-            )}
-
-            {/* Classification Method */}
-            <div className="bg-[var(--card)] p-3 rounded">
-              <p className="text-sm font-semibold text-[var(--foreground)] mb-1">Topic Error Breakdown</p>
-              <p className="text-xs text-[var(--muted-foreground)]">
-                Method: <span className="font-mono text-[var(--primary)]">{analysis.algorithmicMetrics.questionClassification?.method}</span>
-              </p>
-              <div className="mt-2 space-y-1">
-                {analysis.algorithmicMetrics.questionClassification?.typeBreakdown?.map((type, idx) => (
-                  <div key={idx} className="flex justify-between text-xs">
-                    <span className="text-[var(--foreground)]">{type.type}</span>
-                    <span className="font-mono text-[var(--destructive)]">{type.errorCount} error{type.errorCount !== 1 ? 's' : ''}</span>
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              )}
 
-            {/* Error Clustering */}
-            {analysis.algorithmicMetrics.errorClustering && (
-              <div className="bg-[var(--card)] p-3 rounded">
-                <p className="text-sm font-semibold text-[var(--foreground)] mb-1">Error Clustering Analysis</p>
-                <div className="space-y-2 text-xs text-[var(--muted-foreground)]">
-                  {analysis.algorithmicMetrics.errorClustering.mostProblematicType && (
-                    <p>
-                      Most Problematic: <span className="font-semibold text-[var(--destructive)]">
-                        {analysis.algorithmicMetrics.errorClustering.mostProblematicType}
-                      </span>
-                    </p>
-                  )}
-                  <p>
-                    Repeated Patterns: <span className="font-mono">{analysis.algorithmicMetrics.errorClustering.repeatedErrorPatterns}</span>
-                  </p>
-                  {analysis.algorithmicMetrics.errorClustering.errorSignatureWords?.length > 0 && (
-                    <div>
-                      <p className="mb-1">Error Signature Keywords:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {analysis.algorithmicMetrics.errorClustering.errorSignatureWords.map((word, idx) => (
-                          <span key={idx} className="px-2 py-0.5 bg-[var(--destructive)]/10 text-[var(--destructive)] rounded font-mono text-xs">
-                            {word}
-                          </span>
-                        ))}
+              {/* Error Type Profile */}
+              {analysis.algorithmicMetrics.errorClustering?.errorTypeProfile && (
+                <div className="bg-[var(--card)] p-4 rounded-lg border border-[var(--border)]">
+                  <div className="flex items-center gap-2 mb-4">
+                    <AlertTriangle className="w-5 h-5 text-[var(--destructive)]" />
+                    <h4 className="text-sm font-semibold text-[var(--foreground)]">Error Type Profile</h4>
+                  </div>
+                  {(() => {
+                    const ep = analysis.algorithmicMetrics.errorClustering.errorTypeProfile;
+                    const labels = ['Conceptual Misunderstanding', 'Recall Failure', 'Careless Error', 'Unclassified'];
+                    const values = [ep.conceptualMisunderstanding, ep.recallFailure, ep.carelessError, ep.unclassified];
+                    const colors = ['rgba(239,68,68,0.75)', 'rgba(59,130,246,0.75)', 'rgba(251,191,36,0.75)', 'rgba(156,163,175,0.75)'];
+                    return (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="h-48">
+                          <Pie
+                            data={{
+                              labels,
+                              datasets: [{ data: values, backgroundColor: colors, borderWidth: 2 }]
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              animation: { duration: 1000, easing: 'easeOutQuart' },
+                              plugins: {
+                                legend: {
+                                  position: 'bottom',
+                                  labels: { color: 'rgb(156,163,175)', font: { size: 10 } }
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="flex flex-col justify-center space-y-2 text-sm">
+                          {[
+                            { label: 'Conceptual', desc: 'High confidence + wrong', val: ep.conceptualMisunderstanding, color: 'text-red-500' },
+                            { label: 'Recall', desc: 'Low confidence + wrong', val: ep.recallFailure, color: 'text-blue-500' },
+                            { label: 'Careless', desc: 'Uncertain + wrong', val: ep.carelessError, color: 'text-amber-500' },
+                            { label: 'Unclassified', desc: 'No confidence data', val: ep.unclassified, color: 'text-gray-400' },
+                          ].map(({ label, desc, val, color }) => (
+                            <div key={label} className="flex items-center justify-between">
+                              <div>
+                                <span className={`font-semibold ${color}`}>{label}</span>
+                                <span className="text-xs text-[var(--muted-foreground)] ml-1">({desc})</span>
+                              </div>
+                              <span className="font-mono font-bold text-[var(--foreground)]">{val}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Confidence Analysis */}
-            {analysis.algorithmicMetrics.confidenceAnalysis && (
-              <div className="bg-[var(--card)] p-3 rounded">
-                <p className="text-sm font-semibold text-[var(--foreground)] mb-1">Confidence Calibration</p>
-                <div className="space-y-1 text-xs text-[var(--muted-foreground)]">
-                  {analysis.algorithmicMetrics.confidenceAnalysis.hasConfidenceData ? (
-                    <>
-                      <p>
-                        Overconfident Answers: <span className="font-mono text-amber-600">{analysis.algorithmicMetrics.confidenceAnalysis.overconfidentCount}</span>
-                      </p>
-                      <p>
-                        Underconfident Answers: <span className="font-mono text-blue-600">{analysis.algorithmicMetrics.confidenceAnalysis.underconfidentCount}</span>
-                      </p>
-                      <p>
-                        Calibration Score: <span className="font-mono text-[var(--chart-2)]">{analysis.algorithmicMetrics.confidenceAnalysis.calibrationScore}%</span>
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-amber-600 italic">
-                      💡 Enable per-question confidence ratings for deeper analysis
-                    </p>
-                  )}
+              {/* Classification Method */}
+              <div className="bg-[var(--card)] p-3 rounded border border-[var(--border)]">
+                <p className="text-sm font-semibold text-[var(--foreground)] mb-1">Topic Error Breakdown</p>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  Method: <span className="font-mono text-[var(--primary)]">{analysis.algorithmicMetrics.questionClassification?.method}</span>
+                </p>
+                <div className="mt-2 space-y-1">
+                  {analysis.algorithmicMetrics.questionClassification?.typeBreakdown?.map((type, idx) => (
+                    <div key={idx} className="flex justify-between text-xs">
+                      <span className="text-[var(--foreground)]">{type.type}</span>
+                      <span className="font-mono text-[var(--destructive)]">{type.errorCount} error{type.errorCount !== 1 ? 's' : ''}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
-            )}
-          </div>
-        </details>
+
+              {/* Error Clustering */}
+              {analysis.algorithmicMetrics.errorClustering && (
+                <div className="bg-[var(--card)] p-3 rounded border border-[var(--border)]">
+                  <p className="text-sm font-semibold text-[var(--foreground)] mb-1">Error Clustering Analysis</p>
+                  <div className="space-y-2 text-xs text-[var(--muted-foreground)]">
+                    {analysis.algorithmicMetrics.errorClustering.mostProblematicType && (
+                      <p>
+                        Most Problematic: <span className="font-semibold text-[var(--destructive)]">
+                          {analysis.algorithmicMetrics.errorClustering.mostProblematicType}
+                        </span>
+                      </p>
+                    )}
+                    <p>
+                      Repeated Patterns: <span className="font-mono">{analysis.algorithmicMetrics.errorClustering.repeatedErrorPatterns}</span>
+                    </p>
+                    {analysis.algorithmicMetrics.errorClustering.errorSignatureWords?.length > 0 && (
+                      <div>
+                        <p className="mb-1">Error Signature Keywords:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {analysis.algorithmicMetrics.errorClustering.errorSignatureWords.map((word, idx) => (
+                            <span key={idx} className="px-2 py-0.5 bg-[var(--destructive)]/10 text-[var(--destructive)] rounded font-mono text-xs">
+                              {word}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Confidence Analysis */}
+              {analysis.algorithmicMetrics.confidenceAnalysis && (
+                <div className="bg-[var(--card)] p-3 rounded border border-[var(--border)]">
+                  <p className="text-sm font-semibold text-[var(--foreground)] mb-1">Confidence Calibration</p>
+                  <div className="space-y-1 text-xs text-[var(--muted-foreground)]">
+                    {analysis.algorithmicMetrics.confidenceAnalysis.hasConfidenceData ? (
+                      <>
+                        <p>
+                          Overconfident Answers: <span className="font-mono text-amber-600">{analysis.algorithmicMetrics.confidenceAnalysis.overconfidentCount}</span>
+                        </p>
+                        <p>
+                          Underconfident Answers: <span className="font-mono text-blue-600">{analysis.algorithmicMetrics.confidenceAnalysis.underconfidentCount}</span>
+                        </p>
+                        <p>
+                          Calibration Score: <span className="font-mono text-[var(--chart-2)]">{analysis.algorithmicMetrics.confidenceAnalysis.calibrationScore}%</span>
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-amber-600 italic">
+                        ðŸ’¡ Enable per-question confidence ratings for deeper analysis
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </Accordion>
+        </div>
       )}
 
-      {/* Encouragement */}
+      {/* â”€â”€ Encouragement â”€â”€ */}
       {analysis.encouragement && (
-        <div className="bg-gradient-to-r from-[var(--chart-2)]/10 to-[var(--chart-4)]/10 rounded-lg p-6 border border-[var(--chart-2)]/20 text-center">
+        <div className="meta-stagger-item bg-gradient-to-r from-[var(--chart-2)]/10 to-[var(--chart-4)]/10 rounded-lg p-6 border border-[var(--chart-2)]/20 text-center meta-card" style={stagger()}>
           <p className="text-lg font-medium text-[var(--foreground)] italic">
             "{analysis.encouragement}"
           </p>
         </div>
       )}
 
-      {/* Accuracy Warning Banner */}
-      <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+      {/* â”€â”€ Accuracy Warning Banner â”€â”€ */}
+      <div className="meta-stagger-item bg-amber-50 dark:bg-amber-950/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800" style={stagger()}>
         <div className="flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
           <div>
@@ -913,3 +1127,4 @@ export default function MetacognitiveAnalysis({ quizId }) {
 
   );
 }
+

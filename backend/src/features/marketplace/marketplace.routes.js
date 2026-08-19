@@ -1,5 +1,5 @@
 import express from 'express';
-import requireAuth from '../../shared/middleware/requireAuth.js';
+import requireAuth, { optionalAuth } from '../../shared/middleware/requireAuth.js';
 import {
   getPublicTools,
   getSavedTools,
@@ -35,6 +35,16 @@ function createMarketplaceRateLimiter({ bucket, windowMs, max, message }) {
 
     recent.push(now);
     marketplaceRateBuckets.set(key, recent);
+
+    // Prune expired entries to prevent unbounded Map growth
+    if (marketplaceRateBuckets.size > 10000) {
+      for (const [k, timestamps] of marketplaceRateBuckets) {
+        if (timestamps.every(ts => now - ts >= windowMs)) {
+          marketplaceRateBuckets.delete(k);
+        }
+      }
+    }
+
     return next();
   };
 }
@@ -67,8 +77,8 @@ const deleteLimiter = createMarketplaceRateLimiter({
   message: 'Too many delete requests. Please wait a few minutes and try again.',
 });
 
-// Public marketplace listing (still needs auth token to prevent abuse)
-router.get('/marketplace/tools/public', requireAuth, getPublicTools);
+// Public marketplace listing (allows read access to public tools)
+router.get('/marketplace/tools/public', optionalAuth, getPublicTools);
 
 // Live marketplace updates stream
 router.get('/marketplace/tools/stream', requireAuth, streamMarketplaceEvents);

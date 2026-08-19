@@ -23,20 +23,15 @@ import PublicPageBackground from './components/PublicPageBackground.jsx';
 import TermsAndConditions from './pages/TermsAndConditions';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import Marketplace from './pages/Marketplace';
+import GroundedChatHub from './components/GroundedChatHub.jsx';
+import { FullscreenSkeleton } from './components/Skeleton.jsx';
 
 // Renders routes and switches nav/sidebar based on authentication state.
 function AppContent() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-black">
-        <div className="text-center">
-          <div className="mx-auto mb-5 size-12 animate-spin rounded-full border-4 border-white/10 border-t-white" />
-          <p className="text-sm text-white">Loading...</p>
-        </div>
-      </div>
-    );
+    return <FullscreenSkeleton message="Restoring your account and workspace..." />;
   }
 
   return (
@@ -53,6 +48,7 @@ function AppContent() {
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/learningpage" element={<PrivateRoute><Learn /></PrivateRoute>} />
         <Route path="/Learningplayground" element={<PrivateRoute><Learningplayground /></PrivateRoute>} />
+        <Route path="/grounded-studio" element={<PrivateRoute><GroundedChatHub /></PrivateRoute>} />
         <Route path="/marketplace" element={<PrivateRoute><Marketplace /></PrivateRoute>} />
         <Route path="/history" element={<PrivateRoute><History /></PrivateRoute>} />
         <Route path="/Profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
@@ -62,6 +58,7 @@ function AppContent() {
     </>
   );
 }
+
 
 // Wraps the app in routing and auth providers.
 function App() {

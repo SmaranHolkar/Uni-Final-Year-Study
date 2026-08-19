@@ -15,6 +15,7 @@
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",
     "@supabase/supabase-js": "^2.87.1",
+    "adm-zip": "^0.6.0",
     "ajv": "^8.17.1",
     "canvas": "^3.2.3",
     "cors": "^2.8.5",
@@ -25,6 +26,7 @@
     "mammoth": "^1.9.1",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
+    "officeparser": "^7.5.1",
     "pdf-to-img": "^6.0.0",
     "pdf2json": "^4.0.2",
     "pdfjs-dist": "^5.7.284",
@@ -34,6 +36,7 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.23",
+    "concurrently": "^10.0.3",
     "nodemon": "^3.1.10",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18"

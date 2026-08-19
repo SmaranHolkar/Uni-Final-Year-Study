@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useSEO } from "../hooks/useSEO";
 
 const sections = [
   {
@@ -56,7 +57,7 @@ const sections = [
   },
   {
     title: "14. Third-Party Services",
-    content: `HydrusLearn may integrate with or link to third-party services (such as AI providers or cloud storage). We are not responsible for the content, availability, or practices of any third-party services. Your use of third-party services is subject to their respective terms and privacy policies.`,
+    content: `HydrusLearn may integrate with or link to third-party services (such as AI providers, cloud storage, and Google Search Console for website search performance reporting). We are not responsible for the content, availability, or practices of any third-party services. Your use of third-party services is subject to their respective terms and privacy policies.`,
   },
   {
     title: "15. Termination",
@@ -78,6 +79,11 @@ const sections = [
 
 // Handles TermsAndConditions logic.
 export default function TermsAndConditions() {
+  useSEO({
+    title: "Terms and Conditions | HydrusLearn",
+    description: "Read the HydrusLearn Terms and Conditions. These terms govern your use of our AI-powered study platform, including acceptable use, content ownership, and account rules.",
+    path: "/terms",
+  });
   return (
     <div className="min-h-screen px-4 py-16">
       <div className="mx-auto max-w-3xl">
@@ -93,7 +99,7 @@ export default function TermsAndConditions() {
             Terms &amp; Conditions
           </h1>
           <p className="mt-2 text-sm text-[var(--muted-foreground)]">
-            Last updated: March 20, 2026
+            Last updated: May 24, 2026
           </p>
           <p className="mt-4 text-[var(--muted-foreground)]">
             Please read these Terms and Conditions carefully before using

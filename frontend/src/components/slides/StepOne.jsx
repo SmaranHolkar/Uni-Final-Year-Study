@@ -1,15 +1,58 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../../AuthContext";
 import { supabase } from "../../supabaseClient";
+import { Skeleton } from "../Skeleton.jsx";
 
 // Handles StepOne logic.
 export default function StepOne({ onNext }) {
-  const { setCurrentDocumentId, setCurrentDocumentTitle } = useAuth();
+  const { setCurrentDocumentId, setCurrentDocumentTitle, session } = useAuth();
   const [file, setFile] = useState(null);
   const [title, setTitle] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [studySessionsRemaining, setStudySessionsRemaining] = useState(null);
+  const [isLoadingTierStatus, setIsLoadingTierStatus] = useState(false);
+
+  useEffect(() => {
+    if (!session?.access_token) {
+      setStudySessionsRemaining(null);
+      setIsLoadingTierStatus(false);
+      return;
+    }
+
+    const fetchTierStatus = async () => {
+      setIsLoadingTierStatus(true);
+      try {
+        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        const response = await fetch(`${API_BASE}/api/tier-status`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          setStudySessionsRemaining(null);
+          return;
+        }
+
+        const data = await response.json();
+        const quotas = Array.isArray(data?.data?.quotas) ? data.data.quotas : [];
+        const sessionQuota = quotas.find((quota) => quota.actionType !== "learning_tool_generate");
+        const remaining = Number(sessionQuota?.remaining);
+        setStudySessionsRemaining(Number.isFinite(remaining) ? remaining : null);
+      } catch {
+        setStudySessionsRemaining(null);
+      } finally {
+        setIsLoadingTierStatus(false);
+      }
+    };
+
+    fetchTierStatus();
+  }, [session?.access_token]);
 
   // Handles handleFileChange logic.
   const handleFileChange = (e) => {
@@ -93,16 +136,13 @@ export default function StepOne({ onNext }) {
         return;
       }
 
-      console.log('Auth token available:', freshSession.access_token.substring(0, 20) + '...');
-
       const formData = new FormData();
       formData.append("document", file);
       formData.append("title", title.trim());
 
       const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
       // Use query parameter as fallback if headers don't work
-      const uploadUrl = `${API_BASE}/api/upload-document?token=${encodeURIComponent(freshSession.access_token)}`;
-      console.log('Uploading to:', API_BASE + '/api/upload-document');
+      const uploadUrl = `${API_BASE}/api/upload-document`;
       
       const response = await fetch(uploadUrl, {
         method: "POST",
@@ -113,9 +153,7 @@ export default function StepOne({ onNext }) {
         body: formData
       });
 
-      console.log('Response status:', response.status);
       const data = await response.json();
-      console.log('Response data:', data);
 
       if (!response.ok) {
         throw new Error("Upload failed");
@@ -143,96 +181,140 @@ export default function StepOne({ onNext }) {
     setError("");
   };
 
-  return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>Upload Your Study Material</h2>
-      <p style={styles.subtitle}>
-        Upload a document to generate personalized questions and learning materials
-      </p>
+  const renderUploadingSkeleton = () => (
+    <div style={styles.container} aria-hidden>
+      <Skeleton style={{ height: '1.55rem', width: '13.5rem' }} />
+      <Skeleton className="mt-2" style={{ height: '0.9rem', width: '22rem' }} />
 
-      <div style={styles.inputGroup}>
-        <label style={styles.label}>Document Title *</label>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="e.g., Chapter 5: Data Structures"
-          style={styles.input}
-          disabled={uploading}
-        />
+      <div style={{ marginTop: '26px', marginBottom: '16px' }}>
+        <Skeleton style={{ height: '0.78rem', width: '8rem' }} />
+        <Skeleton className="mt-2" rounded="6px" style={{ height: '2.7rem', width: '100%' }} />
       </div>
 
-      <div
-        style={{
-          ...styles.dropzone,
-          ...(dragActive ? styles.dropzoneActive : {}),
-        }}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-      >
-        {!file ? (
-          <>
-            <div style={styles.uploadIcon}>📄</div>
-            <p style={styles.dropzoneText}>
-              Drag and drop your file here, or
-            </p>
-            <label style={styles.browseButton}>
-              Browse Files
-              <input
-                type="file"
-                accept=".pdf,.txt"
-                onChange={handleFileChange}
-                style={styles.fileInput}
-              />
-            </label>
-            <p style={styles.helpText}>
-              Supported formats: PDF, TXT (Max 50MB)
-            </p>
-          </>
-        ) : (
-          <div style={styles.filePreview}>
-            <div style={styles.fileIcon}></div>
-            <div style={styles.fileInfo}>
-              <p style={styles.fileName}>{file.name}</p>
-              <p style={styles.fileSize}>
-                {(file.size / 1024).toFixed(2)} KB
-              </p>
-            </div>
-            <button
-              onClick={removeFile}
-              style={styles.removeButton}
-              disabled={uploading}
-            >
-              ✕
-            </button>
-          </div>
-        )}
+      <div style={{ border: '2px dashed var(--border)', borderRadius: '12px', padding: '42px 20px', marginBottom: '20px' }}>
+        <Skeleton rounded="999px" style={{ height: '3rem', width: '3rem', margin: '0 auto' }} />
+        <Skeleton className="mt-3" style={{ height: '0.8rem', width: '42%', margin: '0.75rem auto 0' }} />
+        <Skeleton className="mt-2" style={{ height: '0.72rem', width: '55%', margin: '0.5rem auto 0' }} />
       </div>
 
-      {error && <div style={styles.error}>{error}</div>}
-
-      <button
-        onClick={handleUpload}
-        disabled={!file || uploading}
-        style={{
-          ...styles.uploadButton,
-          ...((!file || uploading) ? styles.uploadButtonDisabled : {}),
-        }}
-      >
-        {uploading ? "Uploading..." : "Upload and Continue"}
-      </button>
+      <Skeleton rounded="6px" style={{ height: '2.8rem', width: '100%' }} />
     </div>
+  )
+
+  return (
+    <>
+    {uploading && renderUploadingSkeleton()}
+    {!uploading && (
+    <div style={styles.container}>
+      <div style={styles.card}>
+        <h2 style={styles.title}>Upload Your Study Material</h2>
+        <p style={styles.subtitle}>
+          Upload a document to generate personalized questions and learning materials
+        </p>
+
+        <div style={styles.quotaCard}>
+          <span style={styles.quotaLabel}>Study Sessions</span>
+          <span style={styles.quotaValue}>
+            {isLoadingTierStatus ? "Loading..." : `${studySessionsRemaining ?? 0} left`}
+          </span>
+        </div>
+
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Document Title *</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g., Chapter 5: Data Structures"
+            style={styles.input}
+            disabled={uploading}
+          />
+        </div>
+
+        <div
+          style={{
+            ...styles.dropzone,
+            ...(dragActive ? styles.dropzoneActive : {}),
+          }}
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+        >
+          {!file ? (
+            <>
+              <div style={styles.uploadIcon}>📄</div>
+              <p style={styles.dropzoneText}>
+                Drag and drop your file here, or
+              </p>
+              <label style={styles.browseButton}>
+                Browse Files
+                <input
+                  type="file"
+                  accept=".pdf,.txt"
+                  onChange={handleFileChange}
+                  style={styles.fileInput}
+                />
+              </label>
+              <p style={styles.helpText}>
+                Supported formats: PDF, TXT (Max 50MB)
+              </p>
+            </>
+          ) : (
+            <div style={styles.filePreview}>
+              <div style={styles.fileIcon}></div>
+              <div style={styles.fileInfo}>
+                <p style={styles.fileName}>{file.name}</p>
+                <p style={styles.fileSize}>
+                  {(file.size / 1024).toFixed(2)} KB
+                </p>
+              </div>
+              <button
+                onClick={removeFile}
+                style={styles.removeButton}
+                disabled={uploading}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+        </div>
+
+        {error && <div style={styles.error}>{error}</div>}
+
+        <button
+          onClick={handleUpload}
+          disabled={!file || uploading}
+          style={{
+            ...styles.uploadButton,
+            ...((!file || uploading) ? styles.uploadButtonDisabled : {}),
+          }}
+        >
+          {uploading ? "Uploading..." : "Upload and Continue"}
+        </button>
+      </div>
+    </div>
+    )}
+    </>
   );
 }
 
 const styles = {
   container: {
     width: "100%",
-    maxWidth: "600px",
+    maxWidth: "700px",
     margin: "0 auto",
-    padding: "40px 20px",
+    padding: "24px 16px",
+  },
+  card: {
+    width: "100%",
+    background: "linear-gradient(160deg, color-mix(in srgb, var(--card) 42%, transparent), color-mix(in srgb, var(--background) 32%, transparent))",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    border: "1px solid var(--border)",
+    borderRadius: "14px",
+    boxShadow: "var(--shadow, 0 10px 30px rgba(0,0,0,0.15))",
+    padding: "28px 24px",
   },
   inputGroup: {
     marginBottom: "25px",
@@ -266,12 +348,35 @@ const styles = {
     color: "var(--muted-foreground, #666)",
     marginBottom: "30px",
   },
+  quotaCard: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "0.75rem",
+    border: "1px solid var(--border)",
+    borderRadius: "10px",
+    background: "color-mix(in srgb, var(--card) 45%, transparent)",
+    padding: "10px 12px",
+    marginBottom: "20px",
+  },
+  quotaLabel: {
+    fontSize: "12px",
+    fontWeight: "700",
+    letterSpacing: "0.04em",
+    color: "var(--muted-foreground)",
+    textTransform: "uppercase",
+  },
+  quotaValue: {
+    fontSize: "14px",
+    fontWeight: "700",
+    color: "var(--card-foreground)",
+  },
   dropzone: {
     border: "2px dashed var(--border, #ccc)",
     borderRadius: "12px",
     padding: "60px 20px",
     textAlign: "center",
-    backgroundColor: "var(--background, #fafafa)",
+    backgroundColor: "color-mix(in srgb, var(--background, #fafafa) 55%, transparent)",
     transition: "all 0.3s ease",
     cursor: "pointer",
     marginBottom: "20px",
@@ -312,7 +417,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     padding: "20px",
-    backgroundColor: "var(--card, #fff)",
+    backgroundColor: "color-mix(in srgb, var(--card, #fff) 55%, transparent)",
     borderRadius: "8px",
     gap: "15px",
   },

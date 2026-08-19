@@ -13,6 +13,7 @@ import { ArrowLeft, ExternalLink, Lightbulb, X } from "lucide-react";
 import axios from "axios";
 import { useAuth } from "../../AuthContext";
 import { supabase } from "../../supabaseClient";
+import { Skeleton } from "../Skeleton.jsx";
 
 // Color palette
 const categoryColors = [
@@ -34,7 +35,6 @@ async function retryWithBackoff(fn, maxRetries = 3, initialDelay = 2000) {
       
       if (isRateLimited && i < maxRetries - 1) {
         const delay = initialDelay * Math.pow(2, i);
-        console.log(`Rate limited. Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         throw error;
@@ -184,7 +184,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
   }, []);
 
   // Save quiz and mindmap to database with rate limiting
-  const handleSaveQuizAndMindmap = async () => {
+  const handleSaveQuizAndMindmap = useCallback(async () => {
     const accessToken = session?.access_token;
     if (!user?.id || !accessToken || !data || data._perfect || data._failed) {
       setSaveStatus('error');
@@ -200,7 +200,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
       
       await retryWithBackoff(async () => {
         return await axios.post(
-          `${API_BASE}/api/save-quiz-mindmap?token=${encodeURIComponent(accessToken)}`,
+          `${API_BASE}/api/save-quiz-mindmap`,
           {
             userId: user.id,
             title: currentDocumentTitle || `Quiz - ${new Date().toLocaleDateString()}`,
@@ -231,7 +231,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
       setSaveStatus('error');
       setSaveMessage('Failed to save. Please try again');
     }
-  };
+  }, [session?.access_token, user?.id, data, currentDocumentTitle, quizResults]);
 
   useEffect(() => {
     if (hasAutoSavedRef.current) return;
@@ -239,7 +239,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
 
     hasAutoSavedRef.current = true;
     handleSaveQuizAndMindmap();
-  }, [user?.id, session?.access_token, data]);
+  }, [user?.id, session?.access_token, data, handleSaveQuizAndMindmap]);
 
  
   // Add Similar Topic Node
@@ -257,7 +257,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
       }
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const res = await axios.post(
-        `${API_BASE}/api/generate-similar-topic?token=${encodeURIComponent(freshSession.access_token)}`,
+        `${API_BASE}/api/generate-similar-topic`,
         { topic: selectedNode.data.label, description: selectedNode.data.description },
         { headers: { Authorization: `Bearer ${freshSession.access_token}` }, withCredentials: true }
       );
@@ -318,7 +318,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
       }
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const res = await axios.post(
-        `${API_BASE}/api/generate-mcq-for-topic?token=${encodeURIComponent(freshSession.access_token)}`,
+        `${API_BASE}/api/generate-mcq-for-topic`,
         { topic: selectedNode.data.label, description: selectedNode.data.description },
         { headers: { Authorization: `Bearer ${freshSession.access_token}` }, withCredentials: true }
       );
@@ -442,7 +442,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
             onClick={handleAddSimilarTopic}
             disabled={loading}
           >
-            Add Similar Topic
+            {loading ? 'Generating topic...' : 'Add Similar Topic'}
           </button>
 
           <button
@@ -450,8 +450,15 @@ export default function StepThree({ data, onRetake, quizResults }) {
             onClick={handleGenerateMCQ}
             disabled={loading}
           >
-           Generate MCQ
+           {loading ? 'Generating MCQ...' : 'Generate MCQ'}
           </button>
+
+          {loading && (
+            <div className="mt-3 space-y-2" aria-hidden>
+              <Skeleton rounded="0.4rem" style={{ height: '0.75rem', width: '65%' }} />
+              <Skeleton rounded="0.4rem" style={{ height: '0.75rem', width: '88%' }} />
+            </div>
+          )}
 
 
         </div>

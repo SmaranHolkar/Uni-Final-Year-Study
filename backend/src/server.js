@@ -12,11 +12,14 @@ import questionRouter from './features/questions/question.routes.js';
 import quizRouter from './features/quiz/quiz.routes.js';
 import topicRouter from './features/topics/topic.routes.js';
 import marketplaceRouter from './features/marketplace/marketplace.routes.js';
+import groundedRouter from './features/ai/grounded.routes.js';
+import multimodalRouter from './features/ai/multimodal.routes.js';
 
 // Shared middleware
 import requireAuth from './shared/middleware/requireAuth.js';
 
 const app = express();
+app.disable('x-powered-by'); // prevent tech-stack fingerprinting
 const PORT = process.env.PORT || 5000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,6 +31,7 @@ const allowedOrigins = [
   'https://hydruslearn.com',
   'https://www.hydruslearn.com',
   'http://localhost:5173',  // Local Vite dev server
+  'http://localhost:5174',  // Standalone Learning Playground dev server
   'http://localhost:3000'   // Alternative dev port
 ];
 app.use(cors({
@@ -43,10 +47,20 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Memory optimization: Limit request body size
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
+/* SECURITY HEADERS — applied to every response */
+app.use((req, res, next) => {
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
+
+// 10 MB covers all legitimate use cases (embeddings, tool payloads). 50 MB enables DoS.
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // ROUTES — each feature mounts its own router
 app.use('/api/auth', authRouter);
@@ -55,6 +69,9 @@ app.use('/api', marketplaceRouter);
 app.use('/api', questionRouter);
 app.use('/api', quizRouter);
 app.use('/api', topicRouter);
+app.use('/api', groundedRouter);
+app.use('/api', multimodalRouter);
+
 
 // Health check endpoint for Render
 app.get('/api/health', (req, res) => {

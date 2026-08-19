@@ -1,11 +1,12 @@
 import '../App.css'
 import '../index.css'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../AuthContext'
 import { supabase } from '../supabaseClient'
 import { ChevronDown, ChevronUp, Eye, X } from 'lucide-react'
 import { Reveal, DotGrid } from '../components/Reveal.jsx'
+import { Skeleton } from '../components/Skeleton.jsx'
 
 // Handles History logic.
 function History() {
@@ -20,6 +21,7 @@ function History() {
   const [activeSection, setActiveSection] = useState('mine')
   const [notification, setNotification] = useState(null)
   const [modalQuiz, setModalQuiz] = useState(null)
+  const modalShellRef = useRef(null)
 
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000"
   const solidCardBg = 'color-mix(in srgb, var(--background) 90%, var(--foreground) 10%)'
@@ -30,7 +32,7 @@ function History() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`${API_BASE}/api/quiz-history?token=${encodeURIComponent(token)}`, {
+      const response = await fetch(`${API_BASE}/api/quiz-history`, {
         method: "GET",
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         credentials: 'include'
@@ -50,7 +52,7 @@ function History() {
   const fetchSharedWithMe = async (token) => {
     setSharedLoading(true)
     try {
-      const response = await fetch(`${API_BASE}/api/shared-with-me?token=${encodeURIComponent(token)}`, {
+      const response = await fetch(`${API_BASE}/api/shared-with-me`, {
         method: "GET",
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         credentials: 'include'
@@ -128,6 +130,25 @@ function History() {
     setModalQuiz(null)
   }
 
+  useEffect(() => {
+    if (!modalQuiz) return
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        closeModal()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    document.body.style.overflow = 'hidden'
+    modalShellRef.current?.focus()
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [modalQuiz])
+
   // Handles handleViewQuiz logic.
   const handleViewQuiz = (quiz) => {
     sessionStorage.setItem(`quiz_${quiz.id}`, JSON.stringify(quiz))
@@ -178,6 +199,29 @@ function History() {
     return []
   }
 
+  const renderQuizCardSkeletons = ({ count = 6 }) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-hidden>
+      {Array.from({ length: count }).map((_, index) => (
+        <div key={`history-skeleton-${index}`} className="rounded-xl overflow-hidden" style={{ background: solidCardBg, border: '1px solid var(--border)' }}>
+          <div className="px-5 py-4">
+            <Skeleton style={{ height: '0.95rem', width: '78%' }} />
+            <Skeleton className="mt-2" style={{ height: '0.7rem', width: '42%' }} />
+            <div className="mt-3 space-y-2">
+              <Skeleton style={{ height: '0.75rem', width: '66%' }} />
+              <Skeleton style={{ height: '0.75rem', width: '54%' }} />
+            </div>
+          </div>
+          <div className="px-5 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex gap-2">
+              <Skeleton rounded="0.4rem" style={{ height: '1.8rem', width: '100%' }} />
+              <Skeleton rounded="0.4rem" style={{ height: '1.8rem', width: '100%' }} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
   return (
     <div className="main-content min-h-screen relative" style={{ background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'var(--font-sans)' }}>
       <DotGrid />
@@ -202,8 +246,12 @@ function History() {
             <h2 className="text-3xl font-bold mb-4" style={{ color: 'var(--foreground)' }}>Quiz History</h2>
           </Reveal>
           {/* Tab switcher */}
-          <div className="flex gap-1 border-b" style={{ borderColor: 'var(--border)' }}>
+          <div role="tablist" aria-label="History sections" className="flex gap-1 border-b" style={{ borderColor: 'var(--border)' }}>
             <button
+              id="history-tab-mine"
+              role="tab"
+              aria-selected={activeSection === 'mine'}
+              aria-controls="history-panel-mine"
               onClick={() => setActiveSection('mine')}
               className={`px-5 py-2 text-sm font-medium transition-colors ${
                 activeSection === 'mine'
@@ -215,6 +263,10 @@ function History() {
               My Quizzes
             </button>
             <button
+              id="history-tab-shared"
+              role="tab"
+              aria-selected={activeSection === 'shared'}
+              aria-controls="history-panel-shared"
               onClick={() => setActiveSection('shared')}
               className={`px-5 py-2 text-sm font-medium transition-colors flex items-center gap-2 ${
                 activeSection === 'shared'
@@ -236,8 +288,8 @@ function History() {
 
         {/* ── My Quizzes ── */}
         {activeSection === 'mine' && (
-          <>
-            {loading && <p className="text-center" style={{ color: 'var(--muted-foreground)' }}>Loading...</p>}
+          <div id="history-panel-mine" role="tabpanel" aria-labelledby="history-tab-mine">
+            {loading && renderQuizCardSkeletons({ count: 6 })}
 
             {error && (
               <div className="p-4 rounded" style={{ background: 'var(--destructive)', color: 'var(--destructive-foreground)' }}>
@@ -325,13 +377,13 @@ function History() {
                 })}
               </div>
             )}
-          </>
+          </div>
         )}
 
         {/* ── Shared with me ── */}
         {activeSection === 'shared' && (
-          <>
-            {sharedLoading && <p className="text-center" style={{ color: 'var(--muted-foreground)' }}>Loading...</p>}
+          <div id="history-panel-shared" role="tabpanel" aria-labelledby="history-tab-shared">
+            {sharedLoading && renderQuizCardSkeletons({ count: 3 })}
 
             {!sharedLoading && sharedQuizzes.length === 0 && (
               <Reveal>
@@ -370,7 +422,7 @@ function History() {
                 ))}
               </div>
             )}
-          </>
+          </div>
         )}
 
       </main>
@@ -379,15 +431,21 @@ function History() {
       {modalQuiz && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: '#000000' }} onClick={closeModal}>
           <div 
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-modal-title"
             className="bg-card rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto"
             style={{ background: solidCardBg, color: 'var(--foreground)' }}
             onClick={e => e.stopPropagation()}
+            tabIndex={-1}
+            ref={modalShellRef}
           >
             {/* Header with close button */}
             <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b" style={{ background: solidCardBg, borderColor: 'var(--border)' }}>
-              <h3 className="text-xl font-bold">{modalQuiz.title}</h3>
+              <h3 id="history-modal-title" className="text-xl font-bold">{modalQuiz.title}</h3>
               <button
                 onClick={closeModal}
+                aria-label="Close quiz details"
                 className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
               >
                 <X className="w-6 h-6" style={{ color: 'var(--foreground)' }} />

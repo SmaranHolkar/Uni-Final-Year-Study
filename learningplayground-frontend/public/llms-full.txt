@@ -1,0 +1,48 @@
+# Learning Playground — Full AI Context
+
+> This document provides extended context about Learning Playground for AI systems, research tools, and language models.
+
+## What is Learning Playground?
+
+Learning Playground is an open-ended, AI-powered interactive study environment designed for university students and lifelong learners. Instead of restricting users to static flashcards or standard question banks, Learning Playground converts plain-English text prompts into rich, multi-modal interactive learning tools in real time.
+
+## Core Features & Multi-Modal Formats
+
+### 1. Natural Language Tool Generator
+Users type any study requirement—for example:
+- *"Create a study plan for my biochemistry final"*
+- *"Build a practice quiz on contract law remedies"*
+- *"Generate interactive flashcards on quantum mechanics concepts"*
+- *"Construct a step-by-step flowchart for diagnostic medicine"*
+
+The AI engine automatically plans, structures, and compiles the requested tool into an interactive UI widget.
+
+### 2. Supported Interactive Formats
+- **Interactive Flashcards**: Flip cards with spaced recall, difficulty tagging, and instant self-assessment.
+- **Interactive Quizzes**: Multiple-choice and short-answer evaluations with instant explanations.
+- **Structured Notes & Summaries**: Organized topic overviews with key takeaway badges and source links.
+- **Mindmaps & Concept Trees**: Visual nodes and relationships representing complex interdisciplinary topics.
+- **Flowcharts & Process Diagrams**: Sequential steps for algorithms, case studies, or medical procedures.
+- **Calculators & Simulators**: Custom interactive widgets with variable sliders and real-time formula computation.
+- **Code Playgrounds**: Code snippet review with syntax highlighting and step-by-step logic breakdowns.
+
+### 3. Session Management & Library
+- **Playground Sessions**: All interactive chats and tool states are automatically saved to the user's personal cloud space.
+- **Saved Tools Library**: Users can bookmark individual generated tools, fork existing tools, and organize them into custom collections.
+
+### 4. Marketplace & Sharing
+- **Tool Marketplace**: Users can publish their generated learning tools to the public community marketplace.
+- **Collaboration**: Tools can be shared via direct link or email, allowing peer study groups to fork and adapt existing tools.
+
+## Technology & Infrastructure
+
+- **Frontend Framework**: React 19, Vite 7, Tailwind CSS, Lucide icons, glassmorphism design system.
+- **Backend Connection**: Express REST API with streaming AI generation and model orchestration.
+- **Database & Auth**: PostgreSQL database hosted on Supabase with secure JWT user session authentication.
+- **Data Privacy**: User prompts and generated study tools are stored securely in dedicated user collections and are never used to train third-party AI models.
+
+## Contact & Legal
+
+- **App Name**: Learning Playground
+- **License**: Proprietary EdTech Platform
+- **Terms & Privacy**: Available at `/terms` and `/privacy`

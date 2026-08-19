@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ReactFlow,
@@ -19,6 +19,7 @@ import { supabase } from '../supabaseClient'
 import '../App.css'
 import MetacognitiveAnalysis from '../components/MetacognitiveAnalysis'
 import Vela from '../components/Vela'
+import { Skeleton } from '../components/Skeleton.jsx'
 
 // Custom node component
 const CustomNode = ({ data, isSelected, onClick }) => {
@@ -59,6 +60,7 @@ function QuizDetail() {
   const [shareStatus, setShareStatus] = useState('idle')
   const [shareError, setShareError] = useState('')
   const [generatingMindmap, setGeneratingMindmap] = useState(false)
+  const shareModalRef = useRef(null)
 
   // Fetch quiz details
   useEffect(() => {
@@ -191,6 +193,25 @@ function QuizDetail() {
     setEdges(initialEdges)
   }, [initialNodes, initialEdges, setNodes, setEdges])
 
+  useEffect(() => {
+    if (!shareModalOpen) return
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setShareModalOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    document.body.style.overflow = 'hidden'
+    setTimeout(() => shareModalRef.current?.focus(), 0)
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [shareModalOpen])
+
   // Handles handleNodeClick logic.
   const handleNodeClick = (_, node) => {
     setSelectedNodeId(node.id)
@@ -213,7 +234,7 @@ function QuizDetail() {
 
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
       const res = await axios.post(
-        `${API_BASE}/api/generate-similar-topic?token=${encodeURIComponent(accessToken)}`,
+        `${API_BASE}/api/generate-similar-topic`,
         {
           topic: selectedNode.data.label,
           description: selectedNode.data.description,
@@ -282,7 +303,7 @@ function QuizDetail() {
       }
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
       const res = await axios.post(
-        `${API_BASE}/api/share-mindmap?token=${encodeURIComponent(accessToken)}`,
+        `${API_BASE}/api/share-mindmap`,
         { quizMindmapId: quizId, recipientEmail: shareEmail },
         { headers: { Authorization: `Bearer ${accessToken}` }, withCredentials: true }
       )
@@ -311,7 +332,7 @@ function QuizDetail() {
 
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
       const res = await axios.post(
-        `${API_BASE}/api/generate-mcq-for-topic?token=${encodeURIComponent(accessToken)}`,
+        `${API_BASE}/api/generate-mcq-for-topic`,
         {
           topic: selectedNode.data.label,
           description: selectedNode.data.description,
@@ -352,7 +373,7 @@ function QuizDetail() {
 
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
       const res = await axios.post(
-        `${API_BASE}/api/generate-mindmap?token=${encodeURIComponent(accessToken)}`,
+        `${API_BASE}/api/generate-mindmap`,
         { wrongQuestions: wrongQs },
         {
           headers: { Authorization: `Bearer ${accessToken}` },
@@ -363,7 +384,7 @@ function QuizDetail() {
       if (res.data.mindmap) {
         // Save to database
         await axios.post(
-          `${API_BASE}/api/save-quiz-mindmap?token=${encodeURIComponent(accessToken)}`,
+          `${API_BASE}/api/save-quiz-mindmap`,
           {
             userId: session.user?.id,
             title: quizData.title,
@@ -386,7 +407,41 @@ function QuizDetail() {
     }
   }
 
-  if (loading) return <div className="p-6 text-center">Loading quiz details...</div>
+  if (loading) {
+    return (
+      <div className="p-6" style={{ background: 'var(--background)', minHeight: '100vh' }} aria-hidden>
+        <div className="mb-4 flex items-center gap-3">
+          <Skeleton rounded="0.45rem" style={{ width: '5.2rem', height: '2rem' }} />
+          <div className="space-y-2">
+            <Skeleton style={{ width: '14rem', height: '1.1rem' }} />
+            <Skeleton style={{ width: '8rem', height: '0.7rem' }} />
+          </div>
+        </div>
+        <div className="mb-5 flex gap-6 border-b border-[var(--border)] pb-3">
+          <Skeleton style={{ width: '8rem', height: '0.95rem' }} />
+          <Skeleton style={{ width: '7rem', height: '0.95rem' }} />
+          <Skeleton style={{ width: '8.5rem', height: '0.95rem' }} />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={`quiz-detail-card-skeleton-${index}`} className="rounded p-5 border border-[var(--border)]">
+              <Skeleton style={{ width: '55%', height: '0.75rem' }} />
+              <Skeleton className="mt-3" style={{ width: '40%', height: '1.7rem' }} />
+            </div>
+          ))}
+        </div>
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={`quiz-detail-row-skeleton-${index}`} className="rounded p-5 border border-[var(--border)]">
+              <Skeleton style={{ width: '85%', height: '0.95rem' }} />
+              <Skeleton className="mt-3" style={{ width: '60%', height: '0.75rem' }} />
+              <Skeleton className="mt-2" style={{ width: '50%', height: '0.75rem' }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
   if (error) return <div className="p-6 text-center text-red-600">Error: {error}</div>
   if (!quizData) return <div className="p-6 text-center">Quiz not found</div>
 
@@ -412,6 +467,24 @@ function QuizDetail() {
             </p>
           </div>
         </div>
+        {!quizData.isShared && (
+          <button
+            onClick={() => {
+              navigate('/learningpage', {
+                state: {
+                  retakePayload: {
+                    retakeOfQuizId: quizData.id,
+                    retakeTitle: quizData.title,
+                    retakeQuestions: quizQuestions,
+                  },
+                },
+              });
+            }}
+            className="px-3 py-1 border border-[var(--border)] rounded-md text-[var(--foreground)] hover:bg-[var(--muted)]"
+          >
+            Retake Quiz
+          </button>
+        )}
       </header>
 
       {/* Tabs */}
@@ -649,11 +722,19 @@ function QuizDetail() {
 
             {/* Share modal */}
             {shareModalOpen && (
-              <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-                <div className="bg-white rounded-xl shadow-2xl p-6 w-[380px]">
+              <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShareModalOpen(false)}>
+                <div
+                  className="bg-white rounded-xl shadow-2xl p-6 w-[380px]"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="quiz-share-modal-title"
+                  onClick={(e) => e.stopPropagation()}
+                  tabIndex={-1}
+                  ref={shareModalRef}
+                >
                   <div className="flex justify-between items-center mb-4">
-                    <h2 className="font-bold text-lg text-slate-900">Share Mindmap</h2>
-                    <button onClick={() => setShareModalOpen(false)} className="hover:bg-gray-100 p-1 rounded">
+                    <h2 id="quiz-share-modal-title" className="font-bold text-lg text-slate-900">Share Mindmap</h2>
+                    <button aria-label="Close share modal" onClick={() => setShareModalOpen(false)} className="hover:bg-gray-100 p-1 rounded">
                       <X className="w-4 h-4" />
                     </button>
                   </div>

@@ -1,0 +1,50 @@
+# HydrusLearn robots.txt
+# https://developers.google.com/search/docs/crawling-indexing/robots/intro
+
+User-agent: *
+
+# Allow the public marketing and legal pages
+Allow: /
+Allow: /signup
+Allow: /login
+Allow: /privacy
+Allow: /terms
+
+# Block authenticated/private app routes — no indexable content there
+Disallow: /dashboard
+Disallow: /learningpage
+Disallow: /Learningplayground
+Disallow: /marketplace
+Disallow: /history
+Disallow: /Profile
+Disallow: /quiz/
+Disallow: /forgot-password
+Disallow: /reset-password
+
+# Sitemap location
+Sitemap: https://hydruslearn.com/sitemap.xml
+
+# AI / LLM crawler context files
+# llms.txt — structured summary for AI systems (Perplexity, Claude, ChatGPT, etc.)
+# https://llmstxt.org/
+LLMs: https://hydruslearn.com/llms.txt
+LLMs-full: https://hydruslearn.com/llms-full.txt
+
+# Explicitly allow major AI crawlers (covered by wildcard above, listed for clarity)
+User-agent: GPTBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: GoogleOther
+Allow: /
+
+User-agent: CCBot
+Allow: /

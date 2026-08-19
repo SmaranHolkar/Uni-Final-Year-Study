@@ -42,8 +42,27 @@ const cardStyles = {
 
 // Displays a stylized card with optional image and custom child content.
 const Card = ({ title, description, image, onClick, children }) => {
+    const interactiveProps = onClick
+        ? {
+            role: 'button',
+            tabIndex: 0,
+            onKeyDown: (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onClick();
+                }
+            },
+            'aria-label': title ? `Open ${title}` : 'Open card',
+        }
+        : {};
+
     return (
-        <div className="card" style={cardStyles.card} onClick={onClick}>
+        <div
+            className="card"
+            style={{ ...cardStyles.card, cursor: onClick ? 'pointer' : 'default' }}
+            onClick={onClick}
+            {...interactiveProps}
+        >
             {image && <img src={image} alt={title} className="card-image" style={cardStyles.image} />}
             <div className="card-content">
                 {title && <h3 className="card-title" style={cardStyles.title}>{title}</h3>}

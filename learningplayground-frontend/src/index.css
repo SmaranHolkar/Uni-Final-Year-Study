@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #131519;
+  --surface: #1A1E24;
+  --card: #21262E;
+  --border: #282E38;
+  --slate: #3D5E7A;
+  --slate-soft: #5A7D99;
+  --slate-glow: rgba(61,94,122,0.18);
+  --forest: #4A6B52;
+  --bridge: #3D6660;
+  --white: #CDD1D6;
+  --muted: #6E7580;
+  --dim: #3A3F48;
+
+  --background: var(--bg);
+  --foreground: var(--white);
+  --card-foreground: var(--white);
+  --popover: var(--surface);
+  --popover-foreground: var(--white);
+  --primary: var(--slate-soft);
+  --primary-foreground: var(--bg);
+  --secondary: var(--surface);
+  --secondary-foreground: var(--white);
+  --muted-foreground: var(--muted);
+  --accent: var(--bridge);
+  --accent-foreground: var(--white);
+  --destructive: #9A6464;
+  --destructive-foreground: var(--white);
+  --input: var(--border);
+  --ring: var(--slate-soft);
+
+  --font-sans: 'DM Sans', sans-serif;
+  --font-serif: 'DM Serif Display', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius: 0.5rem;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--white);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #131519;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #282E38;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3D5E7A;
+}
+
+/* Custom Glassmorphism */
+.glass-panel {
+  background: rgba(26, 30, 36, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(40, 46, 56, 0.8);
+}
+
+.glass-card {
+  background: rgba(33, 38, 46, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(40, 46, 56, 0.6);
+}
+
+/* Shimmer animation */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+/* Pulse Glow */
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.4; filter: blur(20px); }
+  50% { opacity: 0.8; filter: blur(28px); }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 4s ease-in-out infinite;
+}

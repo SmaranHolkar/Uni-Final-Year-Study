@@ -1,3 +1,17 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies & Build artifacts
+node_modules/
+dist/
+dist-ssr/
+uploads/
+scratch/
+testGen.js
+backend/testGen.js
+
 # Documentation files (keep README.md)
 CONFIDENCE_RATING_IMPLEMENTATION.md
 DOCUMENT_UPLOAD_GUIDE.md

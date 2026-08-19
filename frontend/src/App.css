@@ -76,7 +76,7 @@
 }
 
 .sidebar-link:hover {
-  background-color: var(--sidebar-accent, rgba(255, 255, 255, 0.05));
+  background-color: var(--sidebar-accent, var(--slate-glow));
   color: var(--primary);
 }
 
@@ -225,15 +225,16 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  background-color: rgba(3, 5, 9, 0.6);
+  background-color: color-mix(in srgb, var(--surface) 72%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border);
   color: var(--foreground);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
 }
 
 .nav-logo {
+  font-family: var(--font-serif);
   font-weight: bold;
   font-size: 1.2rem;
 }
@@ -247,7 +248,7 @@
   color: var(--muted-foreground);
   text-decoration: none;
   font-weight: 600;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -264,7 +265,7 @@
   color: var(--destructive);
   border: 1px solid var(--destructive);
   padding: 0.5rem 1.25rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 0.85rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -324,7 +325,7 @@ a.shadow__btn {
   border: 1px solid var(--border);
   padding: 0.5rem 1.25rem;
   font-size: 0.85rem;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -403,7 +404,13 @@ a.shadow__btn {
   border-radius: 0.5rem;
   background: var(--input);
   color: var(--foreground);
-  outline: none;
+}
+
+.signup-card input:focus-visible,
+.signup-card select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-color: var(--primary);
 }
 
 .row {
@@ -531,13 +538,13 @@ a.shadow__btn {
 }
 
 .hero-decor-left {
-  background: #c4b5fd;
+  background: color-mix(in srgb, var(--slate-soft) 75%, var(--bridge));
   top: -120px;
   left: -120px;
 }
 
 .hero-decor-right {
-  background: #93c5fd;
+  background: color-mix(in srgb, var(--slate) 72%, var(--forest));
   bottom: -120px;
   right: -120px;
 }
@@ -692,7 +699,7 @@ a.shadow__btn {
   /* or 224px, matching your sidebar width */
   /* Width of the sidebar + some spacing */
   padding: 1%;
-  background-color: #302e2e;
+  background-color: var(--surface);
 }
 
 /* Loading spinner animation */

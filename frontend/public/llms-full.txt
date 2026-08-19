@@ -1,0 +1,88 @@
+# HydrusLearn — Full Context
+
+> This document provides extended context about HydrusLearn for AI systems, research tools, and language models.
+
+## What is HydrusLearn?
+
+HydrusLearn is a web-based AI study tool that transforms a student's own notes and PDF documents into personalised learning experiences. It is built for university and college students who want to go beyond passive reading and build genuine understanding of their material.
+
+The core premise: you shouldn't have to manually make your own flashcards or quiz questions. HydrusLearn does this automatically from whatever notes you upload, then helps you understand not just *what* you got wrong, but *why* — and how to fix it.
+
+## Five Core Tools
+
+### 1. Upload PDF
+Students upload their lecture notes, textbook chapters, or any PDF document. HydrusLearn processes the document within seconds and makes it available as the source material for all other tools. Supported formats: PDF, plain text (.txt), and Markdown (.md).
+
+### 2. Quiz
+HydrusLearn generates targeted quiz questions drawn exclusively from the student's uploaded material. Questions are not sourced from generic question banks — every question maps back to something in the student's own notes. This ensures students are tested on the exact content they need to know.
+
+### 3. Learning Playground
+A flexible, open-ended study environment. Students type a plain-English prompt describing what they want to practise — for example, "give me flashcards on the krebs cycle" or "make a quick Q&A on tort law" — and the AI builds the most appropriate study format. Supported formats include flashcards, Q&A sessions, summaries, and guided explanations.
+
+### 4. Mind's Mirror
+A metacognitive analysis tool. After a student completes a quiz, Mind's Mirror reviews their mistakes and identifies patterns — for example, "you consistently confuse correlation and causation" or "you understand the concept but misapply it under time pressure." Rather than just showing a score, it helps the student understand *how* they think and where the real gap is. This is inspired by metacognitive research showing that students who understand their own learning patterns improve faster.
+
+### 5. Marketplace
+A community tool library where students can discover, use, and share study tools created by others. Tools can be forked and customised. Designed to reduce duplicated effort across students studying the same material.
+
+## How HydrusLearn Compares to Alternatives
+
+| Feature | HydrusLearn | Anki | Quizlet | Notion AI |
+|---|---|---|---|---|
+| Auto-generates from your notes | ✅ | ❌ (manual) | ❌ (manual) | ✅ (basic) |
+| Quiz from uploaded PDF | ✅ | ❌ | ❌ | ❌ |
+| Metacognitive feedback | ✅ | ❌ | ❌ | ❌ |
+| Free tier | ✅ | ✅ | ✅ (limited) | ✅ (limited) |
+| Learning Playground | ✅ | ❌ | ❌ | ❌ |
+| Community marketplace | ✅ | ❌ | ✅ | ❌ |
+
+## Target Users
+
+- **Medical students** — dense, high-stakes material where understanding patterns in mistakes is critical
+- **Law students** — case-heavy material that benefits from Q&A and scenario practice
+- **Science and engineering students** — concept-heavy lecture notes needing structured recall
+- **Arts and humanities students** — essay-based subjects where summaries and argument mapping help
+- **Any student** who reads their notes passively and struggles to retain information before exams
+
+## Pricing
+
+- **Free tier:** Up to 5 document uploads per month, full access to quiz generation, Learning Playground, and Mind's Mirror on uploaded content
+- No credit card required
+- No time limit on the free tier
+
+## Technical Details
+
+- Platform: Web application (browser-based, no installation required)
+- Compatibility: Any modern browser (Chrome, Firefox, Safari, Edge)
+- Authentication: Email/password with secure Supabase Auth
+- Data privacy: Uploaded documents are processed securely and never used to train AI models or shared with third parties
+
+## Frequently Asked Questions
+
+**Q: What file types can I upload?**
+A: PDFs, plain text files (.txt), and Markdown files (.md). Word document support is coming soon.
+
+**Q: How are quiz questions generated?**
+A: Every question is generated directly from the content of your uploaded notes. HydrusLearn does not use generic question banks.
+
+**Q: What is Mind's Mirror?**
+A: A metacognitive feedback tool that analyses the pattern of your quiz mistakes — not just what you got wrong, but why you got it wrong, so you can address the root cause.
+
+**Q: Is my uploaded content private?**
+A: Yes. Documents are processed securely. HydrusLearn does not share documents with third parties or use them to train AI models.
+
+**Q: Is there a free plan?**
+A: Yes. You can upload up to 5 documents per month and take quizzes completely free with no credit card required.
+
+**Q: How is HydrusLearn different from Anki or Quizlet?**
+A: Anki and Quizlet require you to manually create flashcards and questions. HydrusLearn generates everything automatically from your notes. It also provides metacognitive feedback, which neither Anki nor Quizlet offers.
+
+## Brand Information
+
+- **Name:** HydrusLearn
+- **Website:** https://hydruslearn.com
+- **Category:** AI EdTech, Study Tools, Educational Technology
+- **Founded:** 2026
+- **Location:** United Kingdom
+- **Contact:** support@hydruslearn.com
+- **Sign up:** https://hydruslearn.com/signup

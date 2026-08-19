@@ -20,7 +20,7 @@ function generateEmbeddingText(quizResults, mindmapNodes) {
 }
 
 // Handles saveQuizMindmap logic.
-export async function saveQuizMindmap({ userId, title, quizResults, mindmapNodes }) {
+export async function saveQuizMindmap({ userId, title, quizResults, mindmapNodes, retakeOfQuizId = null }) {
   let client;
   try {
     client = await pool.connect();
@@ -29,8 +29,8 @@ export async function saveQuizMindmap({ userId, title, quizResults, mindmapNodes
     const embeddingVector = await getEmbedding(embeddingText);
     const embedding = `[${embeddingVector.join(',')}]`;
     const insertQuery = `
-      INSERT INTO public.quizzes_mindmaps (user_id, title, quiz, mindmap, embedding, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5::vector, NOW(), NOW())
+      INSERT INTO public.quizzes_mindmaps (user_id, title, quiz, mindmap, embedding, retake_of_quiz_id, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5::vector, $6, NOW(), NOW())
       RETURNING id;
     `;
     const result = await client.query(insertQuery, [
@@ -38,7 +38,8 @@ export async function saveQuizMindmap({ userId, title, quizResults, mindmapNodes
       title,
       JSON.stringify(quizResults),
       JSON.stringify(mindmapNodes),
-      embedding
+      embedding,
+      retakeOfQuizId,
     ]);
     await client.query('COMMIT');
     return { id: result.rows[0].id };
@@ -57,7 +58,7 @@ export async function getUserQuizzesMindmaps(userId) {
   const client = await pool.connect();
   try {
     const query = `
-      SELECT id, user_id, title, quiz, mindmap, embedding, created_at, updated_at
+      SELECT id, user_id, title, quiz, mindmap, embedding, retake_of_quiz_id, created_at, updated_at
       FROM public.quizzes_mindmaps
       WHERE user_id = $1
       ORDER BY created_at DESC;
@@ -74,7 +75,7 @@ export async function getQuizById(quizId, userId) {
   const client = await pool.connect();
   try {
     const query = `
-      SELECT id, user_id, title, quiz, mindmap, created_at
+      SELECT id, user_id, title, quiz, mindmap, retake_of_quiz_id, created_at
       FROM public.quizzes_mindmaps
       WHERE id = $1 AND user_id = $2
     `;

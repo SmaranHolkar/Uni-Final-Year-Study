@@ -1,19 +1,64 @@
 import { saveQuizMindmap as saveQuizMindmapService, getUserQuizzesMindmaps, getQuizById, shareQuizMindmap, getSharedWithMe } from './quiz.service.js';
 import { generateMetacognitiveAnalysis } from '../ai/ml.engine.js';
+import { recordQuizOutcome } from '../../shared/services/tier.service.js';
 
 // Save Quiz and Mindmap
 export async function saveQuizMindmap(req, res) {
   try {
-    const { userId, title, quizResults, mindmapNodes } = req.body;
-    const result = await saveQuizMindmapService({ userId, title, quizResults, mindmapNodes });
-    res.status(201).json({ success: true, message: 'Quiz and mindmap saved successfully', id: result.id });
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Auth required' });
+    }
+
+    const { title, quizResults, mindmapNodes, retakeOfQuizId = null } = req.body || {};
+
+    const safeTitle = String(title || '').trim().slice(0, 180);
+    if (!safeTitle) {
+      return res.status(400).json({ success: false, message: 'title is required' });
+    }
+
+    if (!Array.isArray(quizResults) || !quizResults.length) {
+      return res.status(400).json({ success: false, message: 'quizResults must be a non-empty array' });
+    }
+
+    const safeRetakeOfQuizId = Number.isInteger(Number(retakeOfQuizId)) && Number(retakeOfQuizId) > 0
+      ? Number(retakeOfQuizId)
+      : null;
+
+    const result = await saveQuizMindmapService({
+      userId,
+      title: safeTitle,
+      quizResults,
+      mindmapNodes,
+      retakeOfQuizId: safeRetakeOfQuizId,
+    });
+
+    const outcome = await recordQuizOutcome(userId, {
+      quizId: result.id,
+      title: safeTitle,
+      quizResults,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Quiz and mindmap saved successfully',
+      id: result.id,
+      data: {
+        id: result.id,
+        scorePercentage: outcome.scorePercentage,
+        perfectScore: outcome.perfectScore,
+        masteryCredited: outcome.masteryCredited,
+        rewardUnlocked: outcome.rewardUnlocked,
+        unlimitedUntil: outcome.unlimitedUntil,
+      },
+    });
   } catch (error) {
     console.error('Error saving quiz and mindmap:', error);
     let statusCode = 500;
     let errorMessage = 'Failed to save quiz and mindmap';
     if (error.code === '22P02') { errorMessage = 'Invalid data format for database'; statusCode = 400; }
     else if (error.message?.includes('connection')) { errorMessage = 'Database connection error. Please try again.'; statusCode = 503; }
-    res.status(statusCode).json({ success: false, message: errorMessage, error: error.message });
+    res.status(statusCode).json({ success: false, message: errorMessage });
   }
 }
 
@@ -26,7 +71,7 @@ export async function getQuizzesMindmapsController(req, res) {
     res.status(200).json({ success: true, data: rows, count: rows.length });
   } catch (error) {
     console.error('Error fetching quizzes and mindmaps:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch quizzes and mindmaps', error: error.message });
+    res.status(500).json({ success: false, message: 'Failed to fetch quizzes and mindmaps' });
   }
 }
 
@@ -51,7 +96,7 @@ export async function getMetacognitiveAnalysis(req, res) {
     res.json({ success: true, analysis });
   } catch (err) {
     console.error('METACOGNITIVE ANALYSIS ERROR:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to generate metacognitive analysis' });
   }
 }
 

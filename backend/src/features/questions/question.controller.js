@@ -2,6 +2,11 @@ import { getEmbedding, getTopChunks, generateMCQs, aiMindmapNode, generateLearni
 import { generateStudySuggestions } from '../ai/ai.service.js';
 import { getCorrectAnswerText } from '../../shared/utils/quiz.utils.js';
 import pool from '../../shared/config/dbPool.js';
+import {
+  getTierStatusForUser,
+  getDueSpacedRepetition as getDueSpacedRepetitionItems,
+  markSpacedRepetitionReviewed as markSpacedRepetitionReviewedItem,
+} from '../../shared/services/tier.service.js';
 
 // Generate Questions
 export async function generateQuestions(req, res) {
@@ -23,12 +28,11 @@ export async function generateQuestions(req, res) {
     res.json({ questions });
   } catch (err) {
     console.error('BACKEND ERROR:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to generate questions' });
   }
 }
 
 /* Generate Mindmap */
-// Handles generateMindmap logic.
 export async function generateMindmap(req, res) {
   try {
     const { wrongQuestions, topic, prompt: topicPrompt } = req.body;
@@ -39,11 +43,21 @@ export async function generateMindmap(req, res) {
       const nodes = [{ id: 'root', label: 'Review Topics', description: 'Topics to review based on your incorrect answers', sourceLink: 'Source link' }];
       const edges = [];
 
-      for (let i = 0; i < wrongQuestions.length; i++) {
-        const q = wrongQuestions[i];
-        const id = `n${i}`;
-        const label = (q.prompt && String(q.prompt).slice(0, 120)) || `Topic ${i + 1}`;
+      const maxQuestions = Number(process.env.MINDMAP_MAX_QUESTIONS || 6);
+      const concurrency = Math.max(1, Number(process.env.MINDMAP_CONCURRENCY || 2));
+      const maxConcurrency = Math.min(concurrency, 3);
+      const selectedWrongQuestions = wrongQuestions.slice(0, maxQuestions);
+      console.log(`[MINDMAP] Processing ${selectedWrongQuestions.length}/${wrongQuestions.length} wrong questions with concurrency ${maxConcurrency}`);
+
+      const generatedNodes = [];
+      let cursor = 0;
+
+      async function processOne(index) {
+        const q = selectedWrongQuestions[index];
+        const id = `n${index}`;
+        const label = (q.prompt && String(q.prompt).slice(0, 120)) || `Topic ${index + 1}`;
         let description = '';
+
         try {
           const text = (q.prompt && String(q.prompt)) || '';
           if (text.trim()) {
@@ -58,20 +72,44 @@ export async function generateMindmap(req, res) {
                 context: chunks[0].chunk_text,
                 sourceLink: q.sourceLink || ''
               });
-              // Increased delay to avoid rate limiting (5 seconds per request)
-              await new Promise(resolve => setTimeout(resolve, 5000));
             }
           }
         } catch (err) {
           console.error('Error fetching chunks for question:', err);
         }
+
         if (description && description.trim().length > 0) {
-          nodes.push({ id, label, description, category: 'Suggested Review', sourceLink: q.resource || '' });
-          edges.push({ from: 'root', to: id });
+          generatedNodes.push({
+            index,
+            node: { id, label, description, category: 'Suggested Review', sourceLink: q.resource || '' },
+            edge: { from: 'root', to: id }
+          });
         } else {
           console.warn(`AI did not return description for node ${id} (${label})`);
         }
+
+        // Small jitter smooths burstiness while staying far faster than fixed 5s sleeps.
+        const jitterMs = 250 + Math.floor(Math.random() * 250);
+        await new Promise(resolve => setTimeout(resolve, jitterMs));
       }
+
+      async function worker() {
+        while (cursor < selectedWrongQuestions.length) {
+          const nextIndex = cursor;
+          cursor += 1;
+          await processOne(nextIndex);
+        }
+      }
+
+      await Promise.all(Array.from({ length: Math.min(maxConcurrency, selectedWrongQuestions.length) }, () => worker()));
+
+      generatedNodes
+        .sort((a, b) => a.index - b.index)
+        .forEach(({ node, edge }) => {
+          nodes.push(node);
+          edges.push(edge);
+        });
+
       return res.json({ mindmap: { nodes, edges } });
     }
 
@@ -97,7 +135,7 @@ Rules:
 
       let parsed = null;
       try {
-        const raw = await toolGenAI(mindmapPrompt, 'llama-3.3-70b-versatile', 0.3, 900, { forceJson: true });
+        const raw = await toolGenAI(mindmapPrompt, 'qwen/qwen3.6-27b', 0.3, 900, { forceJson: true });
         parsed = JSON.parse(raw);
       } catch (e) {
         console.error('Failed to parse mindmap JSON:', e);
@@ -133,26 +171,58 @@ Rules:
 // Generate an interactive learning tool plan from a free-form user prompt
 export async function generateLearningTool(req, res) {
   try {
-    const { prompt, context, metacognitiveAnalysis } = req.body;
+    let { prompt, context, metacognitiveAnalysis, documentTitle, chatHistory, previousTool } = req.body;
+
     const userId = req.user?.id;
+
+    if (documentTitle) {
+      try {
+        documentTitle = decodeURIComponent(String(documentTitle).replace(/\+/g, ' ')).trim();
+      } catch {
+        documentTitle = String(documentTitle).replace(/\+/g, ' ').trim();
+      }
+    }
 
     console.log('--- GENERATE LEARNING TOOL CALLED ---');
     console.log('Prompt:', prompt);
-    console.log('Context length:', context ? context.length : 'none');
-    console.log('Metacognitive Analysis:', metacognitiveAnalysis ? 'Yes' : 'No');
+    console.log('Document Title:', documentTitle || 'None');
+
+    console.log('Previous Tool:', previousTool?.title || 'None');
+    console.log('Chat History length:', Array.isArray(chatHistory) ? chatHistory.length : 0);
+    console.log('Context length:', context ? (Array.isArray(context) ? context.length : 'object') : 'none');
 
     if (!prompt || !String(prompt).trim()) {
       return res.status(400).json({ error: 'prompt is required' });
     }
 
-    const tool = await generateLearningToolUtil(userId, prompt, context, { metacognitiveAnalysis });
+    const tool = await generateLearningToolUtil(userId, prompt, context, {
+      metacognitiveAnalysis,
+      documentTitle,
+      chatHistory,
+      previousTool
+    });
 
     return res.json({ success: true, tool });
   } catch (err) {
     console.error('TOOL GENERATOR CONTROLLER ERROR:', err);
-    return res.status(500).json({ success: false, error: err.message || 'Failed to generate tool' });
+    // Provide a resilient fallback tool so tool generation never crashes with HTTP 500
+    const lowerP = String(req.body?.prompt || '').toLowerCase();
+    const isChem = lowerP.includes('chem') || lowerP.includes('titration') || lowerP.includes('beaker');
+    const is3D = lowerP.includes('3d');
+
+    const fallbackTool = {
+      toolType: isChem ? 'chemistry-simulator' : is3D ? '3d-simulation' : 'flashcards',
+      title: isChem ? 'Interactive Chemistry Lab Simulator' : is3D ? '3D Interactive Model Viewer' : 'Study & Revision Guide',
+      description: 'Explore and interact with this live educational tool.',
+      chatResponse: "I've created your revision tool! Explore it on the canvas.",
+      render: 'iframe',
+      ui: isChem ? 'chemistry-simulator' : is3D ? '3d-simulation' : 'flashcards',
+      data: { items: [] }
+    };
+    return res.json({ success: true, tool: fallbackTool });
   }
 }
+
 
 // Save a Learning Playground session (messages + latest generated tool)
 export async function saveLearningPlaygroundSession(req, res) {
@@ -433,5 +503,54 @@ export async function getSuggestionsForUser(req, res) {
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
+  }
+}
+
+export async function getTierStatus(req, res) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Auth required' });
+
+  try {
+    const status = await getTierStatusForUser(userId);
+    return res.json({ success: true, data: status });
+  } catch (err) {
+    console.error('GET TIER STATUS ERROR:', err);
+    return res.status(500).json({ success: false, error: 'Failed to fetch tier status' });
+  }
+}
+
+export async function getDueSpacedRepetition(req, res) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Auth required' });
+
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
+    const rows = await getDueSpacedRepetitionItems(userId, limit);
+    return res.json({ success: true, data: rows, count: rows.length });
+  } catch (err) {
+    console.error('GET DUE SPACED REPETITION ERROR:', err);
+    return res.status(500).json({ success: false, error: 'Failed to fetch spaced repetition items' });
+  }
+}
+
+export async function markSpacedRepetitionReviewed(req, res) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Auth required' });
+
+  try {
+    const queueId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(queueId) || queueId <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid spaced repetition id' });
+    }
+
+    const row = await markSpacedRepetitionReviewedItem(userId, queueId);
+    if (!row) {
+      return res.status(404).json({ success: false, error: 'Spaced repetition item not found' });
+    }
+
+    return res.json({ success: true, data: row });
+  } catch (err) {
+    console.error('MARK SPACED REPETITION REVIEWED ERROR:', err);
+    return res.status(500).json({ success: false, error: 'Failed to update spaced repetition item' });
   }
 }

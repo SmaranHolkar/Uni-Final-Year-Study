@@ -1,7 +1,7 @@
 import fs from 'fs';
 import pool from '../../shared/config/dbPool.js';
 import { getEmbedding, describeImage } from '../ai/ml.engine.js';
-import { extractTextFromFile, chunkText, extractPageImages } from './document.service.js';
+import { extractTextFromFile, chunkText, chunkTextWithParagraphs, extractPageImages } from './document.service.js';
 
 /*  PROCESS & STORE DOCUMENT   */
 
@@ -50,13 +50,16 @@ export async function processAndStoreDocument(req, res) {
     /*  CHECK FOR CONTENT DUPLICATES (by first 500 chars of extracted text)  */
     const newTextPrefix = text.trim().slice(0, 500);
     const contentDuplicateCheck = await client.query(
-      `SELECT title
-       FROM public.w_embeddings
-       WHERE user_id = $1
-         AND id IN (
-           SELECT MIN(id) FROM public.w_embeddings WHERE user_id = $1 GROUP BY title
-         )
-         AND LEFT(TRIM(chunk_text), 500) = $2
+      `SELECT doc.title
+       FROM (
+         SELECT DISTINCT ON (title)
+           title,
+           chunk_text
+         FROM public.w_embeddings
+         WHERE user_id = $1
+         ORDER BY title, created_at ASC, id ASC
+       ) AS doc
+       WHERE LEFT(TRIM(doc.chunk_text), 500) = $2
        LIMIT 1`,
       [userId, newTextPrefix]
     );
@@ -99,11 +102,11 @@ export async function processAndStoreDocument(req, res) {
       }
     }
 
-    /*  CHUNKING  */
+    /*  CHUNKING WITH PARAGRAPH INDEXES  */
     const MAX_CHUNKS = 500;
-    const chunks = chunkText(text, 1000, 100).slice(0, MAX_CHUNKS);
+    const structuredChunks = chunkTextWithParagraphs(text, 350).slice(0, MAX_CHUNKS);
 
-    if (!chunks.length) {
+    if (!structuredChunks.length) {
       throw new Error('No valid chunks generated');
     }
 
@@ -113,9 +116,10 @@ export async function processAndStoreDocument(req, res) {
     let storedChunks = 0;
     const failedChunks = [];
 
-    for (let i = 0; i < chunks.length; i++) {
+    for (let i = 0; i < structuredChunks.length; i++) {
+      const chunkObj = structuredChunks[i];
       try {
-        const embedding = await getEmbedding(chunks[i]);
+        const embedding = await getEmbedding(chunkObj.text);
 
         if (
           !Array.isArray(embedding) ||
@@ -127,10 +131,17 @@ export async function processAndStoreDocument(req, res) {
         await client.query(
           `
           INSERT INTO public.w_embeddings
-          (title, chunk_text, embedding, user_id, created_at)
-          VALUES ($1, $2, $3::vector, $4, NOW())
+          (title, chunk_text, embedding, user_id, paragraph_index, page_number, created_at)
+          VALUES ($1, $2, $3::vector, $4, $5, $6, NOW())
           `,
-          [title, chunks[i], `[${embedding.join(',')}]`, userId]
+          [
+            title,
+            chunkObj.text,
+            `[${embedding.join(',')}]`,
+            userId,
+            chunkObj.paragraphIndex || (i + 1),
+            chunkObj.pageNumber || 1
+          ]
         );
 
         storedChunks++;
@@ -153,7 +164,7 @@ export async function processAndStoreDocument(req, res) {
       document: { id: documentId, title, originalName: req.file.originalname, userId },
       stats: {
         textLength: text.length,
-        totalChunks: chunks.length,
+        totalChunks: structuredChunks.length,
         storedChunks,
         failedChunks: failedChunks.length,
         imagesDescribed,
@@ -164,13 +175,94 @@ export async function processAndStoreDocument(req, res) {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error(' Document processing failed:', error.message);
-    res.status(500).json({ error: 'Failed to process document', details: error.message });
+    res.status(500).json({ error: 'Failed to process document' });
 
   } finally {
     client.release();
     if (uploadedFilePath) {
       fs.unlink(uploadedFilePath, () => {});
     }
+  }
+}
+
+/*  GET USER DOCUMENTS LIST  */
+export async function getUserDocuments(req, res) {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'User authentication required' });
+    }
+
+    const { rows } = await pool.query(
+      `
+      SELECT 
+        title,
+        COUNT(*) as chunk_count,
+        MAX(paragraph_index) as max_paragraph,
+        MIN(created_at) as created_at
+      FROM public.w_embeddings
+      WHERE user_id = $1
+      GROUP BY title
+      ORDER BY created_at DESC
+      `,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      documents: rows.map(r => ({
+        title: r.title,
+        chunkCount: parseInt(r.chunk_count, 10),
+        maxParagraph: parseInt(r.max_paragraph || 1, 10),
+        createdAt: r.created_at,
+        isDeepResearch: r.title.startsWith('[Deep Research]')
+      }))
+    });
+
+  } catch (error) {
+    console.error('Failed to get user documents:', error.message);
+    res.status(500).json({ error: 'Failed to fetch user documents' });
+  }
+}
+
+/*  GET DOCUMENT PARAGRAPHS (FOR PARAGRAPH INSPECTOR)  */
+export async function getDocumentParagraphs(req, res) {
+  try {
+    const userId = req.user?.id;
+    const { title } = req.query;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User authentication required' });
+    }
+
+    if (!title) {
+      return res.status(400).json({ error: 'Document title is required' });
+    }
+
+    const { rows } = await pool.query(
+      `
+      SELECT id, title, chunk_text, paragraph_index, page_number, created_at
+      FROM public.w_embeddings
+      WHERE user_id = $1 AND title = $2
+      ORDER BY paragraph_index ASC, id ASC
+      `,
+      [userId, title]
+    );
+
+    res.json({
+      success: true,
+      title,
+      paragraphs: rows.map(r => ({
+        id: r.id,
+        text: r.chunk_text,
+        paragraphIndex: r.paragraph_index || 1,
+        pageNumber: r.page_number || 1
+      }))
+    });
+
+  } catch (error) {
+    console.error('Failed to get document paragraphs:', error.message);
+    res.status(500).json({ error: 'Failed to fetch document paragraphs' });
   }
 }
 
@@ -205,3 +297,4 @@ export async function deleteDocumentEmbeddings(req, res) {
     res.status(500).json({ error: 'Failed to delete embeddings' });
   }
 }
+

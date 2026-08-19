@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Send, Sparkles, Lightbulb, TrendingUp, AlertCircle, Network, Clock, History, X, Zap, Share2 } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import { useLocation } from 'react-router-dom'
@@ -55,6 +56,10 @@ function Learningplayground() {
 
   const [messages, setMessages] = useState([])
   const [suggestions, setSuggestions] = useState(defaultSuggestions)
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+  const [isLoadingTierStatus, setIsLoadingTierStatus] = useState(false)
+  const [tierStatus, setTierStatus] = useState(null)
+  const toolsQuota = (tierStatus?.quotas || []).find((quota) => quota.actionType === 'learning_tool_generate')
   const [savedToolsTab, setSavedToolsTab] = useState('sessions') // 'sessions' or 'saved'
   const [sessionModalMode, setSessionModalMode] = useState('quiz') // 'quiz' or 'playground'
   const [savedTools, setSavedTools] = useState([])
@@ -66,6 +71,7 @@ function Learningplayground() {
   const [playgroundSessions, setPlaygroundSessions] = useState([])
   const [isLoadingPlaygroundSessions, setIsLoadingPlaygroundSessions] = useState(false)
   const [generatedTool, setGeneratedTool] = useState(null)
+  const [isToolMaximized, setIsToolMaximized] = useState(false)
   const [generationStage, setGenerationStage] = useState(null)
   const [buildPhase, setBuildPhase] = useState(null) // 'planning' | 'building'
   const [inputValue, setInputValue] = useState('')
@@ -91,6 +97,9 @@ function Learningplayground() {
   const textareaRef = useRef(null)
   const mindmapRef = useRef(null)
   const marketplaceMetadataResolverRef = useRef(null)
+  const sessionModalRef = useRef(null)
+  const marketplaceMetadataModalRef = useRef(null)
+  const shareToolModalRef = useRef(null)
 
   const openMarketplaceMetadataModal = ({ title, description, tags }) => {
     setMarketplaceMetadataError('')
@@ -121,6 +130,48 @@ function Learningplayground() {
       setTimeout(() => mindmapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
     }
   }, [generatedTool])
+
+  const anyModalOpen = showSessionModal || showMarketplaceMetadataModal || showShareModal
+
+  useEffect(() => {
+    if (!anyModalOpen) return
+
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape') return
+
+      if (showShareModal) {
+        setShowShareModal(false)
+        return
+      }
+
+      if (showMarketplaceMetadataModal) {
+        closeMarketplaceMetadataModal(null)
+        return
+      }
+
+      if (showSessionModal) {
+        setShowSessionModal(false)
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    document.body.style.overflow = 'hidden'
+
+    setTimeout(() => {
+      if (showShareModal) {
+        shareToolModalRef.current?.focus()
+      } else if (showMarketplaceMetadataModal) {
+        marketplaceMetadataModalRef.current?.focus()
+      } else if (showSessionModal) {
+        sessionModalRef.current?.focus()
+      }
+    }, 0)
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [anyModalOpen, showMarketplaceMetadataModal, showSessionModal, showShareModal])
 
   // Handles toText logic.
   const toText = (value) => {
@@ -197,6 +248,21 @@ function Learningplayground() {
       }
     }
 
+    // If it's a chat response, pass it through directly
+    if (toolType === 'chat' || render === 'chat') {
+      return {
+        toolType: 'chat',
+        title: toText(tool.title) || 'Chat Response',
+        description: toText(tool.description) || '',
+        render: 'chat',
+        ui: 'chat',
+        data: {
+          message: toText(tool?.data?.message) || toText(tool.description) || '',
+          items: []
+        }
+      }
+    }
+
     // Otherwise, normalize items for native rendering
     const normalizedItems = rawItems.map((item, index) => {
       const title = toText(item?.title) || `Item ${index + 1}`
@@ -236,9 +302,49 @@ function Learningplayground() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  const fetchTierStatus = useCallback(async () => {
+    if (!session?.access_token) {
+      setTierStatus(null)
+      return
+    }
+
+    setIsLoadingTierStatus(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/tier-status`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: 'include',
+      })
+
+      if (!res.ok) {
+        setTierStatus(null)
+        return
+      }
+
+      const data = await res.json()
+      setTierStatus(data?.data || null)
+    } catch {
+      setTierStatus(null)
+    } finally {
+      setIsLoadingTierStatus(false)
+    }
+  }, [session?.access_token])
+
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  useEffect(() => {
+    if (!user?.id || !session?.access_token) {
+      setTierStatus(null)
+      setIsLoadingTierStatus(false)
+      return
+    }
+    fetchTierStatus()
+  }, [user?.id, session?.access_token, fetchTierStatus])
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -250,6 +356,7 @@ function Learningplayground() {
   useEffect(() => {
     if (!user?.id || !session?.access_token) {
       setSuggestions(defaultSuggestions)
+      setIsLoadingSuggestions(false)
       return
     }
 
@@ -261,8 +368,9 @@ function Learningplayground() {
     }
 
     // If they came with an analysis, prioritize those suggestions
-    if (activeAnalysis?.recommendedTools && activeAnalysis.recommendedTools.length > 0) {
-      setSuggestions(activeAnalysis.recommendedTools.map((tool, idx) => ({
+    const recommendedTools = activeAnalysis?.recommendedTools || []
+    if (recommendedTools.length > 0) {
+      setSuggestions(recommendedTools.map((tool, idx) => ({
         id: `rec-${idx}`,
         icon: Zap, // I'll use Zap for recommended tools
         title: tool.title,
@@ -317,9 +425,10 @@ function Learningplayground() {
 
     // Handles fetchSuggestions logic.
     const fetchSuggestions = async () => {
+      setIsLoadingSuggestions(true)
       try {
         const res = await fetch(
-          `${API_BASE}/api/suggestions?token=${encodeURIComponent(session.access_token)}`,
+          `${API_BASE}/api/suggestions`,
           {
             headers: { Authorization: `Bearer ${session.access_token}` },
             credentials: 'include',
@@ -376,11 +485,13 @@ function Learningplayground() {
       } catch (err) {
         console.error('Failed to fetch suggestions:', err)
         setSuggestions(defaultSuggestions)
+      } finally {
+        setIsLoadingSuggestions(false)
       }
     }
 
     fetchSuggestions()
-  }, [user?.id, session?.access_token, activeWrongQs, isPerfectScore, activeSessionTitle, initialQuizResults])
+  }, [user?.id, session?.access_token, activeWrongQs, isPerfectScore, activeSessionTitle, initialQuizResults, activeAnalysis])
 
   // Consume backend-provided FLUX image result whenever an image tool is set.
   useEffect(() => {
@@ -401,7 +512,7 @@ function Learningplayground() {
     if (!session?.access_token) return
     setIsLoadingQuizSessions(true)
     try {
-      const res = await fetch(`${API_BASE}/api/quiz-history?token=${encodeURIComponent(session.access_token)}`, {
+      const res = await fetch(`${API_BASE}/api/quiz-history`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
         credentials: 'include',
       })
@@ -421,7 +532,7 @@ function Learningplayground() {
     if (!session?.access_token) return
     setIsLoadingPlaygroundSessions(true)
     try {
-      const res = await fetch(`${API_BASE}/api/learning-playground/sessions?token=${encodeURIComponent(session.access_token)}`, {
+      const res = await fetch(`${API_BASE}/api/learning-playground/sessions`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
         credentials: 'include',
       })
@@ -437,7 +548,7 @@ function Learningplayground() {
   }
 
   // Load a real quiz session into the playground context
-  const handleLoadQuizSession = (quizSession) => {
+  const handleLoadQuizSession = async (quizSession) => {
     const rawQuiz = typeof quizSession.quiz === 'string'
       ? JSON.parse(quizSession.quiz)
       : (quizSession.quiz || [])
@@ -449,21 +560,63 @@ function Learningplayground() {
     setActiveQuizResults(rawQuiz)
     setActiveWrongQs(wrongQuestions.length > 0 ? wrongQuestions : null)
     setActiveSessionTitle(quizSession.title || 'Past Study Session')
-    setMessages([])
     setGeneratedTool(null)
     setShowSessionModal(false)
 
     // Greet the user with context
     const score = rawQuiz.filter(q => q.isCorrect).length
     const total = rawQuiz.length
-    const greeting = allCorrect
+    const fallbackGreeting = allCorrect
       ? `Loaded your study session: **${quizSession.title}**\n\nYou scored ${score}/${total} — perfect score! 🎉 I can generate advanced challenge questions to push your knowledge further.`
       : `Loaded your study session: **${quizSession.title}**\n\nYou scored ${score}/${total}. I found **${wrongQuestions.length} topic${wrongQuestions.length !== 1 ? 's' : ''}** you missed. Use the suggestions below to create a mindmap, flashcards, or explanations based on those gaps.`
 
+    // Show loading state
     setMessages([{
       id: Date.now(),
       role: 'assistant',
-      content: greeting,
+      content: `Loading your study session: **${quizSession.title}**...\n\nAnalyzing performance...`,
+      timestamp: new Date(),
+    }])
+
+    try {
+      const res = await fetch(`${API_BASE}/api/chat-tools`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({ 
+          prompt: `I just loaded my past quiz session titled "${quizSession.title}". I scored ${score} out of ${total}. Please briefly analyze this performance in a friendly way and ask me how I would like to review or proceed.`,
+          context: wrongQuestions.length > 0 ? wrongQuestions : null, 
+          metacognitiveAnalysis: null 
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.tool) {
+          const normalized = normalizeToolPayload(data.tool)
+          if (normalized && normalized.render === 'chat') {
+            setMessages([{
+              id: Date.now() + 1,
+              role: 'assistant',
+              content: normalized.data.message || fallbackGreeting,
+              timestamp: new Date(),
+            }]);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('AI dynamic greeting failed, using fallback', e)
+    }
+
+    // Fallback if AI fails or returns a non-chat tool
+    setMessages([{
+      id: Date.now() + 2,
+      role: 'assistant',
+      content: fallbackGreeting,
       timestamp: new Date(),
     }])
   }
@@ -476,8 +629,7 @@ function Learningplayground() {
       if (activeAnalysis) {
         greeting = `Hi! I'm **Vela**. I've finished analyzing your recent quiz results.\n\nYou're doing great, but I noticed some ${activeAnalysis.patternSpecificity}. I've prepared a personalized action plan for you below. Which one should we start with?`
       } else if (initialPromptFromAnalysis) {
-        // Auto-submit the prompt if they clicked "Launch"
-        handleSuggestionClick({ prompt: initialPromptFromAnalysis, title: "Custom Review" })
+        setInputValue(initialPromptFromAnalysis)
         return
       } else if (activeWrongQs) {
         greeting = `Hi! I'm **Vela**. I see you have some topics to review from your last session. Let's tackle those knowledge gaps together!`
@@ -491,14 +643,14 @@ function Learningplayground() {
       }
       setMessages([initialMessage])
     }
-  }, [activeAnalysis, activeWrongQs]) // Added dependencies for safety
+  }, [activeAnalysis, activeWrongQs, initialPromptFromAnalysis, messages.length]) // Added dependencies for safety
 
   // Handles fetchSavedTools logic.
   const fetchSavedTools = async () => {
     if (!session?.access_token) return
     setIsLoadingSavedTools(true)
     try {
-      const res = await fetch(`${API_BASE}/api/marketplace/tools/saved?token=${encodeURIComponent(session.access_token)}`, {
+      const res = await fetch(`${API_BASE}/api/marketplace/tools/saved`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
         credentials: 'include',
       })
@@ -518,7 +670,7 @@ function Learningplayground() {
     if (!session?.access_token) return
     setIsLoadingSharedTools(true)
     try {
-      const res = await fetch(`${API_BASE}/api/marketplace/tools/shared-with-me?token=${encodeURIComponent(session.access_token)}`, {
+      const res = await fetch(`${API_BASE}/api/marketplace/tools/shared-with-me`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
         credentials: 'include',
       })
@@ -551,7 +703,7 @@ function Learningplayground() {
         })
       })
 
-      const data = await res.json()
+      await res.json()
       if (!res.ok) throw new Error('share_failed')
 
       setMessages(prev => [...prev, {
@@ -561,11 +713,16 @@ function Learningplayground() {
       }])
       setShowShareModal(false)
       setShareEmail('')
-    } catch (err) {
+    } catch {
       setShareError('Something went wrong. Please try again.')
     } finally {
       setShareLoading(false)
     }
+  }
+
+  const handleMindmapGeneration = () => {
+    setInputValue('Create a mindmap of my recent quiz mistakes to help me connect the concepts.')
+    textareaRef.current?.focus()
   }
 
   // Handles loadSession logic.
@@ -620,7 +777,7 @@ function Learningplayground() {
     if (!session?.access_token) return
     try {
       const title = String(tool?.title || latestPrompt || 'Learning Playground Session').slice(0, 180)
-      const res = await fetch(`${API_BASE}/api/learning-playground/sessions?token=${encodeURIComponent(session.access_token)}`, {
+      const res = await fetch(`${API_BASE}/api/learning-playground/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -657,7 +814,7 @@ function Learningplayground() {
     if (!session?.access_token || !generatedTool) return
     
     try {
-      const res = await fetch(`${API_BASE}/api/marketplace/tools/save?token=${encodeURIComponent(session.access_token)}`, {
+      const res = await fetch(`${API_BASE}/api/marketplace/tools/save`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1012,9 +1169,16 @@ function Learningplayground() {
 
     // ALL tools are iframes - render the interactive app
     if (generatedTool.app?.html) {
-      return (
+      const toolFrame = (
         <div
-          style={{
+          style={isToolMaximized ? {
+            position: 'fixed',
+            inset: 0,
+            zIndex: 2147483647,
+            background: 'var(--background)',
+            display: 'flex',
+            flexDirection: 'column',
+          } : {
             border: '2px solid var(--primary)',
             background: 'var(--card)',
             borderRadius: '1rem',
@@ -1023,7 +1187,7 @@ function Learningplayground() {
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem', ...(isToolMaximized ? { padding: '1rem 1.5rem', background: 'var(--card)', borderBottom: '1px solid var(--border)', flexShrink: 0 } : {}) }}>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--foreground)' }}>
                 {generatedTool.title}
@@ -1063,7 +1227,24 @@ function Learningplayground() {
                 🌐 Share
               </button>
               <button
+                onClick={() => setIsToolMaximized(v => !v)}
+                title={isToolMaximized ? 'Minimise' : 'Maximise'}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--border)',
+                  color: 'var(--muted-foreground)',
+                  borderRadius: '0.375rem',
+                  padding: '0.5rem 0.6rem',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  lineHeight: 1,
+                }}
+              >
+                {isToolMaximized ? '⊡' : '⛶'}
+              </button>
+              <button
                 onClick={() => {
+                  setIsToolMaximized(false)
                   setGeneratedTool(null)
                   setGenerationStage(null)
                 }}
@@ -1084,7 +1265,13 @@ function Learningplayground() {
           <iframe
             sandbox="allow-scripts allow-same-origin"
             srcDoc={generatedTool.app.html}
-            style={{
+            style={isToolMaximized ? {
+              flex: 1,
+              width: '100%',
+              border: 'none',
+              background: '#fff',
+              display: 'block',
+            } : {
               width: '100%',
               minHeight: '500px',
               borderRadius: '0.75rem',
@@ -1096,13 +1283,20 @@ function Learningplayground() {
           />
         </div>
       )
+
+      if (isToolMaximized && typeof document !== 'undefined') {
+        return createPortal(toolFrame, document.body)
+      }
+
+      return toolFrame
     }
 
-    // If HTML generation failed, show error
+    // If HTML generation failed, show error with regenerate option
+    const lastUserPrompt = [...messages].reverse().find(m => m.role === 'user')?.content || ''
     return (
       <div
         style={{
-          border: '2px solid #ff6b6b',
+          border: '2px solid var(--destructive)',
           background: 'var(--card)',
           borderRadius: '1rem',
           padding: '1.5rem',
@@ -1110,12 +1304,34 @@ function Learningplayground() {
           textAlign: 'center',
         }}
       >
-        <p style={{ color: '#ff6b6b', fontWeight: 600, margin: 0 }}>
-          Tool failed to generate.
+        <p style={{ color: 'var(--destructive)', fontWeight: 600, margin: 0, fontSize: '1rem' }}>
+          Tool generation failed
         </p>
         <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-          The system couldn't generate an interactive app. Try refining your request.
+          The AI couldn't build a valid interactive app. Try rephrasing — e.g. "create a quiz about X" or "make flashcards on Y".
         </p>
+        {lastUserPrompt && (
+          <button
+            onClick={() => {
+              setGeneratedTool(null)
+              setInputValue(lastUserPrompt)
+              setTimeout(() => textareaRef.current?.focus(), 0)
+            }}
+            style={{
+              marginTop: '1rem',
+              background: 'var(--primary)',
+              color: 'var(--primary-foreground)',
+              border: 'none',
+              borderRadius: '0.5rem',
+              padding: '0.5rem 1.25rem',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Try again
+          </button>
+        )}
       </div>
     )
   }
@@ -1147,7 +1363,7 @@ function Learningplayground() {
     try {
       setGenerationStage('Planning your learning tool…')
 
-      const res = await fetch(`${API_BASE}/api/chat-tools?token=${encodeURIComponent(session.access_token)}`, {
+      const res = await fetch(`${API_BASE}/api/chat-tools`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1157,13 +1373,27 @@ function Learningplayground() {
         body: JSON.stringify({ 
           prompt: trimmedInput, 
           context: activeWrongQs, 
-          metacognitiveAnalysis: activeAnalysis 
+          metacognitiveAnalysis: activeAnalysis,
+          documentTitle: activeSessionTitle || null,
+          previousTool: generatedTool || null,
+          chatHistory: messages.slice(-20).map(m => ({ role: m.role, content: m.content || m.text }))
         }),
       })
 
+
       if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || 'Failed to generate tool')
+        let payload = null
+        try {
+          payload = await res.json()
+        } catch {
+          payload = null
+        }
+
+        if (res.status === 429 && payload?.errorCode === 'FREE_TIER_LIMIT_REACHED') {
+          throw new Error('Daily learning-tool limit reached (1/1 used). Try again tomorrow or unlock unlimited mode through mastery rewards.')
+        }
+
+        throw new Error(payload?.error || 'Failed to generate tool')
       }
 
       // Switch to building phase while the large HTML is being parsed
@@ -1172,30 +1402,31 @@ function Learningplayground() {
 
       const data = await res.json()
 
-      let normalizedTool = generatedTool
+      let normalizedTool = null
+      let chatMessageText = 'I generated a response, but no tool payload was returned.'
+
       if (data?.tool) {
-        setGenerationStage('Finalizing your learning tool...')
+        setGenerationStage('Finalizing your response...')
         normalizedTool = normalizeToolPayload(data.tool)
+        
+        if (normalizedTool.render === 'chat') {
+          // If it's a chat response, just add it to the chat logs and do NOT open a tool pane.
+          chatMessageText = normalizedTool.data.message
+          normalizedTool = null // Do not render a tool
+        } else {
+          setGeneratedTool(normalizedTool)
+          chatMessageText =
+            data.tool.chatResponse ||
+            data.tool.data?.chatResponse ||
+            `I've created **${data.tool.title}** for you! Explore the interactive tool on the canvas, or let me know if you want to quiz yourself or try a different format.`
 
-        // Debug: Log the AI tool output
-        console.log('AI GENERATED TOOL:', {
-          type: normalizedTool?.toolType,
-          render: normalizedTool?.render,
-          hasHTML: !!normalizedTool?.app?.html,
-          title: normalizedTool?.title,
-          itemCount: normalizedTool?.data?.items?.length || 0,
-          fullTool: normalizedTool,
-        })
-
-        setGeneratedTool(normalizedTool)
+        }
       }
 
       const aiMessage = {
         id: Date.now() + 1,
         role: 'assistant',
-        content: data?.tool
-          ? `Created ${data.tool.toolType} tool: ${data.tool.title}`
-          : 'I generated a response, but no tool payload was returned.',
+        content: chatMessageText,
         timestamp: new Date(),
       }
 
@@ -1211,10 +1442,13 @@ function Learningplayground() {
       setBuildPhase(null)
     } catch (error) {
       console.error('Error getting AI response:', error)
+      const isQuotaError = error.message?.includes('limit reached') || error.message?.includes('FREE_TIER')
       const errorMessage = {
         id: Date.now() + 1,
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
+        content: isQuotaError
+          ? error.message
+          : 'Something went wrong generating your tool. Try a different prompt — e.g. "create a quiz about photosynthesis" or "make flashcards on World War 2".',
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, errorMessage])
@@ -1222,6 +1456,7 @@ function Learningplayground() {
       setBuildPhase(null)
     } finally {
       setIsLoading(false)
+      fetchTierStatus()
     }
 
   }
@@ -1233,6 +1468,120 @@ function Learningplayground() {
       handleSubmit(e)
     }
   }
+
+  const skeletonShimmerStyle = {
+    position: 'relative',
+    overflow: 'hidden',
+    background: 'color-mix(in oklch, var(--muted) 80%, var(--card) 20%)',
+  }
+
+  const renderSuggestionSkeletons = () => (
+    <div style={{ width: '100%' }}>
+      <div
+        style={{
+          height: '0.9rem',
+          width: '10rem',
+          borderRadius: '999px',
+          marginBottom: '1rem',
+          ...skeletonShimmerStyle,
+        }}
+        className="lp-skeleton"
+        aria-hidden
+      />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+          gap: '1rem',
+        }}
+      >
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div
+            key={`suggestion-skeleton-${index}`}
+            style={{
+              borderRadius: '0.75rem',
+              border: '1px solid var(--border)',
+              background: 'oklch(0.18 0.01 240.0)',
+              padding: '1.25rem',
+              minHeight: '118px',
+            }}
+            aria-hidden
+          >
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+              <div
+                className="lp-skeleton"
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  borderRadius: '999px',
+                  flexShrink: 0,
+                  marginTop: '2px',
+                  ...skeletonShimmerStyle,
+                }}
+              />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div className="lp-skeleton" style={{ height: '0.95rem', width: '56%', borderRadius: '0.35rem', ...skeletonShimmerStyle }} />
+                <div className="lp-skeleton" style={{ height: '0.75rem', width: '94%', borderRadius: '0.35rem', ...skeletonShimmerStyle }} />
+                <div className="lp-skeleton" style={{ height: '0.75rem', width: '72%', borderRadius: '0.35rem', ...skeletonShimmerStyle }} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
+  const renderSessionSkeletons = ({ variant = 'default', count = 4 }) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+      {Array.from({ length: count }).map((_, index) => (
+        <div
+          key={`${variant}-skeleton-${index}`}
+          style={{
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            border: '1px solid var(--border)',
+            background: 'var(--card)',
+          }}
+          aria-hidden
+        >
+          <div className="lp-skeleton" style={{ height: '0.95rem', width: variant === 'saved' ? '42%' : '55%', borderRadius: '0.35rem', ...skeletonShimmerStyle }} />
+          <div className="lp-skeleton" style={{ height: '0.75rem', width: '38%', borderRadius: '0.35rem', marginTop: '0.4rem', ...skeletonShimmerStyle }} />
+
+          {variant === 'quiz' && (
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.55rem' }}>
+              <div className="lp-skeleton" style={{ height: '0.72rem', width: '30%', borderRadius: '999px', ...skeletonShimmerStyle }} />
+              <div className="lp-skeleton" style={{ height: '0.72rem', width: '24%', borderRadius: '999px', ...skeletonShimmerStyle }} />
+            </div>
+          )}
+
+          {variant === 'playground' && (
+            <>
+              <div className="lp-skeleton" style={{ height: '0.8rem', width: '82%', borderRadius: '0.35rem', marginTop: '0.45rem', ...skeletonShimmerStyle }} />
+              <div className="lp-skeleton" style={{ height: '0.7rem', width: '30%', borderRadius: '0.35rem', marginTop: '0.4rem', ...skeletonShimmerStyle }} />
+            </>
+          )}
+
+          {variant === 'saved' && (
+            <>
+              <div className="lp-skeleton" style={{ height: '0.8rem', width: '50%', borderRadius: '0.35rem', marginTop: '0.4rem', ...skeletonShimmerStyle }} />
+              <div className="lp-skeleton" style={{ height: '0.8rem', width: '85%', borderRadius: '0.35rem', marginTop: '0.45rem', ...skeletonShimmerStyle }} />
+              <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem' }}>
+                <div className="lp-skeleton" style={{ height: '1.2rem', width: '4.3rem', borderRadius: '999px', ...skeletonShimmerStyle }} />
+                <div className="lp-skeleton" style={{ height: '1.2rem', width: '4.9rem', borderRadius: '999px', ...skeletonShimmerStyle }} />
+              </div>
+            </>
+          )}
+
+          {variant === 'shared' && (
+            <>
+              <div className="lp-skeleton" style={{ height: '0.78rem', width: '46%', borderRadius: '0.35rem', marginTop: '0.45rem', ...skeletonShimmerStyle }} />
+              <div className="lp-skeleton" style={{ height: '0.7rem', width: '34%', borderRadius: '0.35rem', marginTop: '0.35rem', ...skeletonShimmerStyle }} />
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <main
@@ -1263,6 +1612,24 @@ function Learningplayground() {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
           <h2 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--foreground)' }}>Learning Playground</h2>
+          <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            {isLoadingTierStatus ? (
+              <span
+                className="lp-skeleton"
+                aria-hidden
+                style={{
+                  height: '0.8rem',
+                  width: '7.5rem',
+                  borderRadius: '999px',
+                  ...skeletonShimmerStyle,
+                }}
+              />
+            ) : (
+              <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
+                Free Tier • Tools: <strong style={{ color: 'var(--foreground)' }}>{toolsQuota?.remaining ?? 0}</strong> left
+              </span>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button
               onClick={() => {
@@ -1408,7 +1775,9 @@ function Learningplayground() {
               </p>
             )}
 
-            {suggestions.length > 0 && (
+            {isLoadingSuggestions && renderSuggestionSkeletons()}
+
+            {!isLoadingSuggestions && suggestions.length > 0 && (
               <div style={{ width: '100%' }}>
                 <h3
                   style={{
@@ -1713,6 +2082,26 @@ function Learningplayground() {
             transform: translateY(-4px);
           }
         }
+
+        .lp-skeleton::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          transform: translateX(-100%);
+          background: linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0),
+            rgba(255, 255, 255, 0.14),
+            rgba(255, 255, 255, 0)
+          );
+          animation: lp-skeleton-shimmer 1.2s ease-in-out infinite;
+        }
+
+        @keyframes lp-skeleton-shimmer {
+          100% {
+            transform: translateX(100%);
+          }
+        }
       `}</style>
 
       {/* Session Loading Modal */}
@@ -1722,19 +2111,26 @@ function Learningplayground() {
           background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center'
         }}>
-          <div style={{
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="learningplayground-session-modal-title"
+            style={{
             background: 'var(--background)', border: '1px solid var(--border)',
             borderRadius: '1rem', padding: '2rem', width: '90%', maxWidth: '500px',
             maxHeight: '80vh', overflowY: 'auto'
-          }}>
+            }}
+            tabIndex={-1}
+            ref={sessionModalRef}
+          >
             {/* Modal Header with Tabs */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold' }}>
+              <h3 id="learningplayground-session-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold' }}>
                 {sessionModalMode === 'quiz'
                   ? 'Past Study Sessions'
                   : 'Learning Playground History'}
               </h3>
-              <button onClick={() => setShowSessionModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.5rem', color: 'var(--muted-foreground)' }}>✕</button>
+              <button aria-label="Close session history" onClick={() => setShowSessionModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.5rem', color: 'var(--muted-foreground)' }}>✕</button>
             </div>
 
             {/* Tab Navigation */}
@@ -1817,7 +2213,7 @@ function Learningplayground() {
             {sessionModalMode === 'quiz' && savedToolsTab === 'sessions' && (
               <>
                 {isLoadingQuizSessions ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>Loading study sessions...</div>
+                  renderSessionSkeletons({ variant: 'quiz' })
                 ) : quizSessions.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>
                     <p>No past study sessions found.</p>
@@ -1866,7 +2262,7 @@ function Learningplayground() {
             {sessionModalMode === 'playground' && savedToolsTab === 'playground' && (
               <>
                 {isLoadingPlaygroundSessions ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>Loading playground history...</div>
+                  renderSessionSkeletons({ variant: 'playground' })
                 ) : playgroundSessions.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>
                     <p>No playground sessions found.</p>
@@ -1904,7 +2300,7 @@ function Learningplayground() {
             {sessionModalMode === 'playground' && savedToolsTab === 'saved' && (
               <>
                 {isLoadingSavedTools ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>Loading saved tools...</div>
+                  renderSessionSkeletons({ variant: 'saved' })
                 ) : savedTools.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>
                     <p>No saved tools yet.</p>
@@ -2053,7 +2449,7 @@ function Learningplayground() {
             {sessionModalMode === 'playground' && savedToolsTab === 'shared' && (
               <>
                 {isLoadingSharedTools ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>Loading shared tools...</div>
+                  renderSessionSkeletons({ variant: 'shared' })
                 ) : sharedTools.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>
                     <p>No shared tools found.</p>
@@ -2117,6 +2513,9 @@ function Learningplayground() {
           onClick={() => closeMarketplaceMetadataModal(null)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="learningplayground-marketplace-modal-title"
             style={{
               background: 'var(--background)',
               border: '1px solid var(--border)',
@@ -2127,14 +2526,17 @@ function Learningplayground() {
               overflow: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
+            tabIndex={-1}
+            ref={marketplaceMetadataModalRef}
           >
             <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--foreground)' }}>
+              <h3 id="learningplayground-marketplace-modal-title" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--foreground)' }}>
                 Share Tool to Marketplace
               </h3>
               <button
                 type="button"
                 onClick={() => closeMarketplaceMetadataModal(null)}
+                aria-label="Close marketplace sharing"
                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)', fontSize: '1.25rem', lineHeight: 1 }}
               >
                 ×
@@ -2278,15 +2680,23 @@ function Learningplayground() {
           position: 'fixed', inset: 0, zIndex: 2100,
           background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
-        }}>
-          <div style={{
+        }} onClick={() => setShowShareModal(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="learningplayground-share-modal-title"
+            style={{
             background: 'var(--background)', border: '1px solid var(--border)',
             borderRadius: '1rem', width: '90%', maxWidth: '450px',
             boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)'
-          }}>
+            }}
+            onClick={(e) => e.stopPropagation()}
+            tabIndex={-1}
+            ref={shareToolModalRef}
+          >
             <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Share Learning Tool</h3>
-              <button onClick={() => setShowShareModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}><X size={20} /></button>
+              <h3 id="learningplayground-share-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Share Learning Tool</h3>
+              <button aria-label="Close share tool modal" onClick={() => setShowShareModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}><X size={20} /></button>
             </div>
             
             <div style={{ padding: '1.5rem' }}>

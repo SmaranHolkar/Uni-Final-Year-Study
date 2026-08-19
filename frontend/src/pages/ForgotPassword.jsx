@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertCircle, CheckCircle, ArrowLeft } from "lucide-react";
 import { supabase } from "../supabaseClient";
+import { Skeleton } from "../components/Skeleton.jsx";
 
 // Shows the forgot-password form and handles reset-link flow.
 export default function ForgotPassword() {
@@ -10,6 +11,17 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  const renderLoadingSkeleton = () => (
+    <div className="w-full max-w-md rounded-xl bg-[var(--card)] p-8 shadow-lg" aria-hidden>
+      <Skeleton style={{ height: '0.75rem', width: '7rem' }} />
+      <Skeleton className="mt-6" style={{ height: '1.45rem', width: '10rem' }} />
+      <Skeleton className="mt-2" style={{ height: '0.85rem', width: '14rem' }} />
+      <Skeleton className="mt-6" style={{ height: '0.75rem', width: '6rem' }} />
+      <Skeleton className="mt-2" rounded="0.4rem" style={{ height: '2.45rem', width: '100%' }} />
+      <Skeleton className="mt-4" rounded="0.4rem" style={{ height: '2.5rem', width: '100%' }} />
+    </div>
+  )
 
   // Sends a password reset email through Supabase.
   async function handleSubmit(e) {
@@ -49,6 +61,9 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
+      {loading && renderLoadingSkeleton()}
+
+      {!loading && (
       <div className="w-full max-w-md rounded-xl bg-[var(--card)] p-8 shadow-lg">
         <Link
           to="/login"
@@ -67,14 +82,14 @@ export default function ForgotPassword() {
         </p>
 
         {error && (
-          <div className="mb-4 flex items-center gap-2 rounded-md border border-red-300 bg-red-100 px-3 py-2 text-sm text-red-700">
+          <div id="forgot-password-error" role="alert" aria-live="assertive" aria-atomic="true" className="mb-4 flex items-center gap-2 rounded-md border border-red-300 bg-red-100 px-3 py-2 text-sm text-red-700">
             <AlertCircle size={18} />
             <span>{error}</span>
           </div>
         )}
 
         {success && (
-          <div className="mb-4 flex items-center gap-2 rounded-md border border-green-300 bg-green-100 px-3 py-2 text-sm text-green-700">
+          <div role="status" aria-live="polite" aria-atomic="true" className="mb-4 flex items-center gap-2 rounded-md border border-green-300 bg-green-100 px-3 py-2 text-sm text-green-700">
             <CheckCircle size={18} />
             <span>
               Password reset link sent! Check your email inbox.
@@ -84,14 +99,17 @@ export default function ForgotPassword() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-[var(--foreground)]">
+            <label htmlFor="forgot-password-email" className="mb-1 block text-sm font-medium text-[var(--foreground)]">
               Email address
             </label>
             <input
+              id="forgot-password-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? "forgot-password-error" : undefined}
               placeholder="you@example.com"
               className="w-full rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] disabled:opacity-50"
             />
@@ -113,6 +131,7 @@ export default function ForgotPassword() {
           </Link>
         </p>
       </div>
+      )}
     </div>
   );
 }

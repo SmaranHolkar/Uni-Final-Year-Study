@@ -1,19 +1,64 @@
 import fs from 'fs';
+import path from 'path';
 import PDFParser from 'pdf2json';
-// pdfjs-dist: used for operator list detection ONLY (no rendering — avoids DOM dependency issues)
+import mammoth from 'mammoth';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { parseOffice } from 'officeparser';
+
+
 
 /**
- * Extracts plain text from an uploaded file.
- * Supports: .txt, .pdf
+ * Extracts plain text from any uploaded file (.pptx, .ppt, .docx, .doc, .pdf, .txt, .md, .csv, .json).
  */
-// Handles extractTextFromFile logic.
 export async function extractTextFromFile(filePath, mimetype) {
-  if (mimetype === 'text/plain') {
+  const ext = path.extname(filePath).toLowerCase();
+
+  // 1. Text & Code / Markdown files
+  if (
+    mimetype === 'text/plain' ||
+    mimetype === 'text/markdown' ||
+    mimetype === 'text/csv' ||
+    mimetype === 'application/json' ||
+    ['.txt', '.md', '.csv', '.json', '.log'].includes(ext)
+  ) {
     return fs.readFileSync(filePath, 'utf-8');
   }
 
-  if (mimetype === 'application/pdf') {
+  // 2. Word Documents (.docx) via Mammoth
+  if (
+    mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    ext === '.docx'
+  ) {
+    try {
+      const result = await mammoth.extractRawText({ path: filePath });
+      if (result.value && result.value.trim().length > 20) {
+        return result.value;
+      }
+    } catch (err) {
+      console.warn('[DOC SERVICE] Mammoth failed, falling back to officeparser:', err.message);
+    }
+  }
+
+  // 3. PowerPoint Presentations (.pptx, .ppt), Word (.doc), Excel (.xlsx) via officeparser
+  if (
+    mimetype.includes('presentation') ||
+    mimetype.includes('powerpoint') ||
+    mimetype.includes('msword') ||
+    ['.pptx', '.ppt', '.docx', '.doc', '.xlsx', '.xls'].includes(ext)
+  ) {
+    try {
+      const extractedText = await parseOffice(filePath);
+      const cleanText = String(extractedText || '').trim();
+      if (cleanText.length > 20) {
+        return cleanText;
+      }
+    } catch (err) {
+      console.warn('[DOC SERVICE] officeparser failed:', err.message);
+    }
+  }
+
+  // 4. PDF files via PDFParser
+  if (mimetype === 'application/pdf' || ext === '.pdf') {
     return new Promise((resolve, reject) => {
       const pdfParser = new PDFParser(null, 1);
 
@@ -36,12 +81,27 @@ export async function extractTextFromFile(filePath, mimetype) {
     });
   }
 
-  if (mimetype === 'application/msword') {
-    throw new Error('DOC files are not supported. Please upload DOCX instead.');
+  // 5. Final fallback attempt with officeparser for any binary office format
+  try {
+    const fallbackText = await parseOffice(filePath);
+    if (fallbackText && String(fallbackText).trim().length > 20) {
+      return String(fallbackText);
+    }
+  } catch {
+    // ignore fallback error
   }
 
-  throw new Error(`Unsupported file type: ${mimetype}`);
+  // If text file fallback
+  try {
+    const rawText = fs.readFileSync(filePath, 'utf-8');
+    if (rawText && rawText.trim().length > 20) return rawText;
+  } catch {
+    // ignore
+  }
+
+  throw new Error(`Could not extract readable text from file type: ${mimetype} (${ext})`);
 }
+
 
 /**
  * Splits text into overlapping word-based chunks for embedding.
@@ -54,6 +114,82 @@ export function chunkText(text, chunkSize = 1000, overlap = 100) {
   for (let i = 0; i < words.length; i += chunkSize - overlap) {
     const chunk = words.slice(i, i + chunkSize).join(' ').trim();
     if (chunk) chunks.push(chunk);
+  }
+
+  return chunks;
+}
+
+/**
+ * Splits document text into paragraph-delimited chunks with exact paragraph indices.
+ * Returns array of objects: { text, paragraphIndex, pageNumber }
+ */
+export function chunkTextWithParagraphs(text, maxWordsPerChunk = 350) {
+  if (!text || typeof text !== 'string') return [];
+
+  const rawParagraphs = text
+    .split(/(?:\r?\n){2,}/)
+    .map(p => p.trim())
+    .filter(p => p.length > 0);
+
+  if (rawParagraphs.length === 0) {
+    const singlePara = text.trim();
+    if (!singlePara) return [];
+    return [{ text: singlePara, paragraphIndex: 1, pageNumber: 1 }];
+  }
+
+  const chunks = [];
+  let currentChunkWords = [];
+  let currentStartParaIndex = 1;
+
+  rawParagraphs.forEach((para, idx) => {
+    const paraNum = idx + 1;
+    const words = para.split(/\s+/).filter(Boolean);
+
+    if (words.length === 0) return;
+
+    if (words.length > maxWordsPerChunk) {
+      if (currentChunkWords.length > 0) {
+        chunks.push({
+          text: currentChunkWords.join(' '),
+          paragraphIndex: currentStartParaIndex,
+          pageNumber: Math.ceil(currentStartParaIndex / 5) || 1
+        });
+        currentChunkWords = [];
+      }
+      for (let w = 0; w < words.length; w += maxWordsPerChunk) {
+        const subWords = words.slice(w, w + maxWordsPerChunk);
+        chunks.push({
+          text: subWords.join(' '),
+          paragraphIndex: paraNum,
+          pageNumber: Math.ceil(paraNum / 5) || 1
+        });
+      }
+      currentStartParaIndex = paraNum + 1;
+      return;
+    }
+
+    if (currentChunkWords.length + words.length > maxWordsPerChunk) {
+      chunks.push({
+        text: currentChunkWords.join(' '),
+        paragraphIndex: currentStartParaIndex,
+        pageNumber: Math.ceil(currentStartParaIndex / 5) || 1
+      });
+      currentChunkWords = [...words];
+      currentStartParaIndex = paraNum;
+    } else {
+      if (currentChunkWords.length === 0) {
+        currentStartParaIndex = paraNum;
+      }
+      currentChunkWords.push(...words);
+    }
+  });
+
+  if (currentChunkWords.length > 0) {
+    chunks.push({
+      text: currentChunkWords.join(' '),
+      paragraphIndex: currentStartParaIndex,
+      pageNumber: Math.ceil(currentStartParaIndex / 5) || 1
+    });
   }
 
   return chunks;

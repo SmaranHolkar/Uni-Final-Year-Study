@@ -11,6 +11,7 @@ import {
   Lightbulb, 
   ShoppingCart, 
   LogOut,
+  BookOpen,
   User as UserIcon
 } from "lucide-react";
 
@@ -120,6 +121,13 @@ const Sidebar = () => {
             </NavLink>
           )}
 
+          {/* Grounded Studio */}
+          {user && (
+            <NavLink to="/grounded-studio" className="sidebar-link" onClick={closeSidebar}>
+              <BookOpen size={18} /> Grounded Studio
+            </NavLink>
+          )}
+
           {/* Start Study Session */}
           {user && (
             <NavLink to="/Learningpage" className="sidebar-primary" onClick={closeSidebar}>
@@ -140,6 +148,7 @@ const Sidebar = () => {
               <Lightbulb size={18} /> Playground
             </NavLink>
           )}
+
 
           {/* Marketplace */}
           {user && (

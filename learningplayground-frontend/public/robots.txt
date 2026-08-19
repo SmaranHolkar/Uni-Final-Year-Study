@@ -1,0 +1,22 @@
+# Learning Playground robots.txt
+User-agent: *
+
+Allow: /
+Allow: /privacy
+Allow: /terms
+Allow: /llms-full.txt
+
+# LLMs context files
+LLMs-full: /llms-full.txt
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /

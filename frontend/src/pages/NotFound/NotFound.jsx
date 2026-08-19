@@ -1,9 +1,16 @@
 // Shows a friendly 404 page with a link back to the home route.
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useSEO } from '../../hooks/useSEO';
 
 // Renders a fallback page for unknown routes.
 const NotFound = () => {
+  useSEO({
+    title: "Page Not Found | HydrusLearn",
+    description: "The page you're looking for doesn't exist. Head back to HydrusLearn to start studying smarter.",
+    noIndex: true,
+  });
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-4">
       <div className="text-center">

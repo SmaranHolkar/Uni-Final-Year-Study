@@ -4,10 +4,11 @@ import { supabase } from '../supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Key, LogOut, Edit2, Save, X, Trash2, UserX, Settings, Shield, Bell, Monitor, Calendar, Lock } from 'lucide-react';
 import { Reveal, DotGrid } from '../components/Reveal.jsx';
+import { Skeleton } from '../components/Skeleton.jsx';
 
 // Handles Profile logic.
 export default function Profile() {
-  const { user, session } = useAuth();
+  const { user, session, loading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [isDeletingData, setIsDeletingData] = useState(false);
@@ -97,7 +98,7 @@ export default function Profile() {
       }
 
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_BASE}/api/auth/data?token=${encodeURIComponent(token)}`, {
+      const response = await fetch(`${API_BASE}/api/auth/data`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -147,7 +148,7 @@ export default function Profile() {
       }
 
       const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${API_BASE}/api/auth/account?token=${encodeURIComponent(token)}`, {
+      const response = await fetch(`${API_BASE}/api/auth/account`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -176,6 +177,61 @@ export default function Profile() {
 
   const solidCardBg = 'color-mix(in srgb, var(--background) 90%, var(--foreground) 10%)';
   const tabClasses = (tabName) => `flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition-all border-b-2 ${activeTab === tabName ? 'border-[var(--primary)] text-[var(--primary)] bg-[var(--muted)]/20' : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/10'}`;
+
+  const renderProfileSkeleton = () => (
+    <main className="main-content min-h-screen relative" style={{ background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'var(--font-sans)' }}>
+      <DotGrid />
+
+      <header
+        className="sticky top-0 z-20 backdrop-blur-lg border-b"
+        style={{
+          background: 'color-mix(in srgb, var(--background) 80%, transparent)',
+          borderColor: 'var(--border)',
+          boxShadow: 'var(--shadow-sm)'
+        }}
+      >
+        <div className="px-8 sm:px-10 lg:px-12 py-6 flex flex-wrap gap-4 justify-between items-center" aria-hidden>
+          <div className="space-y-2">
+            <Skeleton style={{ height: '1.9rem', width: '11.5rem' }} />
+            <Skeleton style={{ height: '0.85rem', width: '15rem' }} />
+          </div>
+          <Skeleton rounded="0.5rem" style={{ height: '2.2rem', width: '6.5rem' }} />
+        </div>
+      </header>
+
+      <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-8 w-full max-w-4xl mx-auto" aria-hidden>
+        <div className="rounded-t-xl p-8 border border-b-0 flex flex-col sm:flex-row items-center gap-6" style={{ background: solidCardBg, borderColor: 'var(--border)' }}>
+          <Skeleton rounded="999px" style={{ width: '6.5rem', height: '6.5rem' }} />
+          <div className="space-y-2 w-full max-w-xs">
+            <Skeleton style={{ height: '1.6rem', width: '70%' }} />
+            <Skeleton style={{ height: '0.9rem', width: '92%' }} />
+          </div>
+        </div>
+
+        <div className="flex border-x border-b overflow-hidden" style={{ borderColor: 'var(--border)', background: 'var(--background)' }}>
+          <Skeleton style={{ height: '2.8rem', width: '33.33%' }} />
+          <Skeleton style={{ height: '2.8rem', width: '33.33%' }} />
+          <Skeleton style={{ height: '2.8rem', width: '33.33%' }} />
+        </div>
+
+        <div className="rounded-b-xl border border-t-0 p-6 sm:p-8 min-h-[300px] space-y-6" style={{ background: solidCardBg, borderColor: 'var(--border)' }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={`profile-field-skeleton-${index}`} className="space-y-2">
+                <Skeleton style={{ height: '0.75rem', width: '35%' }} />
+                <Skeleton rounded="0.5rem" style={{ height: '2.7rem', width: '100%' }} />
+              </div>
+            ))}
+          </div>
+          <Skeleton rounded="0.5rem" style={{ height: '2.6rem', width: '8.5rem' }} />
+        </div>
+      </div>
+    </main>
+  )
+
+  if (isAuthLoading) {
+    return renderProfileSkeleton()
+  }
 
   if (!user) {
     return (
@@ -267,14 +323,14 @@ export default function Profile() {
 
         {/* Tabs */}
         <Reveal delay={0.1}>
-          <div className="flex border-x border-b overflow-hidden" style={{ borderColor: 'var(--border)', background: 'var(--background)' }}>
-            <button onClick={() => setActiveTab('account')} className={tabClasses('account')}>
+          <div role="tablist" aria-label="Profile sections" className="flex border-x border-b overflow-hidden" style={{ borderColor: 'var(--border)', background: 'var(--background)' }}>
+            <button id="profile-tab-account" role="tab" aria-selected={activeTab === 'account'} aria-controls="profile-panel-account" onClick={() => setActiveTab('account')} className={tabClasses('account')}>
               <User size={16} /> <span className="hidden sm:inline">Account</span>
             </button>
-            <button onClick={() => setActiveTab('preferences')} className={tabClasses('preferences')}>
+            <button id="profile-tab-preferences" role="tab" aria-selected={activeTab === 'preferences'} aria-controls="profile-panel-preferences" onClick={() => setActiveTab('preferences')} className={tabClasses('preferences')}>
               <Settings size={16} /> <span className="hidden sm:inline">Preferences</span>
             </button>
-            <button onClick={() => setActiveTab('security')} className={tabClasses('security')}>
+            <button id="profile-tab-security" role="tab" aria-selected={activeTab === 'security'} aria-controls="profile-panel-security" onClick={() => setActiveTab('security')} className={tabClasses('security')}>
               <Shield size={16} /> <span className="hidden sm:inline">Security</span>
             </button>
           </div>
@@ -286,7 +342,7 @@ export default function Profile() {
             
             {/* ACCOUNT TAB */}
             {activeTab === 'account' && (
-              <div className="space-y-6 animate-in fade-in duration-300">
+              <div id="profile-panel-account" role="tabpanel" aria-labelledby="profile-tab-account" className="space-y-6 animate-in fade-in duration-300">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Full Name */}
                   <div className="space-y-2">
@@ -372,7 +428,7 @@ export default function Profile() {
 
             {/* PREFERENCES TAB */}
             {activeTab === 'preferences' && (
-              <div className="space-y-6 animate-in fade-in duration-300">
+              <div id="profile-panel-preferences" role="tabpanel" aria-labelledby="profile-tab-preferences" className="space-y-6 animate-in fade-in duration-300">
                 <p className="text-[var(--muted-foreground)] text-sm mb-6">Customize your learning experience. (Note: These settings are stored locally on this device).</p>
                 
                 <div className="space-y-4">
@@ -413,7 +469,7 @@ export default function Profile() {
 
             {/* SECURITY TAB */}
             {activeTab === 'security' && (
-              <div className="space-y-8 animate-in fade-in duration-300">
+              <div id="profile-panel-security" role="tabpanel" aria-labelledby="profile-tab-security" className="space-y-8 animate-in fade-in duration-300">
                 {/* User ID */}
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">

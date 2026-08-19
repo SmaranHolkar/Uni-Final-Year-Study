@@ -1,0 +1,40 @@
+# HydrusLearn
+
+> HydrusLearn is a free AI-powered study tool that turns your uploaded PDF notes into targeted quizzes, flashcards, and metacognitive feedback. It helps students understand their material — not just memorise it.
+
+## Product
+
+HydrusLearn is an educational web application available at https://hydruslearn.com. It is free to start with no credit card required.
+
+**Core tools:**
+- [Upload PDF](https://hydruslearn.com/signup): Upload lecture notes or PDF documents; HydrusLearn processes them in seconds
+- [Quiz](https://hydruslearn.com/signup): AI-generated quiz questions drawn exclusively from your own uploaded material — not generic question banks
+- [Learning Playground](https://hydruslearn.com/signup): A flexible study space where students type what they want to review and the AI builds the best tool (flashcards, Q&A, summaries)
+- [Mind's Mirror](https://hydruslearn.com/signup): Metacognitive analysis that identifies patterns in your mistakes so you improve how you think, not just what you remember
+- [Marketplace](https://hydruslearn.com/marketplace): Discover and reuse study tools shared by other learners; fork and customise them
+
+## Who It's For
+
+- University and college students revising from lecture notes
+- Medical, law, and science students with dense PDF material
+- Anyone who wants to move from passive reading to active understanding
+
+## Why HydrusLearn vs Anki / Quizlet
+
+Unlike Anki and Quizlet, HydrusLearn generates all questions and flashcards automatically from your own documents. You don't manually create cards. It also provides metacognitive feedback — explaining why you got something wrong and how to fix the underlying gap.
+
+## Pricing
+
+Free tier: up to 5 document uploads per month, unlimited quizzes on uploaded content.
+No credit card required to sign up.
+
+## Contact
+
+- Website: https://hydruslearn.com
+- Support: support@hydruslearn.com
+- Sign up: https://hydruslearn.com/signup
+
+## Docs
+
+- Privacy Policy: https://hydruslearn.com/privacy
+- Terms and Conditions: https://hydruslearn.com/terms

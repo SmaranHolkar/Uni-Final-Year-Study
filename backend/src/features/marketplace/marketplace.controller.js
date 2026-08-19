@@ -157,7 +157,7 @@ export async function getPublicTools(req, res) {
     res.json({ success: true, data: rows });
   } catch (err) {
     console.error('getPublicTools error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to load marketplace tools' });
   }
 }
 
@@ -180,7 +180,7 @@ export async function getSavedTools(req, res) {
     res.json({ success: true, data: rows });
   } catch (err) {
     console.error('getSavedTools error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to load saved tools' });
   }
 }
 

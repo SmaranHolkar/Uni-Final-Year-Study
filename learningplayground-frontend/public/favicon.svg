@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <rect width="100" height="100" rx="20" fill="#131519"/>
+  <defs>
+    <path id="star" d="M 0 -6 L 1.5 -1.5 L 6 0 L 1.5 1.5 L 0 6 L -1.5 1.5 L -6 0 L -1.5 -1.5 Z" fill="#5A7D99"/>
+    <path id="small-star" d="M 0 -4 L 1 -1 L 4 0 L 1 1 L 0 4 L -1 1 L -4 0 L -1 -1 Z" fill="#5A7D99"/>
+  </defs>
+  <g transform="translate(14, 10) scale(0.75)">
+    <path d="M 30 20 L 20 80 L 65 40 L 60 55 L 70 70 L 100 65" fill="none" stroke="#5A7D99" stroke-width="3" stroke-linejoin="round"/>
+    <use href="#star" x="30" y="20"/>
+    <use href="#star" x="20" y="80"/>
+    <use href="#star" x="65" y="40"/>
+    <use href="#small-star" x="60" y="55"/>
+    <use href="#small-star" x="70" y="70"/>
+    <use href="#star" x="100" y="65"/>
+  </g>
+</svg>

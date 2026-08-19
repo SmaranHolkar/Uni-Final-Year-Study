@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useSEO } from "../hooks/useSEO";
 
 const sections = [
   {
@@ -27,11 +28,11 @@ const sections = [
   },
   {
     title: "7. Third-Party Services",
-    content: `To provide the Service, we rely on the following categories of third-party providers:\n\n• Authentication and database: Supabase (data hosted in the EU/UK region).\n• AI model providers: Third-party APIs used to generate quizzes and summaries from your content.\n• Hosting and infrastructure: Cloud hosting providers that may store data in secure data centres.\n\nAll third-party providers are selected carefully and are required to maintain appropriate security standards. We do not allow them to use your data for their own purposes.`,
+    content: `To provide the Service, we rely on the following categories of third-party providers:\n\n• Authentication and database: Supabase (data hosted in the EU/UK region).\n• AI model providers: Third-party APIs used to generate quizzes and summaries from your content.\n• Hosting and infrastructure: Cloud hosting providers that may store data in secure data centres.\n• Search performance and webmaster tools: Google Search Console, which provides aggregated information about how our website appears in Google Search results (such as impressions, clicks, and search queries).\n\nAll third-party providers are selected carefully and are required to maintain appropriate security standards. We do not allow them to use your data for their own purposes.`,
   },
   {
     title: "8. Cookies and Tracking",
-    content: `HydrusLearn uses minimal cookies and local storage to maintain your session and remember your preferences (such as light/dark mode). We do not use third-party advertising cookies or tracking pixels.\n\nYou can disable cookies in your browser settings, but this may affect your ability to log in and use core features of the Service.`,
+    content: `HydrusLearn uses minimal cookies and local storage to maintain your session and remember your preferences (such as light/dark mode). We do not use third-party advertising cookies or tracking pixels.\n\nWe use Google Search Console for website performance insights in Google Search. Search Console reporting is based on aggregated search data and does not give us direct access to private Google account information.\n\nYou can disable cookies in your browser settings, but this may affect your ability to log in and use core features of the Service.`,
   },
   {
     title: "9. Your Rights",
@@ -61,6 +62,11 @@ const sections = [
 
 // Handles PrivacyPolicy logic.
 export default function PrivacyPolicy() {
+  useSEO({
+    title: "Privacy Policy | HydrusLearn",
+    description: "Read the HydrusLearn Privacy Policy. We explain what data we collect, why we collect it, and how we keep your uploaded content and personal information secure.",
+    path: "/privacy",
+  });
   return (
     <div className="min-h-screen px-4 py-16">
       <div className="mx-auto max-w-3xl">
@@ -76,7 +82,7 @@ export default function PrivacyPolicy() {
             Privacy Policy
           </h1>
           <p className="mt-2 text-sm text-[var(--muted-foreground)]">
-            Last updated: March 20, 2026
+            Last updated: May 24, 2026
           </p>
           <p className="mt-4 text-[var(--muted-foreground)]">
             At HydrusLearn, we take your privacy seriously. This policy explains

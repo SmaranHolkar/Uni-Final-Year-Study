@@ -3,6 +3,7 @@ import { Zap, RotateCcw, Search, BookOpen, Gift, TrendingUp, Code2, ThumbsUp, Th
 import { useAuth } from '../AuthContext'
 import '../App.css'
 import { Reveal, DotGrid } from '../components/Reveal.jsx'
+import { Skeleton } from '../components/Skeleton.jsx'
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost:5000' : (import.meta.env.VITE_API_URL || 'http://localhost:5000')
 
@@ -17,8 +18,10 @@ function Marketplace() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [votingToolId, setVotingToolId] = useState(null)
+  const [brokenPreviewImages, setBrokenPreviewImages] = useState(() => new Set())
   const eventSourceRef = useRef(null)
   const lastFetchRef = useRef(null)
+  const modalShellRef = useRef(null)
 
   const categories = [
     { id: 'all', label: 'All Tools', icon: Zap },
@@ -126,7 +129,7 @@ function Marketplace() {
   useEffect(() => {
     if (!session?.access_token) return
 
-    const streamUrl = `${API_BASE}/api/marketplace/tools/stream?token=${encodeURIComponent(session.access_token)}`
+    const streamUrl = `${API_BASE}/api/marketplace/tools/stream`
     const source = new EventSource(streamUrl)
     eventSourceRef.current = source
 
@@ -323,6 +326,55 @@ function Marketplace() {
 
   const closeToolModal = () => setSelectedTool(null)
 
+  const markPreviewImageBroken = (url) => {
+    const normalized = String(url || '').trim()
+    if (!normalized) return
+    setBrokenPreviewImages(prev => {
+      if (prev.has(normalized)) return prev
+      const next = new Set(prev)
+      next.add(normalized)
+      return next
+    })
+  }
+
+  const renderMarketplaceSkeleton = () => (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+        gap: '1.5rem'
+      }}
+      aria-hidden
+    >
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div
+          key={`marketplace-skeleton-${index}`}
+          style={{
+            border: '1px solid var(--border)',
+            borderRadius: '0.75rem',
+            background: 'color-mix(in srgb, var(--background) 82%, var(--muted) 18%)',
+            padding: '1rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem'
+          }}
+        >
+          <Skeleton rounded="0.6rem" style={{ minHeight: '168px', width: '100%' }} />
+          <div className="flex items-center justify-between gap-3">
+            <Skeleton rounded="999px" style={{ height: '1.3rem', width: '5.8rem' }} />
+            <Skeleton rounded="999px" style={{ height: '1.3rem', width: '4.6rem' }} />
+          </div>
+          <Skeleton style={{ height: '0.9rem', width: '78%' }} />
+          <Skeleton style={{ height: '0.75rem', width: '92%' }} />
+          <div className="flex gap-2 mt-1">
+            <Skeleton rounded="0.45rem" style={{ height: '2rem', width: '100%' }} />
+            <Skeleton rounded="0.45rem" style={{ height: '2rem', width: '100%' }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
   useEffect(() => {
     const handleEscape = (event) => {
       if (event.key === 'Escape') {
@@ -333,6 +385,7 @@ function Marketplace() {
     if (selectedTool) {
       document.addEventListener('keydown', handleEscape)
       document.body.style.overflow = 'hidden'
+      setTimeout(() => modalShellRef.current?.focus(), 0)
     }
 
     return () => {
@@ -469,6 +522,8 @@ function Marketplace() {
                 <button
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
+                  aria-pressed={isActive}
+                  aria-label={`Filter by ${cat.label}`}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -502,61 +557,9 @@ function Marketplace() {
           </div>
         </div>
 
-        {/* Live Update Indicator */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          padding: '0.75rem',
-          borderRadius: '0.375rem',
-          background: 'var(--muted)',
-          fontSize: '0.8rem',
-          color: 'var(--muted-foreground)',
-          marginBottom: '1.5rem'
-        }}>
-          <span style={{
-            display: 'inline-block',
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            background: isRefreshing ? 'var(--primary)' : (isLiveConnected ? 'var(--success)' : 'var(--muted-foreground)'),
-            animation: isRefreshing ? 'pulse 1.5s infinite' : 'pulse 3s infinite'
-          }} />
-          {isRefreshing
-            ? 'Updating marketplace...'
-            : (isLiveConnected ? 'Live updates connected' : 'Live updates reconnecting...')}
-        </div>
-
         {/* Tools Grid */}
         {isLoading ? (
-          <div style={{
-            textAlign: 'center',
-            padding: '3rem 1rem',
-            color: 'var(--muted-foreground)'
-          }}>
-            <div style={{
-              display: 'inline-flex',
-              justifyContent: 'center',
-              gap: '0.4rem',
-              marginBottom: '1rem'
-            }}>
-              {[0, 1, 2].map(i => (
-                <span
-                  key={i}
-                  style={{
-                    display: 'inline-block',
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: 'var(--primary)',
-                    animation: `pulse 1.5s infinite`,
-                    animationDelay: `${i * 0.2}s`
-                  }}
-                />
-              ))}
-            </div>
-            <p>Loading marketplace...</p>
-          </div>
+          renderMarketplaceSkeleton()
         ) : filteredTools.length === 0 ? (
           <div style={{
             textAlign: 'center',
@@ -577,9 +580,14 @@ function Marketplace() {
             {filteredTools.map(tool => (
               (() => {
                 const theme = getToolTheme(tool)
-                const previewImage = getToolPreviewImage(tool)
+                const resolvedPreviewImage = getToolPreviewImage(tool)
+                const previewImage = resolvedPreviewImage && !brokenPreviewImages.has(resolvedPreviewImage)
+                  ? resolvedPreviewImage
+                  : ''
                 const previewFrameHtml = getToolPreviewFrameHtml(tool)
                 const previewText = getToolPreviewText(tool)
+                const hasMeaningfulPreviewText = previewText && previewText !== 'Preview not available for this tool yet.'
+                const showPreviewPanel = Boolean(previewImage || previewFrameHtml || hasMeaningfulPreviewText)
                 const previewHeight = 168
                 const iframeScale = 0.68
 
@@ -587,6 +595,9 @@ function Marketplace() {
               <div
                 key={tool.id}
                 className="marketplace-tool-card"
+                role="button"
+                tabIndex={0}
+                aria-label={`View details for ${tool.title}`}
                 style={{
                   border: '1px solid var(--border)',
                   borderRadius: '0.75rem',
@@ -603,6 +614,12 @@ function Marketplace() {
                   boxShadow: `0 4px 20px rgba(0, 0, 0, 0.2), inset 0 1px 0 ${theme.glow}`
                 }}
                 onClick={() => setSelectedTool(tool)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSelectedTool(tool)
+                  }
+                }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = theme.accent
                   e.currentTarget.style.transform = 'translateY(-4px)'
@@ -613,92 +630,104 @@ function Marketplace() {
                   e.currentTarget.style.transform = 'translateY(0)'
                   e.currentTarget.style.boxShadow = `0 4px 20px rgba(0, 0, 0, 0.2), inset 0 1px 0 ${theme.glow}`
                 }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = theme.accent
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = `0 0 0 2px ${theme.accent}66, 0 12px 28px rgba(0, 0, 0, 0.28), inset 0 1px 0 ${theme.glow}`
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--border)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = `0 4px 20px rgba(0, 0, 0, 0.2), inset 0 1px 0 ${theme.glow}`
+                }}
               >
                 {/* Tool visual preview */}
-                <div style={{
-                  position: 'relative',
-                  borderRadius: '0.6rem',
-                  border: `1px solid ${theme.glow}`,
-                  overflow: 'hidden',
-                  minHeight: `${previewHeight}px`,
-                  background: `color-mix(in srgb, var(--background) 78%, ${theme.tint})`,
-                  display: 'flex',
-                  alignItems: 'stretch'
-                }}>
-                  {previewImage ? (
-                    <img
-                      src={previewImage}
-                      alt={`${tool.title} preview`}
-                      loading="lazy"
-                      style={{
-                        width: '100%',
-                        height: `${previewHeight}px`,
-                        objectFit: 'contain',
-                        background: 'rgba(15, 23, 42, 0.28)',
-                        display: 'block'
-                      }}
-                    />
-                  ) : previewFrameHtml ? (
-                    <div style={{
-                      width: '100%',
-                      height: `${previewHeight}px`,
-                      overflow: 'hidden',
-                      background: '#ffffff'
-                    }}>
-                      <iframe
-                        title={`${tool.title} preview`}
-                        srcDoc={previewFrameHtml}
-                        sandbox="allow-scripts"
+                {showPreviewPanel && (
+                  <div style={{
+                    position: 'relative',
+                    borderRadius: '0.6rem',
+                    border: `1px solid ${theme.glow}`,
+                    overflow: 'hidden',
+                    minHeight: `${previewHeight}px`,
+                    background: `color-mix(in srgb, var(--background) 78%, ${theme.tint})`,
+                    display: 'flex',
+                    alignItems: 'stretch'
+                  }}>
+                    {previewImage ? (
+                      <img
+                        src={previewImage}
+                        alt={`${tool.title} preview`}
+                        loading="lazy"
+                        onError={() => markPreviewImageBroken(previewImage)}
                         style={{
-                          width: `${100 / iframeScale}%`,
-                          height: `${previewHeight / iframeScale}px`,
-                          border: 'none',
-                          pointerEvents: 'none',
-                          transform: `scale(${iframeScale})`,
-                          transformOrigin: 'top left',
-                          background: '#fff'
+                          width: '100%',
+                          height: `${previewHeight}px`,
+                          objectFit: 'contain',
+                          display: 'block'
                         }}
                       />
-                    </div>
-                  ) : (
-                    <div style={{
-                      width: '100%',
-                      minHeight: `${previewHeight}px`,
-                      padding: '0.75rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between'
-                    }}>
-                      <span style={{
-                        display: 'inline-block',
-                        alignSelf: 'flex-start',
-                        fontSize: '0.68rem',
-                        fontWeight: 700,
-                        letterSpacing: '0.05em',
-                        textTransform: 'uppercase',
-                        color: 'var(--muted-foreground)',
-                        background: 'color-mix(in srgb, var(--background) 72%, transparent)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '999px',
-                        padding: '0.25rem 0.55rem'
-                      }}>
-                        Live Preview
-                      </span>
-                      <p style={{
-                        margin: '0.75rem 0 0 0',
-                        fontSize: '0.82rem',
-                        lineHeight: 1.4,
-                        color: 'var(--foreground)',
+                    ) : previewFrameHtml ? (
+                      <div style={{
+                        width: '100%',
+                        height: `${previewHeight}px`,
                         overflow: 'hidden',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 5,
-                        WebkitBoxOrient: 'vertical'
+                        background: '#ffffff'
                       }}>
-                        {previewText}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                        <iframe
+                          title={`${tool.title} preview`}
+                          srcDoc={previewFrameHtml}
+                          sandbox="allow-scripts"
+                          style={{
+                            width: `${100 / iframeScale}%`,
+                            height: `${previewHeight / iframeScale}px`,
+                            border: 'none',
+                            pointerEvents: 'none',
+                            transform: `scale(${iframeScale})`,
+                            transformOrigin: 'top left',
+                            background: '#fff'
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{
+                        width: '100%',
+                        minHeight: `${previewHeight}px`,
+                        padding: '0.75rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between'
+                      }}>
+                        <span style={{
+                          display: 'inline-block',
+                          alignSelf: 'flex-start',
+                          fontSize: '0.68rem',
+                          fontWeight: 700,
+                          letterSpacing: '0.05em',
+                          textTransform: 'uppercase',
+                          color: 'var(--muted-foreground)',
+                          background: 'color-mix(in srgb, var(--background) 72%, transparent)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '999px',
+                          padding: '0.25rem 0.55rem'
+                        }}>
+                          Live Preview
+                        </span>
+                        <p style={{
+                          margin: '0.75rem 0 0 0',
+                          fontSize: '0.82rem',
+                          lineHeight: 1.4,
+                          color: 'var(--foreground)',
+                          overflow: 'hidden',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 5,
+                          WebkitBoxOrient: 'vertical'
+                        }}>
+                          {previewText}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Tool Badge */}
                 <div style={{
@@ -815,6 +844,7 @@ function Marketplace() {
                       e.stopPropagation()
                       handleVoteTool(tool, 1)
                     }}
+                    aria-label={`Upvote ${tool.title}`}
                     disabled={votingToolId === tool.id}
                     style={{
                       display: 'inline-flex',
@@ -839,6 +869,7 @@ function Marketplace() {
                       e.stopPropagation()
                       handleVoteTool(tool, -1)
                     }}
+                    aria-label={`Downvote ${tool.title}`}
                     disabled={votingToolId === tool.id}
                     style={{
                       display: 'inline-flex',
@@ -916,6 +947,9 @@ function Marketplace() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="marketplace-tool-modal-title"
             className="marketplace-modal-shell"
             style={{
               width: 'min(980px, 100%)',
@@ -929,6 +963,8 @@ function Marketplace() {
               backdropFilter: 'blur(22px)',
               WebkitBackdropFilter: 'blur(22px)'
             }}
+            tabIndex={-1}
+            ref={modalShellRef}
           >
             <div style={{
               display: 'flex',
@@ -941,13 +977,14 @@ function Marketplace() {
               background: 'color-mix(in srgb, var(--background) 70%, transparent)'
             }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, lineHeight: 1.2 }}>{selectedTool.title}</h2>
+                <h2 id="marketplace-tool-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, lineHeight: 1.2 }}>{selectedTool.title}</h2>
                 <p style={{ margin: '0.35rem 0 0 0', color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>
                   {selectedTool.category || 'General'} • {selectedTool.tool_type}
                 </p>
               </div>
               <button
                 onClick={closeToolModal}
+                aria-label="Close tool details"
                 style={{
                   border: '1px solid var(--border)',
                   background: 'transparent',
@@ -976,7 +1013,10 @@ function Marketplace() {
                   <img
                     src={getToolPreviewImage(selectedTool)}
                     alt={`${selectedTool.title} preview`}
-                    style={{ width: '100%', height: '320px', objectFit: 'contain', background: 'rgba(15, 23, 42, 0.28)' }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                    }}
+                    style={{ width: '100%', height: '320px', objectFit: 'contain' }}
                   />
                 ) : getToolPreviewFrameHtml(selectedTool) ? (
                   <iframe

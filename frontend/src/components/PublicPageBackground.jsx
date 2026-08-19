@@ -4,7 +4,7 @@ const DotGrid = () => (
   <div style={{
     position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
     zIndex: 0, pointerEvents: "none",
-    backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.35) 1px, transparent 1px)",
+    backgroundImage: "radial-gradient(circle, rgba(61,94,122,0.24) 1px, transparent 1px)",
     backgroundSize: "28px 28px",
   }} />
 );
