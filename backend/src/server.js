@@ -27,24 +27,42 @@ const __dirname = path.dirname(__filename);
 /*  MIDDLEWARE */
 
 const allowedOrigins = [
-  'https://uni-final-year-study.onrender.com',  // Production frontend
+  'https://uni-final-year-study.onrender.com',
+  'https://uni-final-year-study-is6r.onrender.com',
   'https://hydruslearn.com',
   'https://www.hydruslearn.com',
-  'http://localhost:5173',  // Local Vite dev server
-  'http://localhost:5174',  // Standalone Learning Playground dev server
-  'http://localhost:3000'   // Alternative dev port
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:3000'
 ];
+
+const envAllowed = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    if (!origin) return callback(null, true);
+    
+    // Check explicit whitelist
+    if (allowedOrigins.includes(origin) || envAllowed.includes(origin)) {
+      return callback(null, true);
     }
+    
+    // Allow all onrender.com subdomains for frontend and preview deployments
+    if (origin.endsWith('.onrender.com')) {
+      return callback(null, true);
+    }
+    
+    // Allow local development on localhost/127.0.0.1
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+
+    console.warn(`[CORS] Blocked unauthorized origin: ${origin}`);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   exposedHeaders: ['Authorization'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 }));
 
 /* SECURITY HEADERS — applied to every response */
