@@ -67,6 +67,55 @@ function sanitizeToolPayload(payload) {
   return payload;
 }
 
+/* ── Auto-Bootstrap Marketplace Schema If Tables Missing ────────────────── */
+export async function ensureMarketplaceTablesExist() {
+  try {
+    await pool.query(`
+      CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+      CREATE TABLE IF NOT EXISTS public.playground_marketplace_tools (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        owner_user_id UUID,
+        title TEXT NOT NULL,
+        description TEXT,
+        tool_type TEXT NOT NULL,
+        render_mode TEXT DEFAULT 'native',
+        category TEXT,
+        tags JSONB DEFAULT '[]'::jsonb,
+        generated_tool JSONB NOT NULL,
+        latest_prompt TEXT,
+        is_published BOOLEAN DEFAULT false,
+        visibility TEXT DEFAULT 'private',
+        forked_from_tool_id UUID,
+        forked_from_user_id UUID,
+        fork_count INTEGER DEFAULT 0,
+        collaborator_ids JSONB DEFAULT '[]'::jsonb,
+        viewer_ids JSONB DEFAULT '[]'::jsonb,
+        version_number INTEGER DEFAULT 1,
+        change_summary TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        last_forked_at TIMESTAMP WITH TIME ZONE
+      );
+
+      CREATE TABLE IF NOT EXISTS public.playground_tool_votes (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        tool_id UUID NOT NULL,
+        user_id UUID NOT NULL,
+        vote_value SMALLINT NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+    console.log('[Marketplace] Marketplace tables verified/bootstrapped successfully.');
+  } catch (err) {
+    console.warn('[Marketplace] Auto-bootstrap tables note:', err.message);
+  }
+}
+
+// Ensure schema is available on controller import
+ensureMarketplaceTablesExist();
+
 /* ── GET /api/marketplace/tools/public ──────────────────────────────────── */
 export async function getPublicTools(req, res) {
   try {
@@ -118,37 +167,10 @@ export async function getPublicTools(req, res) {
       const result = await pool.query(query, params);
       rows = result.rows;
     } catch (queryErr) {
-      // If votes migration has not been applied yet, still return marketplace tools.
-      if (queryErr?.code === '42P01' && String(queryErr?.message || '').includes('playground_tool_votes')) {
-        let fallbackQuery = `
-          SELECT
-            t.id, t.owner_user_id, t.title, t.description, t.tool_type, t.category, t.tags,
-            t.generated_tool,
-            t.fork_count, t.forked_from_tool_id, t.latest_prompt, t.created_at, t.updated_at,
-            0::int AS vote_score,
-            0::int AS upvote_count,
-            0::int AS downvote_count,
-            0::int AS my_vote
-          FROM public.playground_marketplace_tools t
-          WHERE t.is_published = true AND t.visibility = 'public'
-        `;
-
-        const fallbackParams = [];
-
-        if (category) {
-          fallbackParams.push(category);
-          fallbackQuery += ` AND t.category = $${fallbackParams.length}`;
-        }
-        if (search) {
-          fallbackParams.push(`%${search}%`);
-          fallbackQuery += ` AND (t.title ILIKE $${fallbackParams.length} OR t.description ILIKE $${fallbackParams.length})`;
-        }
-
-        fallbackParams.push(Math.min(parseInt(limit, 10) || 50, 200));
-        fallbackQuery += ` ORDER BY t.created_at DESC LIMIT $${fallbackParams.length}`;
-
-        const fallbackResult = await pool.query(fallbackQuery, fallbackParams);
-        rows = fallbackResult.rows;
+      if (queryErr?.code === '42P01') {
+        console.warn('[Marketplace] Undefined table in getPublicTools. Auto-bootstrapping and returning empty list.');
+        ensureMarketplaceTablesExist().catch(() => {});
+        rows = [];
       } else {
         throw queryErr;
       }
@@ -167,16 +189,28 @@ export async function getSavedTools(req, res) {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ error: 'Unauthorised' });
 
-    const { rows } = await pool.query(
-      `SELECT
-         id, title, description, tool_type, category, tags,
-         generated_tool, fork_count, forked_from_tool_id,
-         is_published, visibility, latest_prompt, created_at, updated_at
-       FROM public.playground_marketplace_tools
-       WHERE owner_user_id = $1
-       ORDER BY updated_at DESC`,
-      [userId]
-    );
+    let rows = [];
+    try {
+      const result = await pool.query(
+        `SELECT
+           id, title, description, tool_type, category, tags,
+           generated_tool, fork_count, forked_from_tool_id,
+           is_published, visibility, latest_prompt, created_at, updated_at
+         FROM public.playground_marketplace_tools
+         WHERE owner_user_id = $1
+         ORDER BY updated_at DESC`,
+        [userId]
+      );
+      rows = result.rows;
+    } catch (err) {
+      if (err?.code === '42P01') {
+        ensureMarketplaceTablesExist().catch(() => {});
+        rows = [];
+      } else {
+        throw err;
+      }
+    }
+
     res.json({ success: true, data: rows });
   } catch (err) {
     console.error('getSavedTools error:', err);
