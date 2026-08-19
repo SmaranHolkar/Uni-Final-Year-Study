@@ -5,7 +5,8 @@ export default function enforceDailyQuota(actionType) {
     try {
       const userId = req.user?.id;
       if (!userId) {
-        return res.status(401).json({ error: 'Unauthorized' });
+        // Guest / unauthenticated playground users are allowed to generate tools
+        return next();
       }
 
       const result = await consumeDailyQuota(userId, actionType);
@@ -24,8 +25,8 @@ export default function enforceDailyQuota(actionType) {
       req.freeTierQuota = result;
       return next();
     } catch (err) {
-      console.error('Quota middleware error:', err);
-      return res.status(500).json({ error: 'Failed to apply tier limits' });
+      console.warn('Quota middleware non-fatal warning:', err.message);
+      return next(); // Graceful degradation
     }
   };
 }

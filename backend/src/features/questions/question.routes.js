@@ -1,5 +1,5 @@
 import express from 'express';
-import requireAuth from '../../shared/middleware/requireAuth.js';
+import requireAuth, { optionalAuth } from '../../shared/middleware/requireAuth.js';
 import enforceDailyQuota from '../../shared/middleware/enforceDailyQuota.js';
 import {
 	generateQuestions,
@@ -19,7 +19,7 @@ const router = express.Router();
 
 router.post('/generate-questions', requireAuth, enforceDailyQuota('study_session_start'), generateQuestions);
 router.post('/generate-mindmap', requireAuth, generateMindmap);
-router.post('/chat-tools', requireAuth, enforceDailyQuota('learning_tool_generate'), generateLearningTool);
+router.post('/chat-tools', optionalAuth, enforceDailyQuota('learning_tool_generate'), generateLearningTool);
 router.post('/learning-playground/sessions', requireAuth, saveLearningPlaygroundSession);
 router.get('/learning-playground/sessions', requireAuth, getLearningPlaygroundSessions);
 router.get('/suggestions', requireAuth, getSuggestionsForUser);
