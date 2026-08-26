@@ -441,8 +441,8 @@ Source link:
 ${sourceLink}
 `;
 
-  // Use toolGenAI to keep routing consistent across all AI calls
-  return toolGenAI(prompt, 'qwen/qwen3.6-27b', 0.1, 140);
+  // Use toolGenAI with our primary 70B model
+  return toolGenAI(prompt, 'llama-3.3-70b-versatile', 0.1, 140);
 }
 
 
@@ -475,7 +475,7 @@ Be thorough and specific. This description will be used to generate exam questio
         Authorization: `Bearer ${GROQ_KEY}`,
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        model: 'llama-3.2-11b-vision-preview',
         messages: [
           {
             role: 'user',
@@ -1636,7 +1636,7 @@ ITEM SCHEMA (for interactive tool types):
 
   let plan = null;
   try {
-    const planRaw = await toolGenAI(planPrompt, 'qwen/qwen3.6-27b', 0.3, 2500, { forceJson: false });
+    const planRaw = await toolGenAI(planPrompt, 'llama-3.3-70b-versatile', 0.3, 2500, { forceJson: false });
     plan = safeParse(planRaw);
     if (!plan) console.log('DEBUG planRaw failed to parse:\n', planRaw);
   } catch (err) {
@@ -1718,7 +1718,7 @@ ITEM SCHEMA (for interactive tool types):
     let diagramSpec = null;
     try {
       const diagramPrompt = buildSVGDiagramPrompt(promptText, contextString);
-      const diagramRaw = await toolGenAI(diagramPrompt, 'qwen/qwen3.6-27b', 0.3, 2500, { forceJson: false });
+      const diagramRaw = await toolGenAI(diagramPrompt, 'llama-3.3-70b-versatile', 0.3, 2500, { forceJson: false });
 
       diagramSpec = safeParse(diagramRaw);
       if (!diagramSpec) console.log('DEBUG diagramRaw failed to parse:\n', diagramRaw?.slice(0, 300));
@@ -1795,7 +1795,7 @@ Return ONLY valid JSON array with no extra text:
 [
   { "id": "1", "front": "Core concept or question", "back": "Detailed, accurate explanation, mechanism, and exam facts." }
 ]`;
-      const fallbackRaw = await toolGenAI(itemsPrompt, 'qwen/qwen3.6-27b', 0.3, 2000, { forceJson: false });
+      const fallbackRaw = await toolGenAI(itemsPrompt, 'llama-3.3-70b-versatile', 0.3, 2000, { forceJson: false });
       const parsed = safeParse(fallbackRaw);
       if (Array.isArray(parsed) && parsed.length > 0) {
         rawItems = parsed.slice(0, 12);
@@ -2002,7 +2002,7 @@ RULES:
   let html = '';
 
   try {
-    const rawHtml = await getChatCompletion(buildPrompt, 'qwen/qwen3.6-27b', 0.2, 5000, { forceJson: false });
+    const rawHtml = await getChatCompletion(buildPrompt, 'llama-3.3-70b-versatile', 0.2, 5000, { forceJson: false });
     html = stripFences(rawHtml);
 
     if (!isUsableToolHtml(html) || hasPlaceholderComments(html)) {
@@ -2199,7 +2199,7 @@ Return ONLY valid JSON with this exact structure:
   ]
 }`;
 
-      const raw = await getChatCompletion(aiPrompt, 'qwen/qwen3.6-27b', 0.3, 1500, { forceJson: true });
+      const raw = await getChatCompletion(aiPrompt, 'llama-3.3-70b-versatile', 0.3, 1500, { forceJson: true });
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') aiAnalysis = parsed;
     } catch (err) {

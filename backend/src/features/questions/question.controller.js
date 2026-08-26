@@ -135,7 +135,7 @@ Rules:
 
       let parsed = null;
       try {
-        const raw = await toolGenAI(mindmapPrompt, 'qwen/qwen3.6-27b', 0.3, 900, { forceJson: true });
+        const raw = await toolGenAI(mindmapPrompt, 'llama-3.3-70b-versatile', 0.3, 900, { forceJson: true });
         parsed = JSON.parse(raw);
       } catch (e) {
         console.error('Failed to parse mindmap JSON:', e);

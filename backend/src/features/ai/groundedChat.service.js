@@ -122,7 +122,7 @@ ${contextBlock || 'NO SOURCE DOCUMENTS AVAILABLE FOR THIS USER QUERY.'}
     ? `Recent Conversation History:\n${historyMessages}\n\n${systemPrompt}`
     : systemPrompt;
 
-  const rawAnswer = await getChatCompletion(fullPrompt, 'qwen/qwen3.6-27b', 0.2, 1200);
+  const rawAnswer = await getChatCompletion(fullPrompt, 'llama-3.3-70b-versatile', 0.2, 1200);
 
   // 7. Parse & Extract Citations for Frontend Render
   const citationRegex = /\[Cite:\s*id="([^"]+)",\s*title="([^"]+)",\s*para=(\d+)\]/g;

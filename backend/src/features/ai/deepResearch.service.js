@@ -83,7 +83,7 @@ Return ONLY valid JSON (no markdown formatting):
 
   let subQueries = [cleanTopic, `${cleanTopic} overview explanation`, `${cleanTopic} key concepts research` ];
   try {
-    const rawPlan = await getChatCompletion(planPrompt, 'qwen/qwen3.6-27b', 0.2, 300, { forceJson: true });
+    const rawPlan = await getChatCompletion(planPrompt, 'llama-3.1-8b-instant', 0.2, 300, { forceJson: true });
     const parsedPlan = JSON.parse(rawPlan.replace(/```json|```/g, '').trim());
     if (Array.isArray(parsedPlan.queries) && parsedPlan.queries.length) {
       subQueries = parsedPlan.queries.slice(0, 4);
@@ -137,7 +137,7 @@ Write in clear, authoritative, highly informative academic tone. Ensure paragrap
 Begin directly with "# Executive Summary":
 `;
 
-  const reportMarkdown = await getChatCompletion(reportPrompt, 'qwen/qwen3.6-27b', 0.3, 2000);
+  const reportMarkdown = await getChatCompletion(reportPrompt, 'llama-3.3-70b-versatile', 0.3, 2000);
 
   // STAGE 5: Ingest into User Knowledge Base (w_embeddings)
   let ingestedChunks = 0;
