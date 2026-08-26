@@ -58,6 +58,11 @@ import {
   CheckSquare,
   Compass,
   Scale,
+  SquarePen,
+  Folder,
+  Pin,
+  AudioLines,
+  MoreHorizontal,
   Activity,
   Target,
 } from 'lucide-react'
@@ -135,6 +140,8 @@ export default function Learningplayground() {
   const [isLoadingSavedTools, setIsLoadingSavedTools] = useState(false)
   const [marketplaceTools, setMarketplaceTools] = useState([])
   const [isLoadingMarketplaceTools, setIsLoadingMarketplaceTools] = useState(false)
+  const [isThinkingMode, setIsThinkingMode] = useState(false)
+  const [showSidebarSearch, setShowSidebarSearch] = useState(false)
 
   // Persistent Chat History (Recents) State — strictly scoped to logged-in user
   const [chatHistory, setChatHistory] = useState([])
@@ -1520,167 +1527,182 @@ export default function Learningplayground() {
     const meta = extractToolMetadata(t)
     return meta.title.toLowerCase().includes(searchQuery.toLowerCase())
   })
-
   return (
-    <div className="flex-1 h-0 w-full relative bg-[#171717] text-[#ECECF1] flex overflow-hidden font-sans">
+    <div className="flex-1 h-0 w-full relative bg-[#080c14] text-[#f1f5f9] flex overflow-hidden font-sans">
       <DotGrid />
 
-      {/* Left Collapsible Sidebar */}
+      {/* Left ChatGPT-Style Sidebar */}
       <aside
-        className={`relative z-30 bg-[#171717] border-r border-[#2F2F2F] flex flex-col transition-all duration-300 ${sidebarOpen ? 'w-64 sm:w-72' : 'w-0 border-r-0 overflow-hidden'
+        className={`relative z-30 bg-[#080c14] border-r border-[#162032] flex flex-col transition-all duration-300 ${sidebarOpen ? 'w-64 sm:w-68' : 'w-0 border-r-0 overflow-hidden'
           }`}
       >
         {/* Top Header in Sidebar */}
-        <div className="p-3 border-b border-[#2F2F2F] flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Vela size={22} className="flex-shrink-0" />
-            <span className="font-bold text-xs sm:text-sm text-white tracking-tight truncate">
-              Learning Playground
+        <div className="p-3.5 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-bold text-sm text-white tracking-tight">
+              ChatGPT
             </span>
           </div>
 
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="p-1.5 rounded-[6px] hover:bg-[#212121] text-[#8E8E93] hover:text-white transition-colors flex-shrink-0"
-            title="Close Sidebar"
-          >
-            <PanelLeftClose className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowSidebarSearch(!showSidebarSearch)}
+              className="p-1.5 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#131c2e] transition-colors"
+              title="Search"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="p-1.5 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#131c2e] transition-colors"
+              title="Close Sidebar"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Primary Action Buttons (+ New chat & Toggle Canvas) */}
-        <div className="p-2 border-b border-[#2F2F2F] space-y-1.5">
+        {/* New Chat Button */}
+        <div className="px-3 pb-2">
           <button
             onClick={handleStartNewSession}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-[6px] bg-[#212121] hover:bg-[#282E38] border border-[#2F2F2F] text-xs font-semibold text-white transition-all group shadow-sm"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#131c2e] hover:bg-[#19243b] border border-[#1e2d45] text-xs font-medium text-white transition-all group"
           >
-            <Plus className="w-4 h-4 text-[#5A7D99] group-hover:scale-110 transition-transform" />
+            <SquarePen className="w-4 h-4 text-[#38bdf8] group-hover:scale-105 transition-transform" />
             <span>New chat</span>
-          </button>
-
-          <button
-            onClick={() => setRightPanelOpen(!rightPanelOpen)}
-            className="w-full flex items-center justify-between px-3 py-1.5 rounded-[6px] bg-[#212121]/60 hover:bg-[#282E38] border border-[#2F2F2F] text-xs font-medium text-[#C5C5D2] hover:text-white transition-all"
-            title={rightPanelOpen ? 'Hide Tool Canvas' : 'Show Tool Canvas'}
-          >
-            <div className="flex items-center gap-2">
-              <PanelRight className="w-3.5 h-3.5 text-[#5A7D99]" />
-              <span>Canvas Panel</span>
-            </div>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${rightPanelOpen ? 'bg-[#5A7D99]/20 text-[#8BB0D1]' : 'bg-[#2F2F2F] text-[#8E8E93]'}`}>
-              {rightPanelOpen ? 'Open' : 'Hidden'}
-            </span>
           </button>
         </div>
 
-        {/* Main Nav Section Shortcuts */}
-        <div className="px-2 pt-2 space-y-0.5 border-b border-[#2F2F2F] pb-2">
+        {/* Core Navigation Items */}
+        <div className="px-2 space-y-0.5 text-xs text-[#94a3b8]">
           <button
-            onClick={() => setActiveNavSection('chats')}
-            className={`w-full px-3 py-2 rounded-[6px] text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'chats'
-              ? 'bg-[#212121] text-white font-semibold'
-              : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
+            onClick={() => {
+              setUploadTab('image-ocr')
+              setShowUploadModal(true)
+            }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#131c2e] hover:text-white transition-colors text-left"
+          >
+            <Image className="w-4 h-4 text-[#8493a8]" />
+            <span>Images</span>
+          </button>
+
+          <button
+            onClick={() => setActiveNavSection('saved-tools')}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-left ${activeNavSection === 'saved-tools'
+              ? 'bg-[#131c2e] text-white font-medium'
+              : 'hover:bg-[#131c2e] hover:text-white'
               }`}
           >
             <div className="flex items-center gap-2.5">
-              <MessageSquare className="w-4 h-4 text-[#5A7D99]" />
-              <span>Chats</span>
+              <Bookmark className="w-4 h-4 text-[#8493a8]" />
+              <span>Library</span>
+            </div>
+            {savedTools.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#1e293b] text-[#8493a8] font-mono">
+                {savedTools.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveNavSection('chats')}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-left ${activeNavSection === 'chats'
+              ? 'bg-[#131c2e] text-white font-medium'
+              : 'hover:bg-[#131c2e] hover:text-white'
+              }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Clock className="w-4 h-4 text-[#8493a8]" />
+              <span>Scheduled</span>
             </div>
             {chatHistory.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[#5A7D99]/20 text-[#5A7D99] font-mono">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#1e293b] text-[#8493a8] font-mono">
                 {chatHistory.length}
               </span>
             )}
           </button>
 
+          <button
+            onClick={() => setShowMarketplaceExplorer(true)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#131c2e] hover:text-white transition-colors text-left"
+          >
+            <div className="flex items-center gap-2.5">
+              <Layers className="w-4 h-4 text-[#8493a8]" />
+              <span>Plugins</span>
+            </div>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#3b82f6]/20 text-[#38bdf8] font-mono">
+              {marketplaceTools.length}
+            </span>
+          </button>
+
           <Link
             to="/tools"
-            className="w-full px-3 py-2 rounded-[6px] text-xs font-medium text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white flex items-center gap-2.5 transition-all"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#131c2e] hover:text-white transition-colors text-left"
           >
-            <Wrench className="w-4 h-4 text-[#5A7D99]" />
-            <span>Tools Studio</span>
+            <Wrench className="w-4 h-4 text-[#8493a8]" />
+            <span>Codex</span>
           </Link>
 
           <button
-            onClick={() => setShowMarketplaceExplorer(true)}
-            className="w-full px-3 py-2 rounded-[6px] text-xs font-medium text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white flex items-center justify-between transition-all"
-            title="Browse Community Marketplace Tools"
+            onClick={() => setShowUploadModal(true)}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#131c2e] hover:text-white transition-colors text-left"
           >
-            <div className="flex items-center gap-2.5">
-              <Globe className="w-4 h-4 text-[#5A7D99]" />
-              <span>Marketplace</span>
-            </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[#5A7D99]/20 text-[#5A7D99] font-mono">
-              {marketplaceTools.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveNavSection('saved-tools')}
-            className={`w-full px-3 py-2 rounded-[6px] text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'saved-tools'
-              ? 'bg-[#212121] text-white font-semibold'
-              : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
-              }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <Bookmark className="w-4 h-4 text-[#5A7D99]" />
-              <span>Saved Tools</span>
-            </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[#2F2F2F] text-[#8E8E93] font-mono">
-              {savedTools.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveNavSection('community')}
-            className={`w-full px-3 py-2 rounded-[6px] text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'community'
-              ? 'bg-[#212121] text-white font-semibold'
-              : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
-              }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <Sparkles className="w-4 h-4 text-[#5A7D99]" />
-              <span>Community Library</span>
-            </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[#2F2F2F] text-[#8E8E93] font-mono">
-              {marketplaceTools.length}
-            </span>
+            <MoreHorizontal className="w-4 h-4 text-[#8493a8]" />
+            <span>More</span>
           </button>
         </div>
 
-        {/* Search Input Filter */}
-        <div className="px-3 pt-2 pb-1">
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[#8E8E93]" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={
-                activeNavSection === 'chats'
-                  ? 'Search chats...'
-                  : activeNavSection === 'saved-tools'
-                    ? 'Search saved tools...'
-                    : 'Search community...'
-              }
-              className="w-full bg-[#212121] border border-[#2F2F2F] rounded-[6px] pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#8E8E93] focus:outline-none focus:border-[#5A7D99]"
-            />
+        {/* Search Bar (Collapsible) */}
+        {showSidebarSearch && (
+          <div className="px-3 pt-2 pb-1">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[#64748b]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search chats..."
+                className="w-full bg-[#131c2e] border border-[#1e2b45] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#64748b] focus:outline-none focus:border-[#38bdf8]"
+                autoFocus
+              />
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Scrollable Recents / Conversations & Tools List */}
-        <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1 scrollbar-thin">
-          {activeNavSection === 'chats' && (
-            <div>
-              <div className="px-2 pt-1 pb-1.5 flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#8E8E93] uppercase tracking-wider">
-                  Recents
-                </span>
-                <Clock className="w-3 h-3 text-[#8E8E93]" />
-              </div>
+        {/* Scrollable Pinned & Projects / Recents Section */}
+        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4 scrollbar-thin">
+          {/* Pinned Section */}
+          <div>
+            <div className="px-3 py-1 text-[11px] font-semibold text-[#64748b]">
+              Pinned
+            </div>
+            <div className="space-y-0.5">
+              <button
+                onClick={() => handleSendMessage('Help me write an academic revision story with key principles')}
+                className="w-full px-3 py-1.5 rounded-lg text-xs text-[#cbd5e1] hover:bg-[#131c2e] hover:text-white flex items-center gap-2.5 text-left truncate transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                <span className="truncate">Writing story</span>
+              </button>
+              <button
+                onClick={() => handleSendMessage('Review core concepts and problem sets for final year project')}
+                className="w-full px-3 py-1.5 rounded-lg text-xs text-[#cbd5e1] hover:bg-[#131c2e] hover:text-white flex items-center gap-2.5 text-left truncate transition-colors"
+              >
+                <Folder className="w-3.5 h-3.5 text-[#38bdf8] flex-shrink-0" />
+                <span className="truncate">final year project</span>
+              </button>
+            </div>
+          </div>
 
+          {/* Projects / Recents Section */}
+          <div>
+            <div className="px-3 py-1 text-[11px] font-semibold text-[#64748b]">
+              Projects
+            </div>
+
+            <div className="space-y-0.5">
               {filteredChats.length === 0 ? (
-                <p className="px-3 py-3 text-xs text-[#8E8E93]">No previous chats found.</p>
+                <p className="px-3 py-2 text-xs text-[#64748b]">No previous chats.</p>
               ) : (
                 filteredChats.map((chat) => {
                   const isActive = activeChatId === chat.id
@@ -1688,19 +1710,19 @@ export default function Learningplayground() {
                     <div
                       key={chat.id}
                       onClick={() => loadChatSession(chat)}
-                      className={`group px-3 py-2 rounded-[6px] text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
-                        ? 'bg-[#212121] text-white font-medium border border-[#2F2F2F]'
-                        : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
+                      className={`group px-3 py-1.5 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
+                        ? 'bg-[#131c2e] text-white font-medium border border-[#1e2b45]'
+                        : 'text-[#94a3b8] hover:bg-[#131c2e]/70 hover:text-white'
                         }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                        <MessageSquare className="w-3.5 h-3.5 text-[#5A7D99] flex-shrink-0" />
+                      <div className="flex items-center gap-2.5 min-w-0 pr-1">
+                        <Folder className="w-3.5 h-3.5 text-[#64748b] group-hover:text-[#38bdf8] flex-shrink-0" />
                         <span className="truncate">{chat.title || 'Previous Chat'}</span>
                       </div>
 
                       <button
                         onClick={(e) => deleteChatSession(chat.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-[#8E8E93] transition-opacity rounded-[4px]"
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-[#64748b] transition-opacity"
                         title="Delete chat thread"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1710,205 +1732,212 @@ export default function Learningplayground() {
                 })
               )}
             </div>
-          )}
-
-          {activeNavSection === 'saved-tools' && (
-            <div>
-              <div className="px-2 pt-1 pb-1.5">
-                <span className="text-[11px] font-semibold text-[#8E8E93] uppercase tracking-wider">
-                  Saved Tools
-                </span>
-              </div>
-              {isLoadingSavedTools ? (
-                <p className="px-3 py-2 text-xs text-[#8E8E93]">Loading saved tools...</p>
-              ) : filteredSavedTools.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-[#8E8E93]">No saved tools found.</p>
-              ) : (
-                filteredSavedTools.map((tool) => {
-                  const meta = extractToolMetadata(tool)
-                  const isActive = generatedTool?.id === tool.id
-                  return (
-                    <div
-                      key={tool.id}
-                      onClick={() => selectTool(tool)}
-                      className={`group px-3 py-2 rounded-[6px] text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
-                        ? 'bg-[#212121] text-white font-medium border border-[#2F2F2F]'
-                        : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                        <Wrench className="w-3.5 h-3.5 text-[#5A7D99] flex-shrink-0" />
-                        <span className="truncate">{meta.title}</span>
-                      </div>
-
-                      <button
-                        onClick={(e) => handleDeleteTool(tool.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-[#8E8E93] transition-opacity rounded-[4px]"
-                        title="Delete tool"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          )}
-
-          {activeNavSection === 'community' && (
-            <div>
-              <div className="px-2 pt-1 pb-1.5">
-                <span className="text-[11px] font-semibold text-[#8E8E93] uppercase tracking-wider">
-                  Community Library
-                </span>
-              </div>
-              {isLoadingMarketplaceTools ? (
-                <p className="px-3 py-2 text-xs text-[#8E8E93]">Loading community tools...</p>
-              ) : filteredMarketplaceTools.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-[#8E8E93]">No community tools available.</p>
-              ) : (
-                filteredMarketplaceTools.map((mTool) => {
-                  const meta = extractToolMetadata(mTool)
-                  const isActive = generatedTool?.id === mTool.id
-                  return (
-                    <div
-                      key={mTool.id}
-                      onClick={() => selectTool(mTool)}
-                      className={`group px-3 py-2 rounded-[6px] text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
-                        ? 'bg-[#212121] text-white font-medium border border-[#2F2F2F]'
-                        : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                        <Sparkles className="w-3.5 h-3.5 text-[#5A7D99] flex-shrink-0" />
-                        <span className="truncate">{meta.title}</span>
-                      </div>
-
-                      <button className="opacity-0 group-hover:opacity-100 px-2 py-0.5 text-[10px] font-semibold rounded-[4px] bg-[#5A7D99]/20 text-[#5A7D99] transition-opacity">
-                        Load
-                      </button>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          )}
+          </div>
         </div>
 
-        {/* Bottom User Profile Footer */}
-        <div className="p-3 border-t border-[#2F2F2F] bg-[#171717] flex items-center justify-between">
+        {/* User Profile Footer (ChatGPT Style) */}
+        <div className="p-3 border-t border-[#162032] bg-[#080c14] flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-[6px] bg-[#212121] border border-[#2F2F2F] flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
-              {user?.email ? user.email.charAt(0).toUpperCase() : 'S'}
+            <div className="w-7 h-7 rounded-full bg-amber-600/90 text-white font-bold text-xs flex items-center justify-center flex-shrink-0 shadow-sm">
+              {user?.email ? user.email.slice(0, 2).toUpperCase() : 'CO'}
             </div>
             <div className="min-w-0">
-              <p className="font-semibold text-xs text-white truncate max-w-[120px]">
-                {user?.email ? user.email.split('@')[0] : 'Smaran Holkar'}
+              <p className="font-semibold text-xs text-white truncate max-w-[90px]">
+                {user?.email ? user.email.split('@')[0] : 'coolhairy'}
               </p>
-              <p className="text-[10px] text-[#8E8E93] truncate">
-                Unlimited Plan
-              </p>
+              <p className="text-[10px] text-[#64748b]">Free</p>
             </div>
           </div>
 
-          <button
-            onClick={async () => {
-              setChatHistory([])
-              setActiveChatId(null)
-              setMessages([])
-              setGeneratedTool(null)
-              setAttachedDocument(null)
-              if (signOut) await signOut()
-            }}
-            className="p-1.5 rounded-[6px] hover:bg-[#212121] text-[#8E8E93] hover:text-red-400 transition-colors"
-            title="Sign Out"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#131c2e] hover:bg-[#1b2840] text-[#cbd5e1] border border-[#1e2d45] transition-all">
+              Upgrade
+            </button>
+            <button
+              onClick={async () => {
+                setChatHistory([])
+                setActiveChatId(null)
+                setMessages([])
+                setGeneratedTool(null)
+                setAttachedDocument(null)
+                if (signOut) await signOut()
+              }}
+              className="p-1 rounded-lg text-[#64748b] hover:text-red-400 transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </aside>
 
       {/* Main Center & Canvas Workspace */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative z-10">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative z-10 bg-[#080c14]">
 
-        {/* Unobtrusive Floating Sidebar Opener when closed */}
-        {!sidebarOpen && (
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="absolute top-3 left-3 z-30 p-2 rounded-[6px] bg-[#212121]/90 hover:bg-[#282E38] text-[#8E8E93] hover:text-white border border-[#2F2F2F] shadow-lg transition-all"
-            title="Open Sidebar"
-          >
-            <PanelLeft className="w-4 h-4" />
-          </button>
-        )}
+        {/* Top Header Bar */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#141c2e]/60 bg-[#080c14] flex-shrink-0 z-20">
+          <div className="flex items-center gap-2">
+            {!sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="p-1.5 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#131c2e] transition-colors"
+                title="Open Sidebar"
+              >
+                <PanelLeft className="w-4 h-4" />
+              </button>
+            )}
 
-        {/* Center Tabs for Mobile/Tablet View (< lg screens) */}
-        <div className="lg:hidden absolute top-3 right-3 z-30 flex items-center bg-[#212121]/90 p-0.5 rounded-[6px] border border-[#2F2F2F] shadow-lg">
-          <button
-            onClick={() => setMobileTab('chat')}
-            className={`px-2.5 py-1 text-[11px] font-semibold rounded-[4px] flex items-center gap-1.5 transition-all ${mobileTab === 'chat'
-              ? 'bg-[#2F2F2F] text-white shadow-sm'
-              : 'text-[#8E8E93] hover:text-white'
-              }`}
-          >
-            <MessageSquare className="w-3 h-3" />
-            <span>Chat</span>
-          </button>
-          <button
-            onClick={() => setMobileTab('tool')}
-            className={`px-2.5 py-1 text-[11px] font-semibold rounded-[4px] flex items-center gap-1.5 transition-all ${mobileTab === 'tool'
-              ? 'bg-[#5A7D99] text-white shadow-sm'
-              : 'text-[#8E8E93] hover:text-white'
-              }`}
-          >
-            <Wrench className="w-3 h-3" />
-            <span>Canvas</span>
-            {generatedTool && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
-          </button>
+            <button
+              onClick={handleStartNewSession}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-[#cbd5e1] hover:text-white hover:bg-[#131c2e] transition-colors"
+            >
+              <SquarePen className="w-3.5 h-3.5" />
+              <span>New chat</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <button className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0e1726] border border-[#1e2d45] text-xs font-semibold text-white hover:bg-[#182338] transition-all shadow-sm">
+              <Sparkles className="w-3.5 h-3.5 text-[#38bdf8]" />
+              <span>Upgrade</span>
+            </button>
+
+            <button
+              onClick={() => setRightPanelOpen(!rightPanelOpen)}
+              className={`p-1.5 rounded-lg transition-colors ${rightPanelOpen ? 'text-[#38bdf8] bg-[#131c2e]' : 'text-[#8493a8] hover:text-white'}`}
+              title={rightPanelOpen ? 'Hide Tool Canvas' : 'Show Tool Canvas'}
+            >
+              <PanelRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Center Workspace (Chat Stream + Interactive Canvas) */}
         <div className="flex-1 flex overflow-hidden min-h-0 relative">
 
-          {/* Left Chat Stream Column */}
+          {/* Center Chat Stream Column */}
           <div
-            className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden min-w-0 bg-[#0E1015] relative z-10 transition-all ${mobileTab === 'tool' ? 'hidden lg:flex' : 'flex'
+            className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden min-w-0 bg-[#080c14] relative z-10 transition-all ${mobileTab === 'tool' ? 'hidden lg:flex' : 'flex'
               }`}
           >
             {/* Conversation Stream */}
-            <div className="flex-1 overflow-y-auto min-h-0 px-4 py-4 space-y-4 max-w-3xl mx-auto w-full">
+            <div className="flex-1 overflow-y-auto min-h-0 px-4 py-6 space-y-4 max-w-3xl mx-auto w-full flex flex-col">
               {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center py-2 px-2">
-                  <Vela size={52} className="mb-3" />
-                  <h3 className="text-lg font-semibold text-white mb-1.5">What would you like to learn today?</h3>
-                  <p className="text-xs text-[#8E8E93] max-w-md mb-5">
-                    Attach course notes, PDFs, or slides for <strong>RAG Vector Context</strong>, or ask Vela to create a custom revision tool.
-                  </p>
+                <div className="flex-1 flex flex-col items-center justify-center text-center py-6 px-2">
+                  {/* ChatGPT Hero Title */}
+                  <h1 className="text-3xl font-semibold text-white mb-8 tracking-tight">
+                    Where should we begin?
+                  </h1>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full max-w-xl text-left">
+                  {/* Centered Large ChatGPT Input Pill Capsule */}
+                  <div className="w-full max-w-2xl bg-[#131c2e] border border-[#1f2d45] rounded-3xl p-3 shadow-2xl focus-within:border-[#38bdf8]/70 focus-within:shadow-[0_0_30px_rgba(56,189,248,0.15)] transition-all">
+                    {/* Top Input Row */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowUploadModal(true)}
+                        className="w-8 h-8 rounded-full bg-[#1b2740] hover:bg-[#243555] text-white flex items-center justify-center font-bold text-base transition-colors flex-shrink-0"
+                        title="Attach files, PDF, audio, or YouTube"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+
+                      <textarea
+                        ref={textareaRef}
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            handleSendMessage()
+                          }
+                        }}
+                        placeholder="Ask anything"
+                        className="flex-1 bg-transparent border-none focus:outline-none text-sm text-white placeholder-[#8493a8] resize-none py-1 max-h-32 min-h-[36px]"
+                        rows={1}
+                      />
+                    </div>
+
+                    {/* Bottom Action Controls Row inside Pill */}
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#1a263c]">
+                      <div className="flex items-center gap-2">
+                        {attachedDocument && (
+                          <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#3b82f6]/20 border border-[#3b82f6]/40 text-xs text-[#38bdf8]">
+                            <FileText className="w-3 h-3" />
+                            <span className="truncate max-w-[140px]">{attachedDocument.title}</span>
+                            <button onClick={() => setAttachedDocument(null)} className="hover:text-white ml-1">✕</button>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {/* Grammer / AI Icon */}
+                        <div className="w-6 h-6 rounded-full bg-[#0e1726] border border-[#1e2d45] flex items-center justify-center text-[#38bdf8]" title="Vela AI Ready">
+                          <Sparkles className="w-3 h-3" />
+                        </div>
+
+                        {/* Think Button */}
+                        <button
+                          type="button"
+                          onClick={() => setIsThinkingMode(!isThinkingMode)}
+                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${isThinkingMode
+                            ? 'bg-[#3b82f6]/20 text-[#38bdf8] border border-[#3b82f6]/40 shadow-sm'
+                            : 'text-[#8493a8] hover:text-white hover:bg-[#1b2740]'
+                            }`}
+                          title="Deep Reasoning Mode"
+                        >
+                          <Brain className="w-3.5 h-3.5" />
+                          <span>Think</span>
+                        </button>
+
+                        {/* Voice Mic Button */}
+                        <button
+                          type="button"
+                          onClick={toggleChatVoiceInput}
+                          className={`p-1.5 rounded-full transition-colors ${isChatListening ? 'bg-red-500 text-white animate-pulse' : 'text-[#8493a8] hover:text-white hover:bg-[#1b2740]'}`}
+                          title="Voice Input (Whisper)"
+                        >
+                          <Mic className="w-4 h-4" />
+                        </button>
+
+                        {/* Audio Waveform / Send Button */}
+                        <button
+                          onClick={() => handleSendMessage()}
+                          disabled={isLoading || !inputValue.trim()}
+                          className="w-8 h-8 rounded-full bg-[#3b82f6] hover:bg-[#2563eb] text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105 disabled:opacity-40"
+                          title="Send prompt"
+                        >
+                          <AudioLines className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3 Quick Action Prompt Items under Capsule */}
+                  <div className="flex flex-col items-start gap-2.5 mt-6 w-full max-w-2xl px-2">
                     <button
-                      onClick={() => setShowUploadModal(true)}
-                      className="p-3 rounded-[8px] bg-[#1A1E24] border border-[#282E38] hover:border-[#5A7D99] text-left transition-all group"
+                      onClick={() => handleSendMessage('Create an image or diagram illustrating key concepts with labeled components')}
+                      className="flex items-center gap-3 text-xs text-[#94a3b8] hover:text-white transition-colors"
                     >
-                      <Paperclip className="w-4 h-4 text-[#5A7D99] mb-1.5 group-hover:scale-110 transition-transform" />
-                      <p className="font-semibold text-xs text-white mb-0.5">Attach File (RAG)</p>
-                      <p className="text-[10px] text-[#8E8E93] line-clamp-2">Upload PDF, DOCX, or TXT to ground generated tools in your notes.</p>
+                      <Image className="w-4 h-4 text-[#8493a8]" />
+                      <span>Create an image or sticker</span>
                     </button>
 
-                    {suggestions.slice(0, 2).map((s) => {
-                      const IconComponent = s.icon
-                      return (
-                        <button
-                          key={s.id}
-                          onClick={() => handleSendMessage(s.prompt)}
-                          className="p-3 rounded-[8px] bg-[#1A1E24] border border-[#282E38] hover:border-[#5A7D99] text-left transition-all group"
-                        >
-                          <IconComponent className="w-4 h-4 text-[#5A7D99] mb-1.5 group-hover:scale-110 transition-transform" />
-                          <p className="font-semibold text-xs text-white mb-0.5">{s.title}</p>
-                          <p className="text-[10px] text-[#8E8E93] line-clamp-2">{s.prompt}</p>
-                        </button>
-                      )
-                    })}
+                    <button
+                      onClick={() => handleSendMessage('Generate an interactive revision tool and flashcards on this topic')}
+                      className="flex items-center gap-3 text-xs text-[#94a3b8] hover:text-white transition-colors"
+                    >
+                      <Edit3 className="w-4 h-4 text-[#8493a8]" />
+                      <span>Write or edit</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleSendMessage('Search the web and lecture notes for deep academic analysis')}
+                      className="flex items-center gap-3 text-xs text-[#94a3b8] hover:text-white transition-colors"
+                    >
+                      <Globe className="w-4 h-4 text-[#8493a8]" />
+                      <span>Search the web</span>
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -1919,9 +1948,9 @@ export default function Learningplayground() {
                   >
                     {m.role === 'assistant' && <Vela size={26} className="mt-1 flex-shrink-0" />}
                     <div
-                      className={`max-w-xl px-4 py-3 rounded-[8px] text-xs leading-relaxed ${m.role === 'user'
-                        ? 'bg-[#5A7D99] text-white shadow-md'
-                        : 'bg-[#1A1E24] border border-[#282E38] text-[#ECECF1]'
+                      className={`max-w-xl px-4 py-3 rounded-2xl text-xs leading-relaxed ${m.role === 'user'
+                        ? 'bg-[#1e293b] border border-[#334155] text-white shadow-md'
+                        : 'bg-[#131c2e] border border-[#1e2d45] text-[#f1f5f9]'
                         }`}
                     >
                       <div className="whitespace-pre-wrap">{m.content}</div>
@@ -1932,7 +1961,7 @@ export default function Learningplayground() {
                               selectTool(m.attachedTool)
                               setRightPanelOpen(true)
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-white font-semibold text-[11px] transition-all shadow-sm"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#3b82f6] hover:bg-[#2563eb] text-white font-semibold text-[11px] transition-all shadow-sm"
                           >
                             <Sparkles className="w-3.5 h-3.5 text-white" />
                             <span>Open in Canvas</span>
@@ -1947,8 +1976,8 @@ export default function Learningplayground() {
               {isLoading && (
                 <div className="flex gap-3 justify-start items-center animate-fade-in py-1">
                   <Vela size={26} loading={true} className="flex-shrink-0" />
-                  <div className="px-4 py-2.5 rounded-[8px] bg-[#1A1E24] border border-[#282E38] text-xs text-white flex items-center gap-2 shadow-sm">
-                    <span className="w-2 h-2 rounded-full bg-[#5A7D99] animate-ping" />
+                  <div className="px-4 py-2.5 rounded-2xl bg-[#131c2e] border border-[#1e2d45] text-xs text-white flex items-center gap-2 shadow-sm">
+                    <span className="w-2 h-2 rounded-full bg-[#38bdf8] animate-ping" />
                     <span>{generationStage || 'Vela is crafting your interactive tool on the canvas...'}</span>
                   </div>
                 </div>
@@ -1956,249 +1985,68 @@ export default function Learningplayground() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Pinned Input Bar */}
-            <div className="p-3 border-t border-[#2F2F2F] bg-[#171717] flex-shrink-0">
-              <div className="max-w-3xl mx-auto w-full">
-                {/* Share Link Toast */}
-                {shareToastMessage && (
-                  <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-[6px] bg-emerald-500/20 border border-emerald-500/40 text-xs text-emerald-300 max-w-fit shadow-md animate-fade-in">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{shareToastMessage}</span>
-                  </div>
-                )}
-
-                {/* Pasted YouTube Video Quick Detection Banner */}
-                {pastedYouTubeUrl && (
-                  <div className="flex items-center justify-between gap-3 mb-2 px-3.5 py-2 rounded-[6px] bg-red-500/15 border border-red-500/30 text-xs text-white shadow-md animate-fade-in">
-                    <div className="flex items-center gap-2 truncate">
-                      <Video className="w-4 h-4 text-red-400 flex-shrink-0" />
-                      <span className="truncate">Detected YouTube Link: <strong>{pastedYouTubeUrl}</strong></span>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Docked Bottom Input Bar (when conversation has messages) */}
+            {messages.length > 0 && (
+              <div className="p-4 bg-[#080c14] border-t border-[#141c2e]/60 flex-shrink-0">
+                <div className="max-w-3xl mx-auto w-full">
+                  <div className="bg-[#131c2e] border border-[#1f2d45] rounded-3xl p-2.5 shadow-2xl focus-within:border-[#38bdf8]/70 transition-all">
+                    <div className="flex items-center gap-2.5">
                       <button
-                        onClick={() => {
-                          setYoutubeUrl(pastedYouTubeUrl)
-                          setUploadTab('youtube')
-                          setShowUploadModal(true)
-                          setPastedYouTubeUrl('')
+                        type="button"
+                        onClick={() => setShowUploadModal(true)}
+                        className="w-7 h-7 rounded-full bg-[#1b2740] hover:bg-[#243555] text-white flex items-center justify-center font-bold text-sm transition-colors flex-shrink-0"
+                        title="Attach files or notes"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+
+                      <textarea
+                        ref={textareaRef}
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault()
+                            handleSendMessage()
+                          }
                         }}
-                        className="px-3 py-1 rounded-[6px] bg-red-500 hover:bg-red-600 text-white text-xs font-semibold shadow-sm transition-all"
-                      >
-                        Ingest Video
-                      </button>
+                        placeholder="Ask anything"
+                        className="flex-1 bg-transparent border-none focus:outline-none text-xs text-white placeholder-[#8493a8] resize-none px-1 py-1 max-h-24 min-h-[32px]"
+                        rows={1}
+                      />
+
                       <button
-                        onClick={() => setPastedYouTubeUrl('')}
-                        className="p-1 rounded-[4px] text-[#8E8E93] hover:text-white"
+                        type="button"
+                        onClick={toggleChatVoiceInput}
+                        className={`p-1.5 rounded-full transition-colors ${isChatListening ? 'bg-red-500 text-white animate-pulse' : 'text-[#8493a8] hover:text-white hover:bg-[#1b2740]'}`}
+                        title="Voice Input (Whisper)"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <Mic className="w-4 h-4" />
+                      </button>
+
+                      <button
+                        onClick={() => handleSendMessage()}
+                        disabled={isLoading || !inputValue.trim()}
+                        className="w-7 h-7 rounded-full bg-[#3b82f6] hover:bg-[#2563eb] text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105 disabled:opacity-40 flex-shrink-0"
+                        title="Send message"
+                      >
+                        <Send className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  </div>
-                )}
-
-                {/* Voice Listening Active Badge */}
-                {isChatListening && (
-                  <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-[6px] bg-red-500/20 border border-red-500/40 text-xs text-red-300 max-w-fit shadow-sm animate-pulse">
-                    <Mic className="w-3.5 h-3.5 text-red-400 animate-bounce" />
-                    <span>Listening to your voice... Speak now (click red mic to stop)</span>
-                  </div>
-                )}
-
-                {/* RAG Context Active Document Badge */}
-                {attachedDocument && (
-                  <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-[6px] bg-[#5A7D99]/20 border border-[#5A7D99]/40 text-xs text-white max-w-fit shadow-sm animate-fade-in">
-                    <FileText className="w-4 h-4 text-[#5A7D99]" />
-                    <span>RAG Context Active: <strong>{attachedDocument.title}</strong></span>
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-1" title="RAG Vector Search Active" />
-                    <button
-                      onClick={() => setAttachedDocument(null)}
-                      className="ml-2 text-[#8E8E93] hover:text-white transition-colors"
-                      title="Remove document context"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-
-                {/* Quick Tool Format & Action Tray in Chat Box */}
-                <div className="relative mb-2">
-                  <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 px-0.5 text-[11px]">
-                    {generatedTool ? (
-                      <>
-                        <span className="text-[#8E8E93] font-semibold flex items-center gap-1 flex-shrink-0 text-[10px] uppercase tracking-wider pr-0.5">
-                          <Sparkles className="w-3 h-3 text-[#5A7D99]" />
-                          <span>Morph:</span>
-                        </span>
-                        {[
-                          { id: 'flashcards', label: 'Cards', icon: Layers },
-                          { id: 'timeline', label: 'Timeline', icon: Clock },
-                          { id: 'crossword', label: 'Crossword', icon: CheckSquare },
-                          { id: 'quiz', label: 'Quiz', icon: Target },
-                          { id: 'memory', label: 'Palace', icon: Compass },
-                          { id: 'cloze', label: 'Cloze', icon: Zap },
-                          { id: 'feynman', label: 'Feynman', icon: Mic },
-                          { id: 'revision-kit', label: 'Revision Kit', icon: Package },
-                        ].map((fmt) => {
-                          const IconComp = fmt.icon
-                          return (
-                            <button
-                              key={fmt.id}
-                              type="button"
-                              onClick={() => handleMorphTool(fmt.id)}
-                              className={`px-2.5 py-1 rounded-[6px] border text-[11px] font-semibold transition-all flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap ${activeMorphFormat === fmt.id || activeMeta.toolType?.toLowerCase().includes(fmt.id)
-                                  ? 'bg-[#5A7D99] text-white border-[#5A7D99] shadow-sm'
-                                  : 'bg-[#212121] text-[#8E8E93] hover:text-white border-[#2F2F2F] hover:border-[#5A7D99]/60'
-                                }`}
-                              title={`Instantly morph active tool into ${fmt.label}`}
-                            >
-                              <IconComp className="w-3 h-3 text-[#5A7D99]" />
-                              <span>{fmt.label}</span>
-                            </button>
-                          )
-                        })}
-
-                        <span className="w-px h-3.5 bg-[#2F2F2F] flex-shrink-0 mx-0.5" />
-
-                        <span className="text-[#8E8E93] font-semibold flex items-center gap-1 flex-shrink-0 text-[10px] uppercase tracking-wider pr-0.5">
-                          <Zap className="w-3 h-3 text-[#5A7D99]" />
-                          <span>Tweaks:</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage(`Make this "${activeMeta.title}" revision tool more challenging with advanced exam questions and hard problem-solving scenarios.`)}
-                          className="px-2.5 py-1 rounded-[6px] bg-[#212121] hover:bg-[#282E38] text-[#8E8E93] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99] transition-all flex items-center gap-1.5 flex-shrink-0 text-[11px] whitespace-nowrap"
-                        >
-                          <Zap className="w-3 h-3 text-[#5A7D99]" />
-                          <span>Harder</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage(`Convert this "${activeMeta.title}" topic into a fast-paced 60-second timed speed drill assessment.`)}
-                          className="px-2.5 py-1 rounded-[6px] bg-[#212121] hover:bg-[#282E38] text-[#8E8E93] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99] transition-all flex items-center gap-1.5 flex-shrink-0 text-[11px] whitespace-nowrap"
-                        >
-                          <Timer className="w-3 h-3 text-[#5A7D99]" />
-                          <span>Speed Drill</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage(`Convert this "${activeMeta.title}" topic into an interactive Spatial Memory Palace with loci anchors and active recall walk-throughs.`)}
-                          className="px-2.5 py-1 rounded-[6px] bg-[#212121] hover:bg-[#282E38] text-[#8E8E93] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99] transition-all flex items-center gap-1.5 flex-shrink-0 text-[11px] whitespace-nowrap"
-                        >
-                          <Compass className="w-3 h-3 text-[#5A7D99]" />
-                          <span>Memory Palace</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSendMessage(`Convert this "${activeMeta.title}" subject into a Feynman Active Recall Audio/Text Grader with key rubrics.`)}
-                          className="px-2.5 py-1 rounded-[6px] bg-[#212121] hover:bg-[#282E38] text-[#8E8E93] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99] transition-all flex items-center gap-1.5 flex-shrink-0 text-[11px] whitespace-nowrap"
-                        >
-                          <Mic className="w-3 h-3 text-[#5A7D99]" />
-                          <span>Feynman Grader</span>
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-[#8E8E93] font-semibold flex items-center gap-1 flex-shrink-0 text-[10px] uppercase tracking-wider pr-0.5">
-                          <Sparkles className="w-3 h-3 text-[#5A7D99]" />
-                          <span>Create:</span>
-                        </span>
-                        {[
-                          { label: 'Timeline', icon: Clock, prompt: 'Create a chronological timeline drag and drop on ' },
-                          { label: 'Flashcards', icon: Layers, prompt: 'Create interactive 3D flashcards on ' },
-                          { label: '2D Crossword', icon: CheckSquare, prompt: 'Create an interlocking 2D crossword puzzle on ' },
-                          { label: 'MCQ Quiz', icon: Target, prompt: 'Generate a timed multiple-choice quiz on ' },
-                          { label: 'Memory Palace', icon: Compass, prompt: 'Create an interactive spatial memory palace on ' },
-                          { label: 'Cloze Blurter', icon: Zap, prompt: 'Create active recall fill-in-the-blank blurting notes on ' },
-                          { label: 'Feynman Grader', icon: Mic, prompt: 'Create a Feynman active recall audio grader on ' },
-                          { label: '3-in-1 Kit', icon: Package, prompt: 'Generate a comprehensive Cornell revision kit on ' },
-                        ].map((chip, idx) => {
-                          const IconComp = chip.icon
-                          return (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => {
-                                setInputValue(chip.prompt)
-                                textareaRef.current?.focus()
-                              }}
-                              className="px-2.5 py-1 rounded-[6px] bg-[#212121] hover:bg-[#282E38] text-[#8E8E93] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99]/60 transition-all flex items-center gap-1.5 flex-shrink-0 text-[11px] whitespace-nowrap"
-                            >
-                              <IconComp className="w-3 h-3 text-[#5A7D99]" />
-                              <span>{chip.label}</span>
-                            </button>
-                          )
-                        })}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Input Container */}
-                <div className="rounded-[8px] p-2 sm:p-2.5 bg-[#212121] border border-[#2F2F2F] focus-within:border-[#5A7D99] shadow-lg transition-all">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowUploadModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[#282E38] hover:bg-[#323946] border border-[#3A4250] text-xs font-semibold text-[#CDD1D6] hover:text-white transition-all shadow-sm flex-shrink-0"
-                      title="Attach a PDF, DOCX, or TXT file to give Vela context"
-                    >
-                      <Paperclip className="w-3.5 h-3.5 text-[#5A7D99]" />
-                      <span className="hidden sm:inline">Attach File</span>
-                    </button>
-
-                    <textarea
-                      ref={textareaRef}
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault()
-                          handleSendMessage()
-                        }
-                      }}
-                      placeholder={
-                        attachedDocument
-                          ? `Ask Vela to generate a tool based on "${attachedDocument.title}"...`
-                          : "Message Vela to generate a revision tool (or attach a file)..."
-                      }
-                      className="flex-1 bg-transparent border-none focus:outline-none text-xs text-white placeholder-[#8E8E93] resize-none px-2 py-1 max-h-24 min-h-[34px]"
-                      rows={1}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={toggleChatVoiceInput}
-                      className={`w-7 h-7 rounded-[6px] flex items-center justify-center transition-all flex-shrink-0 ${isChatListening
-                        ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
-                        : 'bg-[#282E38] hover:bg-[#323946] text-[#CDD1D6] hover:text-white border border-[#3A4250]'
-                        }`}
-                      title={isChatListening ? 'Listening... Click to stop recording' : 'Voice Input: Click to speak your prompt'}
-                    >
-                      {isChatListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-[#5A7D99]" />}
-                    </button>
-
-                    <button
-                      onClick={() => handleSendMessage()}
-                      disabled={isLoading || !inputValue.trim()}
-                      className="w-7 h-7 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-white flex items-center justify-center font-bold transition-all disabled:opacity-30 flex-shrink-0"
-                      title="Send message (Enter)"
-                    >
-                      <Send className="w-3.5 h-3.5" />
-                    </button>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
           </div>
 
           {/* Right Interactive Tool Viewer Canvas Panel */}
           <div
             ref={toolContainerRef}
-            className={`bg-[#141820] flex flex-col overflow-hidden transition-all duration-300 relative ${isToolMaximized
-              ? 'fixed inset-0 z-50 bg-[#141820]'
+            className={`bg-[#0b101b] flex flex-col overflow-hidden transition-all duration-300 relative ${isToolMaximized
+              ? 'fixed inset-0 z-50 bg-[#080c14]'
               : rightPanelOpen
-                ? 'flex-1 border-l border-[#21262D] min-w-0 shadow-2xl'
+                ? 'flex-1 border-l border-[#162032] min-w-0 shadow-2xl'
                 : 'w-0 border-l-0 overflow-hidden hidden'
               } ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex'}`}
           >
@@ -2206,7 +2054,7 @@ export default function Learningplayground() {
             {isToolMaximized && (
               <button
                 onClick={() => setIsToolMaximized(false)}
-                className="fixed top-3 right-4 z-50 px-3 py-1.5 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-white text-xs font-bold shadow-2xl border border-white/20 flex items-center gap-1.5 transition-all"
+                className="fixed top-3 right-4 z-50 px-3 py-1.5 rounded-lg bg-[#3b82f6] hover:bg-[#2563eb] text-white text-xs font-bold shadow-2xl border border-white/20 flex items-center gap-1.5 transition-all"
                 title="Exit Fullscreen (Escape)"
               >
                 <Minimize2 className="w-3.5 h-3.5" />
@@ -2215,70 +2063,70 @@ export default function Learningplayground() {
             )}
 
             {/* Unified Single Canvas Header Bar */}
-            <div className="px-4 py-2.5 border-b border-[#21262D] bg-[#161B22] flex items-center justify-between flex-shrink-0 z-30 relative gap-3">
+            <div className="px-4 py-2.5 border-b border-[#162032] bg-[#0e1424] flex items-center justify-between flex-shrink-0 z-30 relative gap-3">
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <Sparkles className="w-4 h-4 text-[#5A7D99] flex-shrink-0" />
+                <Sparkles className="w-4 h-4 text-[#38bdf8] flex-shrink-0" />
                 <span className="text-xs sm:text-sm font-bold text-white truncate">
                   {activeMeta.title || 'Interactive Workspace'}
                 </span>
                 {generatedTool && (
-                  <span className="capitalize text-[10px] px-2 py-0.5 rounded-[4px] bg-[#5A7D99]/15 border border-[#5A7D99]/30 text-[#8BB0D1] font-mono font-semibold flex-shrink-0">
+                  <span className="capitalize text-[10px] px-2 py-0.5 rounded-full bg-[#3b82f6]/15 border border-[#3b82f6]/30 text-[#38bdf8] font-mono font-semibold flex-shrink-0">
                     {activeMeta.toolType}
                   </span>
                 )}
               </div>
 
               {generatedTool && (
-                <div className="flex items-center gap-1.5 text-xs text-[#CDD1D6] flex-shrink-0">
+                <div className="flex items-center gap-1.5 text-xs text-[#cbd5e1] flex-shrink-0">
                   <button
                     onClick={openInlineEditor}
-                    className="p-1 px-2.5 rounded-[6px] bg-[#21262D] hover:bg-[#2A313C] text-[#CDD1D6] hover:text-white transition-colors flex items-center gap-1 text-[11px] border border-[#2F3746]"
+                    className="p-1 px-2.5 rounded-lg bg-[#131c2e] hover:bg-[#1a253c] text-[#cbd5e1] hover:text-white transition-colors flex items-center gap-1 text-[11px] border border-[#1e2d45]"
                     title="Edit questions, cards, and content in canvas"
                   >
-                    <Edit3 className="w-3.5 h-3.5 text-[#5A7D99]" />
+                    <Edit3 className="w-3.5 h-3.5 text-[#38bdf8]" />
                     <span className="hidden md:inline">Edit</span>
                   </button>
 
                   <button
                     onClick={() => handleCopyShareLink(generatedTool)}
-                    className="p-1 px-2.5 rounded-[6px] bg-[#21262D] hover:bg-[#2A313C] text-[#CDD1D6] hover:text-white transition-all flex items-center gap-1 text-[11px] border border-[#2F3746]"
+                    className="p-1 px-2.5 rounded-lg bg-[#131c2e] hover:bg-[#1a253c] text-[#cbd5e1] hover:text-white transition-all flex items-center gap-1 text-[11px] border border-[#1e2d45]"
                     title="Copy direct shareable study link"
                   >
-                    <Share2 className="w-3.5 h-3.5 text-[#5A7D99]" />
+                    <Share2 className="w-3.5 h-3.5 text-[#38bdf8]" />
                     <span className="hidden md:inline">Share</span>
                   </button>
 
                   <div className="relative">
                     <button
                       onClick={() => setShowExportMenu(!showExportMenu)}
-                      className="p-1 px-2.5 rounded-[6px] bg-[#21262D] hover:bg-[#2A313C] text-[#CDD1D6] hover:text-white transition-all flex items-center gap-1 text-[11px] border border-[#2F3746]"
-                      title="Export to Anki / Quizlet or Print Study Sheet"
+                      className="p-1 px-2 rounded-lg bg-[#131c2e] hover:bg-[#1a253c] text-[#cbd5e1] hover:text-white transition-all flex items-center gap-1 text-[11px] border border-[#1e2d45]"
+                      title="Export or print study materials"
                     >
-                      <Download className="w-3.5 h-3.5 text-[#5A7D99]" />
+                      <Download className="w-3.5 h-3.5 text-[#38bdf8]" />
                       <span className="hidden md:inline">Export</span>
                     </button>
 
                     {showExportMenu && (
-                      <div className="absolute right-0 mt-1.5 w-52 bg-[#1A1E24] border border-[#282E38] rounded-[8px] shadow-2xl p-1.5 z-50 animate-fade-in space-y-1">
+                      <div className="absolute right-0 mt-1.5 w-56 rounded-xl bg-[#131c2e] border border-[#1e2d45] shadow-2xl p-1.5 z-50 animate-fade-in space-y-1">
                         <button
-                          onClick={handleExportAnkiCsv}
-                          className="w-full text-left px-3 py-2 rounded-[6px] hover:bg-[#21262E] text-xs font-semibold text-white flex items-center gap-2 transition-colors"
+                          onClick={handleExportMarkdown}
+                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#1a253c] text-xs font-semibold text-white flex items-center gap-2 transition-colors"
                         >
-                          <Download className="w-3.5 h-3.5 text-[#5A7D99]" />
+                          <FileText className="w-3.5 h-3.5 text-[#38bdf8]" />
                           <div>
-                            <p className="text-xs">Export Anki / Quizlet</p>
-                            <p className="text-[10px] text-[#8E8E93]">Download tab-separated .csv</p>
+                            <p className="text-xs">Download Markdown</p>
+                            <p className="text-[10px] text-[#8493a8]">Clean Obsidian/Notion format</p>
                           </div>
                         </button>
 
                         <button
                           onClick={handlePrintStudySheet}
-                          className="w-full text-left px-3 py-2 rounded-[6px] hover:bg-[#21262E] text-xs font-semibold text-white flex items-center gap-2 transition-colors"
+                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#1a253c] text-xs font-semibold text-white flex items-center gap-2 transition-colors"
                         >
-                          <Printer className="w-3.5 h-3.5 text-[#3D6660]" />
+                          <Printer className="w-3.5 h-3.5 text-[#38bdf8]" />
                           <div>
                             <p className="text-xs">Print / PDF Cheat Sheet</p>
-                            <p className="text-[10px] text-[#8E8E93]">Clean 2-column print layout</p>
+                            <p className="text-[10px] text-[#8493a8]">Clean 2-column print layout</p>
                           </div>
                         </button>
                       </div>
@@ -2287,18 +2135,18 @@ export default function Learningplayground() {
 
                   <button
                     onClick={() => openPublishModal(generatedTool)}
-                    className="p-1 px-2.5 rounded-[6px] bg-[#5A7D99]/20 hover:bg-[#5A7D99] text-[#8BB0D1] hover:text-white transition-all flex items-center gap-1.5 text-[11px] border border-[#5A7D99]/40 hover:border-[#5A7D99] font-medium shadow-sm group"
+                    className="p-1 px-2.5 rounded-lg bg-[#3b82f6]/20 hover:bg-[#3b82f6] text-[#38bdf8] hover:text-white transition-all flex items-center gap-1.5 text-[11px] border border-[#3b82f6]/40 hover:border-[#3b82f6] font-medium shadow-sm group"
                     title="Publish this tool to the Community Marketplace"
                   >
-                    <Globe className="w-3.5 h-3.5 text-[#5A7D99] group-hover:text-white" />
+                    <Globe className="w-3.5 h-3.5 text-[#38bdf8] group-hover:text-white" />
                     <span className="hidden sm:inline">Publish</span>
                   </button>
 
                   <button
                     onClick={() => setIsToolMaximized(!isToolMaximized)}
-                    className={`p-1 px-2.5 rounded-[6px] transition-all flex items-center gap-1 text-[11px] font-medium border ${isToolMaximized
-                      ? 'bg-[#5A7D99] hover:bg-[#3D5E7A] text-white border-[#5A7D99] shadow-md'
-                      : 'bg-[#21262D] hover:bg-[#2A313C] text-[#CDD1D6] hover:text-white border-[#2F3746]'
+                    className={`p-1 px-2.5 rounded-lg transition-all flex items-center gap-1 text-[11px] font-medium border ${isToolMaximized
+                      ? 'bg-[#3b82f6] hover:bg-[#2563eb] text-white border-[#3b82f6] shadow-md'
+                      : 'bg-[#131c2e] hover:bg-[#1a253c] text-[#cbd5e1] hover:text-white border-[#1e2d45]'
                       }`}
                     title={isToolMaximized ? 'Minimize Workspace (Esc)' : 'Expand Fullscreen'}
                   >
@@ -2308,7 +2156,7 @@ export default function Learningplayground() {
 
                   <button
                     onClick={handleUnloadTool}
-                    className="p-1 px-1.5 rounded-[6px] hover:bg-red-500/20 text-[#8E8E93] hover:text-red-400 transition-colors flex items-center gap-1 text-[11px]"
+                    className="p-1 px-1.5 rounded-lg hover:bg-red-500/20 text-[#8493a8] hover:text-red-400 transition-colors flex items-center gap-1 text-[11px]"
                     title="Close tool and return to canvas idle"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -2318,7 +2166,7 @@ export default function Learningplayground() {
             </div>
 
             {/* Sandbox Canvas Body */}
-            <div className="flex-1 p-2 sm:p-4 overflow-y-auto bg-[#10141C] flex flex-col min-h-0">
+            <div className="flex-1 p-2 sm:p-4 overflow-y-auto bg-[#080c14] flex flex-col min-h-0">
               {isLoading ? (
                 <div className="flex-1 flex flex-col items-center justify-center my-auto w-full max-w-xl mx-auto p-2 sm:p-4">
                   <PlaygroundLoader stage={generationStage} phase={buildPhase} />

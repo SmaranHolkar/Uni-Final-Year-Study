@@ -3,43 +3,41 @@
 @tailwind utilities;
 
 :root {
-  --bg: #131519;
-  --surface: #1A1E24;
-  --card: #21262E;
-  --border: #282E38;
-  --slate: #3D5E7A;
-  --slate-soft: #5A7D99;
-  --slate-glow: rgba(61, 94, 122, 0.18);
-  --forest: #4A6B52;
-  --bridge: #3D6660;
-  --white: #CDD1D6;
-  --muted: #6E7580;
-  --dim: #3A3F48;
+  --bg: #080c14;
+  --surface: #0e1422;
+  --surface-hover: #141c30;
+  --card: #131c2e;
+  --card-hover: #19243b;
+  --border: #1d2b45;
+  --border-subtle: rgba(56, 189, 248, 0.12);
+  
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+  --primary-glow: rgba(59, 130, 246, 0.25);
+  --cyan: #38bdf8;
+  --cyan-glow: rgba(56, 189, 248, 0.2);
+  
+  --white: #f1f5f9;
+  --muted: #8493a8;
+  --dim: #475569;
 
   --background: var(--bg);
   --foreground: var(--white);
   --card-foreground: var(--white);
   --popover: var(--surface);
   --popover-foreground: var(--white);
-  --primary: var(--slate-soft);
-  --primary-foreground: #ffffff;
   --secondary: var(--surface);
   --secondary-foreground: var(--white);
   --muted-foreground: var(--muted);
-  --accent: var(--slate-soft);
+  --accent: var(--cyan);
   --accent-foreground: #ffffff;
-  --destructive: #9A6464;
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --input: var(--border);
-  --ring: var(--slate-soft);
+  --input: var(--card);
+  --ring: var(--primary);
 
-  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --radius: 0px;
-}
-
-*, *::before, *::after {
-  border-radius: 0 !important;
 }
 
 body {
@@ -48,40 +46,42 @@ body {
   color: var(--white);
   font-family: var(--font-sans);
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #131519;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #282E38;
-  border-radius: 0px;
+  background: #1d2b45;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3D5E7A;
+  background: #2a3d60;
 }
 
-/* Custom Glassmorphism */
+/* Custom Glassmorphism in Dark Blue Hue */
 .glass-panel {
-  background: rgba(26, 30, 36, 0.85);
+  background: rgba(14, 20, 34, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(40, 46, 56, 0.8);
+  border: 1px solid rgba(30, 43, 69, 0.8);
 }
 
 .glass-card {
-  background: rgba(33, 38, 46, 0.7);
+  background: rgba(19, 28, 46, 0.7);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(40, 46, 56, 0.6);
+  border: 1px solid rgba(30, 43, 69, 0.6);
 }
 
 /* Shimmer animation */
