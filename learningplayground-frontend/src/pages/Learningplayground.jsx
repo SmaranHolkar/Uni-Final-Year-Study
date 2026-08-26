@@ -1933,25 +1933,6 @@ export default function Learningplayground() {
                       </div>
 
                       <div className="flex items-center gap-2">
-                        {/* Grammer / AI Icon */}
-                        <div className="w-6 h-6 rounded-full bg-[#0e1726] border border-[#1e2d45] flex items-center justify-center text-[#38bdf8]" title="Vela AI Ready">
-                          <Sparkles className="w-3 h-3" />
-                        </div>
-
-                        {/* Think Button */}
-                        <button
-                          type="button"
-                          onClick={() => setIsThinkingMode(!isThinkingMode)}
-                          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${isThinkingMode
-                            ? 'bg-[#3b82f6]/20 text-[#38bdf8] border border-[#3b82f6]/40 shadow-sm'
-                            : 'text-[#8493a8] hover:text-white hover:bg-[#1b2740]'
-                            }`}
-                          title="Deep Reasoning Mode"
-                        >
-                          <Brain className="w-3.5 h-3.5" />
-                          <span>Think</span>
-                        </button>
-
                         {/* Voice Mic Button */}
                         <button
                           type="button"
@@ -1962,14 +1943,14 @@ export default function Learningplayground() {
                           <Mic className="w-4 h-4" />
                         </button>
 
-                        {/* Audio Waveform / Send Button */}
+                        {/* Send Button */}
                         <button
                           onClick={() => handleSendMessage()}
                           disabled={isLoading || !inputValue.trim()}
                           className="w-8 h-8 rounded-full bg-[#3b82f6] hover:bg-[#2563eb] text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105 disabled:opacity-40"
                           title="Send prompt"
                         >
-                          <AudioLines className="w-4 h-4" />
+                          <Send className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
