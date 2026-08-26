@@ -1537,10 +1537,12 @@ export default function Learningplayground() {
           }`}
       >
         {/* Top Header in Sidebar */}
-        <div className="p-3.5 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="font-bold text-sm text-white tracking-tight">
-              ChatGPT
+        {/* Top Header in Sidebar */}
+        <div className="p-3.5 flex items-center justify-between gap-2 border-b border-[#162032]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Vela size={22} className="flex-shrink-0" />
+            <span className="font-bold text-xs sm:text-sm text-white tracking-tight truncate">
+              Learning Playground
             </span>
           </div>
 
@@ -1562,93 +1564,89 @@ export default function Learningplayground() {
           </div>
         </div>
 
-        {/* New Chat Button */}
-        <div className="px-3 pb-2">
+        {/* Primary Action Buttons */}
+        <div className="p-3 space-y-1.5 border-b border-[#162032]">
           <button
             onClick={handleStartNewSession}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#131c2e] hover:bg-[#19243b] border border-[#1e2d45] text-xs font-medium text-white transition-all group"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[#131c2e] hover:bg-[#19243b] border border-[#1e2d45] text-xs font-semibold text-white transition-all group shadow-sm"
           >
-            <SquarePen className="w-4 h-4 text-[#38bdf8] group-hover:scale-105 transition-transform" />
+            <Plus className="w-4 h-4 text-[#38bdf8] group-hover:scale-110 transition-transform" />
             <span>New chat</span>
           </button>
         </div>
 
         {/* Core Navigation Items */}
-        <div className="px-2 space-y-0.5 text-xs text-[#94a3b8]">
-          <button
-            onClick={() => {
-              setUploadTab('image-ocr')
-              setShowUploadModal(true)
-            }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#131c2e] hover:text-white transition-colors text-left"
-          >
-            <Image className="w-4 h-4 text-[#8493a8]" />
-            <span>Images</span>
-          </button>
-
-          <button
-            onClick={() => setActiveNavSection('saved-tools')}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-left ${activeNavSection === 'saved-tools'
-              ? 'bg-[#131c2e] text-white font-medium'
-              : 'hover:bg-[#131c2e] hover:text-white'
-              }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <Bookmark className="w-4 h-4 text-[#8493a8]" />
-              <span>Library</span>
-            </div>
-            {savedTools.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#1e293b] text-[#8493a8] font-mono">
-                {savedTools.length}
-              </span>
-            )}
-          </button>
-
+        <div className="px-2 pt-2 space-y-0.5 text-xs text-[#94a3b8] border-b border-[#162032] pb-2">
           <button
             onClick={() => setActiveNavSection('chats')}
-            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-left ${activeNavSection === 'chats'
-              ? 'bg-[#131c2e] text-white font-medium'
-              : 'hover:bg-[#131c2e] hover:text-white'
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'chats'
+              ? 'bg-[#131c2e] text-white font-semibold'
+              : 'hover:bg-[#131c2e]/70 hover:text-white'
               }`}
           >
             <div className="flex items-center gap-2.5">
-              <Clock className="w-4 h-4 text-[#8493a8]" />
-              <span>Scheduled</span>
+              <MessageSquare className="w-4 h-4 text-[#38bdf8]" />
+              <span>Chats</span>
             </div>
             {chatHistory.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#1e293b] text-[#8493a8] font-mono">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#3b82f6]/20 text-[#38bdf8] font-mono">
                 {chatHistory.length}
               </span>
             )}
           </button>
 
+          <Link
+            to="/tools"
+            className="w-full px-3 py-2 rounded-lg text-xs font-medium text-[#94a3b8] hover:bg-[#131c2e]/70 hover:text-white flex items-center gap-2.5 transition-all"
+          >
+            <Wrench className="w-4 h-4 text-[#38bdf8]" />
+            <span>Tools Studio</span>
+          </Link>
+
           <button
             onClick={() => setShowMarketplaceExplorer(true)}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#131c2e] hover:text-white transition-colors text-left"
+            className="w-full px-3 py-2 rounded-lg text-xs font-medium text-[#94a3b8] hover:bg-[#131c2e]/70 hover:text-white flex items-center justify-between transition-all"
+            title="Browse Community Marketplace Tools"
           >
             <div className="flex items-center gap-2.5">
-              <Layers className="w-4 h-4 text-[#8493a8]" />
-              <span>Plugins</span>
+              <Globe className="w-4 h-4 text-[#38bdf8]" />
+              <span>Marketplace</span>
             </div>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#3b82f6]/20 text-[#38bdf8] font-mono">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#3b82f6]/20 text-[#38bdf8] font-mono">
               {marketplaceTools.length}
             </span>
           </button>
 
-          <Link
-            to="/tools"
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#131c2e] hover:text-white transition-colors text-left"
+          <button
+            onClick={() => setActiveNavSection('saved-tools')}
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'saved-tools'
+              ? 'bg-[#131c2e] text-white font-semibold'
+              : 'hover:bg-[#131c2e]/70 hover:text-white'
+              }`}
           >
-            <Wrench className="w-4 h-4 text-[#8493a8]" />
-            <span>Codex</span>
-          </Link>
+            <div className="flex items-center gap-2.5">
+              <Bookmark className="w-4 h-4 text-[#38bdf8]" />
+              <span>Saved Tools</span>
+            </div>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1e293b] text-[#8493a8] font-mono">
+              {savedTools.length}
+            </span>
+          </button>
 
           <button
-            onClick={() => setShowUploadModal(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#131c2e] hover:text-white transition-colors text-left"
+            onClick={() => setActiveNavSection('community')}
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'community'
+              ? 'bg-[#131c2e] text-white font-semibold'
+              : 'hover:bg-[#131c2e]/70 hover:text-white'
+              }`}
           >
-            <MoreHorizontal className="w-4 h-4 text-[#8493a8]" />
-            <span>More</span>
+            <div className="flex items-center gap-2.5">
+              <Sparkles className="w-4 h-4 text-[#38bdf8]" />
+              <span>Community Library</span>
+            </div>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1e293b] text-[#8493a8] font-mono">
+              {marketplaceTools.length}
+            </span>
           </button>
         </div>
 
@@ -1661,7 +1659,13 @@ export default function Learningplayground() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search chats..."
+                placeholder={
+                  activeNavSection === 'chats'
+                    ? 'Search chats...'
+                    : activeNavSection === 'saved-tools'
+                      ? 'Search saved tools...'
+                      : 'Search community...'
+                }
                 className="w-full bg-[#131c2e] border border-[#1e2b45] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#64748b] focus:outline-none focus:border-[#38bdf8]"
                 autoFocus
               />
@@ -1669,40 +1673,19 @@ export default function Learningplayground() {
           </div>
         )}
 
-        {/* Scrollable Pinned & Projects / Recents Section */}
-        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4 scrollbar-thin">
-          {/* Pinned Section */}
-          <div>
-            <div className="px-3 py-1 text-[11px] font-semibold text-[#64748b]">
-              Pinned
-            </div>
-            <div className="space-y-0.5">
-              <button
-                onClick={() => handleSendMessage('Help me write an academic revision story with key principles')}
-                className="w-full px-3 py-1.5 rounded-lg text-xs text-[#cbd5e1] hover:bg-[#131c2e] hover:text-white flex items-center gap-2.5 text-left truncate transition-colors"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
-                <span className="truncate">Writing story</span>
-              </button>
-              <button
-                onClick={() => handleSendMessage('Review core concepts and problem sets for final year project')}
-                className="w-full px-3 py-1.5 rounded-lg text-xs text-[#cbd5e1] hover:bg-[#131c2e] hover:text-white flex items-center gap-2.5 text-left truncate transition-colors"
-              >
-                <Folder className="w-3.5 h-3.5 text-[#38bdf8] flex-shrink-0" />
-                <span className="truncate">final year project</span>
-              </button>
-            </div>
-          </div>
+        {/* Scrollable Recents / Conversations & Tools List */}
+        <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1 scrollbar-thin">
+          {activeNavSection === 'chats' && (
+            <div>
+              <div className="px-2 pt-1 pb-1.5 flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-[#8493a8] uppercase tracking-wider">
+                  Recents
+                </span>
+                <Clock className="w-3 h-3 text-[#64748b]" />
+              </div>
 
-          {/* Projects / Recents Section */}
-          <div>
-            <div className="px-3 py-1 text-[11px] font-semibold text-[#64748b]">
-              Projects
-            </div>
-
-            <div className="space-y-0.5">
               {filteredChats.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-[#64748b]">No previous chats.</p>
+                <p className="px-3 py-3 text-xs text-[#64748b]">No previous chats found.</p>
               ) : (
                 filteredChats.map((chat) => {
                   const isActive = activeChatId === chat.id
@@ -1710,19 +1693,19 @@ export default function Learningplayground() {
                     <div
                       key={chat.id}
                       onClick={() => loadChatSession(chat)}
-                      className={`group px-3 py-1.5 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
+                      className={`group px-3 py-2 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
                         ? 'bg-[#131c2e] text-white font-medium border border-[#1e2b45]'
-                        : 'text-[#94a3b8] hover:bg-[#131c2e]/70 hover:text-white'
+                        : 'text-[#94a3b8] hover:bg-[#131c2e]/60 hover:text-white'
                         }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-1">
-                        <Folder className="w-3.5 h-3.5 text-[#64748b] group-hover:text-[#38bdf8] flex-shrink-0" />
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <MessageSquare className="w-3.5 h-3.5 text-[#38bdf8] flex-shrink-0" />
                         <span className="truncate">{chat.title || 'Previous Chat'}</span>
                       </div>
 
                       <button
                         onClick={(e) => deleteChatSession(chat.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-[#64748b] transition-opacity"
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-[#64748b] transition-opacity rounded-md"
                         title="Delete chat thread"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1732,42 +1715,121 @@ export default function Learningplayground() {
                 })
               )}
             </div>
-          </div>
+          )}
+
+          {activeNavSection === 'saved-tools' && (
+            <div>
+              <div className="px-2 pt-1 pb-1.5">
+                <span className="text-[11px] font-semibold text-[#8493a8] uppercase tracking-wider">
+                  Saved Tools
+                </span>
+              </div>
+              {isLoadingSavedTools ? (
+                <p className="px-3 py-2 text-xs text-[#64748b]">Loading saved tools...</p>
+              ) : filteredSavedTools.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-[#64748b]">No saved tools found.</p>
+              ) : (
+                filteredSavedTools.map((tool) => {
+                  const meta = extractToolMetadata(tool)
+                  const isActive = generatedTool?.id === tool.id
+                  return (
+                    <div
+                      key={tool.id}
+                      onClick={() => selectTool(tool)}
+                      className={`group px-3 py-2 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
+                        ? 'bg-[#131c2e] text-white font-medium border border-[#1e2b45]'
+                        : 'text-[#94a3b8] hover:bg-[#131c2e]/60 hover:text-white'
+                        }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <Wrench className="w-3.5 h-3.5 text-[#38bdf8] flex-shrink-0" />
+                        <span className="truncate">{meta.title}</span>
+                      </div>
+
+                      <button
+                        onClick={(e) => handleDeleteTool(tool.id, e)}
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-[#64748b] transition-opacity rounded-md"
+                        title="Delete tool"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          )}
+
+          {activeNavSection === 'community' && (
+            <div>
+              <div className="px-2 pt-1 pb-1.5">
+                <span className="text-[11px] font-semibold text-[#8493a8] uppercase tracking-wider">
+                  Community Library
+                </span>
+              </div>
+              {isLoadingMarketplaceTools ? (
+                <p className="px-3 py-2 text-xs text-[#64748b]">Loading community tools...</p>
+              ) : filteredMarketplaceTools.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-[#64748b]">No community tools available.</p>
+              ) : (
+                filteredMarketplaceTools.map((mTool) => {
+                  const meta = extractToolMetadata(mTool)
+                  const isActive = generatedTool?.id === mTool.id
+                  return (
+                    <div
+                      key={mTool.id}
+                      onClick={() => selectTool(mTool)}
+                      className={`group px-3 py-2 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
+                        ? 'bg-[#131c2e] text-white font-medium border border-[#1e2b45]'
+                        : 'text-[#94a3b8] hover:bg-[#131c2e]/60 hover:text-white'
+                        }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <Sparkles className="w-3.5 h-3.5 text-[#38bdf8] flex-shrink-0" />
+                        <span className="truncate">{meta.title}</span>
+                      </div>
+
+                      <button className="opacity-0 group-hover:opacity-100 px-2 py-0.5 text-[10px] font-semibold rounded-md bg-[#3b82f6]/20 text-[#38bdf8] transition-opacity">
+                        Load
+                      </button>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          )}
         </div>
 
-        {/* User Profile Footer (ChatGPT Style) */}
+        {/* User Profile Footer */}
         <div className="p-3 border-t border-[#162032] bg-[#080c14] flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-full bg-amber-600/90 text-white font-bold text-xs flex items-center justify-center flex-shrink-0 shadow-sm">
-              {user?.email ? user.email.slice(0, 2).toUpperCase() : 'CO'}
+            <div className="w-7 h-7 rounded-full bg-[#1e293b] border border-[#334155] flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm">
+              {user?.email ? user.email.charAt(0).toUpperCase() : 'G'}
             </div>
             <div className="min-w-0">
-              <p className="font-semibold text-xs text-white truncate max-w-[90px]">
-                {user?.email ? user.email.split('@')[0] : 'coolhairy'}
+              <p className="font-semibold text-xs text-white truncate max-w-[110px]">
+                {user?.email ? user.email.split('@')[0] : 'Guest User'}
               </p>
-              <p className="text-[10px] text-[#64748b]">Free</p>
+              <p className="text-[10px] text-[#64748b] truncate">
+                {user ? 'Unlimited Plan' : 'Free Plan'}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <button className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#131c2e] hover:bg-[#1b2840] text-[#cbd5e1] border border-[#1e2d45] transition-all">
-              Upgrade
-            </button>
-            <button
-              onClick={async () => {
-                setChatHistory([])
-                setActiveChatId(null)
-                setMessages([])
-                setGeneratedTool(null)
-                setAttachedDocument(null)
-                if (signOut) await signOut()
-              }}
-              className="p-1 rounded-lg text-[#64748b] hover:text-red-400 transition-colors"
-              title="Sign Out"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <button
+            onClick={async () => {
+              setChatHistory([])
+              setActiveChatId(null)
+              setMessages([])
+              setGeneratedTool(null)
+              setAttachedDocument(null)
+              if (signOut) await signOut()
+            }}
+            className="p-1.5 rounded-lg hover:bg-[#131c2e] text-[#64748b] hover:text-red-400 transition-colors"
+            title="Sign Out"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
         </div>
       </aside>
 
@@ -1913,30 +1975,30 @@ export default function Learningplayground() {
                     </div>
                   </div>
 
-                  {/* 3 Quick Action Prompt Items under Capsule */}
+                  {/* Quick Action Prompt Items under Capsule */}
                   <div className="flex flex-col items-start gap-2.5 mt-6 w-full max-w-2xl px-2">
                     <button
-                      onClick={() => handleSendMessage('Create an image or diagram illustrating key concepts with labeled components')}
+                      onClick={() => handleSendMessage('Create interactive revision flashcards and a timed quiz on key concepts')}
                       className="flex items-center gap-3 text-xs text-[#94a3b8] hover:text-white transition-colors"
                     >
-                      <Image className="w-4 h-4 text-[#8493a8]" />
-                      <span>Create an image or sticker</span>
+                      <Sparkles className="w-4 h-4 text-[#38bdf8]" />
+                      <span>Create interactive revision tools or flashcards</span>
                     </button>
 
                     <button
-                      onClick={() => handleSendMessage('Generate an interactive revision tool and flashcards on this topic')}
+                      onClick={() => setShowUploadModal(true)}
                       className="flex items-center gap-3 text-xs text-[#94a3b8] hover:text-white transition-colors"
                     >
-                      <Edit3 className="w-4 h-4 text-[#8493a8]" />
-                      <span>Write or edit</span>
+                      <FileText className="w-4 h-4 text-[#38bdf8]" />
+                      <span>Ground study session in lecture notes (PDF / Slides)</span>
                     </button>
 
                     <button
-                      onClick={() => handleSendMessage('Search the web and lecture notes for deep academic analysis')}
+                      onClick={() => handleSendMessage('Perform deep research and generate a comprehensive study guide')}
                       className="flex items-center gap-3 text-xs text-[#94a3b8] hover:text-white transition-colors"
                     >
-                      <Globe className="w-4 h-4 text-[#8493a8]" />
-                      <span>Search the web</span>
+                      <Globe className="w-4 h-4 text-[#38bdf8]" />
+                      <span>Deep academic research and study summary</span>
                     </button>
                   </div>
                 </div>
