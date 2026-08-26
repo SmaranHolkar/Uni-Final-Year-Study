@@ -263,22 +263,22 @@ export default function ToolsStudio() {
             ))}
           </div>
         ) : filteredTools.length === 0 ? (
-          <div className="glass-panel rounded-2xl border border-[#282E38] p-12 text-center my-8">
-            <div className="w-14 h-14 rounded-2xl bg-[#21262E] border border-[#282E38] flex items-center justify-center text-[#5A7D99] mx-auto mb-4">
-              <Wrench className="w-7 h-7" />
+          <div className="rounded-[8px] bg-[#1A1E24] border border-[#282E38] p-10 text-center my-8">
+            <div className="w-12 h-12 rounded-[6px] bg-[#21262E] border border-[#282E38] flex items-center justify-center text-[#5A7D99] mx-auto mb-3">
+              <Wrench className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-semibold text-white mb-1">No Tools Found</h3>
-            <p className="text-xs text-[#6E7580] max-w-md mx-auto mb-6">
+            <h3 className="text-sm font-semibold text-white mb-1">No Tools Found</h3>
+            <p className="text-xs text-[#8E8E93] max-w-md mx-auto mb-5">
               {activeTab === 'my-tools'
                 ? "You haven't saved any revision tools yet. Ask Vela in the playground to generate custom tools!"
                 : "No community tools matched your search filter."}
             </p>
             <Link
               to="/"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#5A7D99] hover:bg-[#3D5E7A] text-white text-xs font-semibold transition-all shadow-md"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-white text-xs font-semibold transition-all shadow-md"
             >
-              <Plus className="w-4 h-4" />
-              Create a Tool
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create a Tool</span>
             </Link>
           </div>
         ) : (
@@ -289,7 +289,7 @@ export default function ToolsStudio() {
                 <div
                   key={tool.id}
                   onClick={() => setActiveTool(tool)}
-                  className="group glass-card rounded-2xl border border-[#282E38] hover:border-[#5A7D99]/60 p-5 flex flex-col justify-between cursor-pointer transition-all hover:scale-[1.01] hover:shadow-xl relative overflow-hidden"
+                  className="group rounded-[8px] bg-[#1A1E24] border border-[#282E38] hover:border-[#5A7D99]/60 p-5 flex flex-col justify-between cursor-pointer transition-all hover:shadow-xl relative overflow-hidden"
                 >
                   <div className="absolute top-0 right-0 w-24 h-24 bg-[#5A7D99]/5 rounded-bl-full pointer-events-none group-hover:bg-[#5A7D99]/15 transition-all" />
 

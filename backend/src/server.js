@@ -18,6 +18,46 @@ import multimodalRouter from './features/ai/multimodal.routes.js';
 // Shared middleware
 import requireAuth from './shared/middleware/requireAuth.js';
 
+import pool from './shared/config/dbPool.js';
+
+// Auto-verify and run lightweight database migrations
+async function runAutoMigrations() {
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query(`
+        DO $$ 
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = 'w_embeddings' 
+                AND column_name = 'paragraph_index'
+            ) THEN
+                ALTER TABLE public.w_embeddings ADD COLUMN paragraph_index INT DEFAULT 1;
+            END IF;
+            IF NOT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = 'w_embeddings' 
+                AND column_name = 'page_number'
+            ) THEN
+                ALTER TABLE public.w_embeddings ADD COLUMN page_number INT DEFAULT 1;
+            END IF;
+        END $$;
+      `);
+      console.log('[DB MIGRATIONS] w_embeddings paragraph & page metadata verified');
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.warn('[DB MIGRATION NOTICE]:', err.message);
+  }
+}
+runAutoMigrations();
+
 const app = express();
 app.disable('x-powered-by'); // prevent tech-stack fingerprinting
 const PORT = process.env.PORT || 5000;

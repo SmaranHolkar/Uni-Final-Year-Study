@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Send, Sparkles, Lightbulb, TrendingUp, AlertCircle, Network, Clock, History, X, Zap, Share2 } from 'lucide-react'
+import { Send, Sparkles, Lightbulb, TrendingUp, AlertCircle, Network, Clock, History, X, Zap, Share2, Image, Camera, BookOpen, Volume2, ShieldCheck } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import { useLocation } from 'react-router-dom'
 import Vela from '../components/Vela'
@@ -42,17 +42,18 @@ function Learningplayground() {
   const { user, session } = useAuth()
   const location = useLocation()
   
-  // Extract quiz context if passed from StepTwo
+  // Extract quiz context if passed from StepTwo or Metacognitive Analysis
   const initialQuizResults = location.state?.quizResults || null
   const initialWrongQs = location.state?.mindmapData?.wrongQuestions || null
   const isPerfectScore = location.state?.mindmapData?._perfect || false
   const initialAnalysis = location.state?.analysis || null
   const initialPromptFromAnalysis = location.state?.initialPrompt || null
+  const initialDocumentTitle = location.state?.documentTitle || location.state?.title || null
 
   const [_activeQuizResults, setActiveQuizResults] = useState(initialQuizResults)
   const [activeWrongQs, setActiveWrongQs] = useState(initialWrongQs)
   const [activeAnalysis, setActiveAnalysis] = useState(initialAnalysis)
-  const [activeSessionTitle, setActiveSessionTitle] = useState(null)
+  const [activeSessionTitle, setActiveSessionTitle] = useState(initialDocumentTitle || null)
 
   const [messages, setMessages] = useState([])
   const [suggestions, setSuggestions] = useState(defaultSuggestions)
@@ -80,6 +81,18 @@ function Learningplayground() {
   const [showMarketplaceMetadataModal, setShowMarketplaceMetadataModal] = useState(false)
   const [marketplaceMetadataForm, setMarketplaceMetadataForm] = useState({ title: '', description: '', tags: '' })
   const [marketplaceMetadataError, setMarketplaceMetadataError] = useState('')
+
+  // Multimodal Image Attachment state
+  const [attachedImage, setAttachedImage] = useState(null) // { file, previewUrl, base64 }
+  const imageInputRef = useRef(null)
+
+  // Grounded Paragraph Inspector Drawer state
+  const [inspectorOpen, setInspectorOpen] = useState(false)
+  const [inspectorDocTitle, setInspectorDocTitle] = useState('')
+  const [inspectorParagraphs, setInspectorParagraphs] = useState([])
+  const [inspectorTargetPara, setInspectorTargetPara] = useState(null)
+  const [isLoadingParagraphs, setIsLoadingParagraphs] = useState(false)
+  const inspectorScrollRef = useRef(null)
 
   const [generatedImageUrl, setGeneratedImageUrl] = useState(null)
   const [generatedImageError, setGeneratedImageError] = useState(null)
@@ -567,14 +580,14 @@ function Learningplayground() {
     const score = rawQuiz.filter(q => q.isCorrect).length
     const total = rawQuiz.length
     const fallbackGreeting = allCorrect
-      ? `Loaded your study session: **${quizSession.title}**\n\nYou scored ${score}/${total} — perfect score! 🎉 I can generate advanced challenge questions to push your knowledge further.`
-      : `Loaded your study session: **${quizSession.title}**\n\nYou scored ${score}/${total}. I found **${wrongQuestions.length} topic${wrongQuestions.length !== 1 ? 's' : ''}** you missed. Use the suggestions below to create a mindmap, flashcards, or explanations based on those gaps.`
+      ? `Loaded your study session: **${quizSession.title}**\n\nYou scored ${score}/${total} — perfect score! 🎉 I am now grounded in your quiz's source documents and can generate advanced challenge questions to push your knowledge further.`
+      : `Loaded your study session: **${quizSession.title}**\n\nYou scored ${score}/${total}. I found **${wrongQuestions.length} topic${wrongQuestions.length !== 1 ? 's' : ''}** you missed and loaded the source document for review. Use the suggestions below to create a mindmap, flashcards, or explanations based on those gaps.`
 
     // Show loading state
     setMessages([{
       id: Date.now(),
       role: 'assistant',
-      content: `Loading your study session: **${quizSession.title}**...\n\nAnalyzing performance...`,
+      content: `Loading your study session: **${quizSession.title}**...\n\nGrounding in source documents & analyzing performance...`,
       timestamp: new Date(),
     }])
 
@@ -589,7 +602,8 @@ function Learningplayground() {
         body: JSON.stringify({ 
           prompt: `I just loaded my past quiz session titled "${quizSession.title}". I scored ${score} out of ${total}. Please briefly analyze this performance in a friendly way and ask me how I would like to review or proceed.`,
           context: wrongQuestions.length > 0 ? wrongQuestions : null, 
-          metacognitiveAnalysis: null 
+          metacognitiveAnalysis: null,
+          documentTitle: quizSession.title
         }),
       })
 
@@ -620,6 +634,89 @@ function Learningplayground() {
       timestamp: new Date(),
     }])
   }
+
+  // Image selection for Multimodal Vision
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file (PNG, JPG, WEBP).')
+      return
+    }
+    const previewUrl = URL.createObjectURL(file)
+    const reader = new FileReader()
+    reader.onload = () => {
+      setAttachedImage({ file, previewUrl, base64: reader.result })
+    }
+    reader.readAsDataURL(file)
+  }
+
+  // Open the Paragraph Inspector Drawer for verified citations
+  const openParagraphInspector = async (docTitle, targetParagraphIndex) => {
+    setInspectorDocTitle(docTitle)
+    setInspectorTargetPara(targetParagraphIndex)
+    setInspectorOpen(true)
+    setIsLoadingParagraphs(true)
+
+    try {
+      const res = await fetch(`${API_BASE}/api/document-paragraphs?title=${encodeURIComponent(docTitle)}`, {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        credentials: 'include',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setInspectorParagraphs(data.paragraphs || [])
+      } else {
+        setInspectorParagraphs([])
+      }
+    } catch (err) {
+      console.error('Failed to load document paragraphs for inspector:', err)
+      setInspectorParagraphs([])
+    } finally {
+      setIsLoadingParagraphs(false)
+    }
+  }
+
+  // Render message text with interactive citation pills
+  const renderMessageWithCitations = (content) => {
+    if (!content || typeof content !== 'string') return content;
+    const regex = /\[Cite:\s*id="([^"]+)",\s*title="([^"]+)",\s*para=(\d+)\]/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(content.substring(lastIndex, match.index));
+      }
+      const [fullMatch, chunkId, title, paraIndex] = match;
+      parts.push(
+        <button
+          key={`${chunkId}-${match.index}`}
+          onClick={() => openParagraphInspector(title, Number(paraIndex))}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '2px',
+            margin: '0 3px', padding: '1px 7px', borderRadius: '12px',
+            background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.35)',
+            color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer'
+          }}
+          title={`Inspect paragraph ${paraIndex} of "${title}"`}
+        >
+          <BookOpen size={11} />
+          <span>{title.length > 20 ? title.slice(0, 18) + '…' : title} ¶{paraIndex}</span>
+        </button>
+      );
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < content.length) {
+      parts.push(content.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : content;
+  };
 
   // Initial greeting effect for fresh sessions with context
   useEffect(() => {
@@ -1341,26 +1438,65 @@ function Learningplayground() {
   // Handles handleSubmit logic.
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!inputValue.trim() || isLoading) return
+    if ((!inputValue.trim() && !attachedImage) || isLoading) return
 
     const trimmedInput = inputValue.trim()
-
-
+    const imageToSend = attachedImage
 
     const userMessage = {
       id: Date.now(),
       role: 'user',
-      content: inputValue.trim(),
+      content: trimmedInput || 'Analyze this image and explain what is depicted in academic detail.',
+      image: imageToSend?.previewUrl || null,
       timestamp: new Date(),
     }
 
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
+    setAttachedImage(null)
     setIsLoading(true)
-    setGenerationStage('Analysing your learning request…')
+    setGenerationStage(imageToSend ? 'Analyzing image notes with Vision AI…' : 'Analysing your learning request…')
     setBuildPhase('planning')
 
     try {
+      if (imageToSend) {
+        const formData = new FormData()
+        formData.append('prompt', trimmedInput || 'Analyze this study image/diagram and explain key concepts step-by-step.')
+        if (imageToSend.file) {
+          formData.append('image', imageToSend.file)
+        } else if (imageToSend.base64) {
+          formData.append('imageBase64', imageToSend.base64)
+        }
+
+        const res = await fetch(`${API_BASE}/api/ai/vision-chat`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          credentials: 'include',
+          body: formData,
+        })
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}))
+          throw new Error(errData.error || 'Failed to analyze image.')
+        }
+
+        const data = await res.json()
+        const aiMessage = {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content: data.answer || data.tool?.data?.message || 'Analyzed your image.',
+          timestamp: new Date(),
+        }
+
+        const nextMessages = [...messages, userMessage, aiMessage]
+        setMessages(nextMessages)
+        setGenerationStage(null)
+        setBuildPhase(null)
+        return
+      }
+
       setGenerationStage('Planning your learning tool…')
 
       const res = await fetch(`${API_BASE}/api/chat-tools`, {
@@ -1686,48 +1822,65 @@ function Learningplayground() {
         {/* Active Session Header */}
         {activeSessionTitle && (
           <div style={{
-            background: 'var(--muted)',
-            border: '1px solid var(--border)',
-            padding: '0.75rem 1.5rem',
+            background: 'rgba(59, 130, 246, 0.1)',
+            border: '1px solid rgba(59, 130, 246, 0.3)',
+            padding: '0.6rem 1.25rem',
             borderRadius: '0.5rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '1.5rem',
-            fontSize: '0.9rem',
-            color: 'var(--muted-foreground)',
+            fontSize: '0.88rem',
+            color: 'var(--foreground)',
             maxWidth: 'fit-content',
-            margin: '0 auto'
+            margin: '0 auto 0.5rem'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Clock size={16} />
-              Active Session: <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>{activeSessionTitle}</span>
+              <BookOpen size={16} color="var(--primary)" />
+              <span>Grounded in Quiz: <strong style={{ color: 'var(--primary)' }}>{activeSessionTitle}</strong></span>
+              {activeWrongQs && <span style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>({activeWrongQs.length} mistake{activeWrongQs.length !== 1 ? 's' : ''} loaded)</span>}
             </div>
             
-            <button
-              onClick={() => {
-                setSessionModalMode('playground')
-                setSavedToolsTab('playground')
-                fetchPlaygroundSessions()
-                fetchSavedTools()
-                setShowSessionModal(true)
-              }}
-              style={{
-                background: 'transparent',
-                border: '1px solid var(--primary)',
-                color: 'var(--primary)',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                padding: '0.25rem 0.75rem',
-                borderRadius: '0.25rem',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary-foreground)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--primary)'; }}
-            >
-              Change
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button
+                onClick={() => {
+                  setSessionModalMode('quiz')
+                  setSavedToolsTab('sessions')
+                  fetchQuizSessions()
+                  setShowSessionModal(true)
+                }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--primary)',
+                  color: 'var(--primary)',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '0.25rem',
+                  transition: 'all 0.2s'
+                }}
+              >
+                Change Quiz
+              </button>
+              <button
+                onClick={() => {
+                  setActiveSessionTitle(null)
+                  setActiveWrongQs(null)
+                }}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--muted-foreground)',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  padding: '0.2rem',
+                }}
+                title="Clear quiz session context"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         )}
 
@@ -1907,7 +2060,23 @@ function Learningplayground() {
                     <span style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: 'bold', textTransform: 'uppercase' }}>Vela</span>
                   </div>
                 )}
-                <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{message.content}</div>
+                {message.image && (
+                  <img
+                    src={message.image}
+                    alt="Uploaded notes/diagram"
+                    style={{
+                      maxWidth: '240px',
+                      maxHeight: '180px',
+                      borderRadius: '0.5rem',
+                      objectFit: 'contain',
+                      marginBottom: '0.25rem',
+                      background: 'rgba(0,0,0,0.3)'
+                    }}
+                  />
+                )}
+                <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {renderMessageWithCitations(message.content)}
+                </div>
                 <div style={{ fontSize: '0.75rem', marginTop: '0.5rem', opacity: 0.7 }}>
                   {message.timestamp.toLocaleTimeString([], {
                     hour: '2-digit',
@@ -1968,14 +2137,66 @@ function Learningplayground() {
           background: 'var(--card)',
         }}
       >
-        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+        {attachedImage && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginBottom: '0.75rem',
+            padding: '0.4rem 0.75rem',
+            borderRadius: '0.5rem',
+            background: 'var(--background)',
+            border: '1px solid var(--border)',
+            width: 'fit-content'
+          }}>
+            <img src={attachedImage.previewUrl} alt="Attached" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px' }} />
+            <span style={{ fontSize: '0.8rem', color: 'var(--foreground)', fontWeight: 500 }}>Image notes attached</span>
+            <button
+              type="button"
+              onClick={() => setAttachedImage(null)}
+              style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: '0.9rem', padding: '0 0.25rem' }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
+          <input
+            type="file"
+            ref={imageInputRef}
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={handleImageSelect}
+          />
+          
+          <button
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            style={{
+              padding: '0.875rem',
+              borderRadius: '0.75rem',
+              border: '1px solid var(--border)',
+              background: attachedImage ? 'rgba(59, 130, 246, 0.15)' : 'var(--background)',
+              color: attachedImage ? '#3b82f6' : 'var(--muted-foreground)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+            }}
+            title="Attach diagram, handwritten formulas, or study notes"
+          >
+            <Image size={18} />
+          </button>
+
           <div style={{ flex: 1, position: 'relative' }}>
             <textarea
               ref={textareaRef}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask me anything..."
+              placeholder={attachedImage ? "Ask a question about this image..." : (activeSessionTitle ? `Ask about "${activeSessionTitle}" or create flashcards...` : "Ask me anything...")}
               disabled={isLoading}
               rows={1}
               style={{
@@ -2004,24 +2225,24 @@ function Learningplayground() {
 
           <button
             type="submit"
-            disabled={!inputValue.trim() || isLoading}
+            disabled={(!inputValue.trim() && !attachedImage) || isLoading}
             style={{
               padding: '0.875rem 1.5rem',
               borderRadius: '0.75rem',
               border: 'none',
-              background: inputValue.trim() && !isLoading ? 'var(--primary)' : 'var(--muted)',
+              background: (inputValue.trim() || attachedImage) && !isLoading ? 'var(--primary)' : 'var(--muted)',
               color: '#ffffff',
-              cursor: inputValue.trim() && !isLoading ? 'pointer' : 'not-allowed',
+              cursor: (inputValue.trim() || attachedImage) && !isLoading ? 'pointer' : 'not-allowed',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
               fontWeight: '500',
               fontSize: '0.95rem',
               transition: 'all 0.2s',
-              opacity: inputValue.trim() && !isLoading ? 1 : 0.5,
+              opacity: (inputValue.trim() || attachedImage) && !isLoading ? 1 : 0.5,
             }}
             onMouseEnter={(e) => {
-              if (inputValue.trim() && !isLoading) {
+              if ((inputValue.trim() || attachedImage) && !isLoading) {
                 e.target.style.transform = 'translateY(-1px)'
                 e.target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
               }
@@ -2758,6 +2979,128 @@ function Learningplayground() {
                 {shareError && <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.5rem' }}>{shareError}</p>}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Paragraph Inspector Drawer */}
+      {inspectorOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          maxWidth: '460px',
+          background: 'var(--background)',
+          borderLeft: '1px solid var(--border)',
+          zIndex: 2200,
+          boxShadow: '-8px 0 25px rgba(0,0,0,0.3)',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: '1.25rem 1.5rem',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'var(--card)'
+          }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <BookOpen size={18} color="var(--primary)" />
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--foreground)' }}>Source Citations</h3>
+              </div>
+              <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
+                {inspectorDocTitle || 'Quiz Source Document'}
+              </p>
+            </div>
+            <button
+              onClick={() => setInspectorOpen(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--muted-foreground)',
+                cursor: 'pointer',
+                fontSize: '1.25rem',
+                lineHeight: 1,
+                padding: '0.25rem'
+              }}
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Paragraph List */}
+          <div
+            ref={inspectorScrollRef}
+            style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}
+          >
+            {isLoadingParagraphs ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>
+                Loading source paragraphs...
+              </div>
+            ) : inspectorParagraphs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
+                No paragraph content found for this document.
+              </div>
+            ) : (
+              inspectorParagraphs.map((para) => {
+                const isTarget = Number(para.paragraph_index) === Number(inspectorTargetPara)
+                return (
+                  <div
+                    key={para.id || para.paragraph_index}
+                    style={{
+                      padding: '1rem',
+                      borderRadius: '0.6rem',
+                      border: isTarget ? '2px solid var(--primary)' : '1px solid var(--border)',
+                      background: isTarget ? 'rgba(59, 130, 246, 0.08)' : 'var(--card)',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: '0.5rem',
+                      fontSize: '0.75rem',
+                      color: isTarget ? 'var(--primary)' : 'var(--muted-foreground)',
+                      fontWeight: 600
+                    }}>
+                      <span>Paragraph {para.paragraph_index}</span>
+                      {isTarget && (
+                        <span style={{
+                          background: 'var(--primary)',
+                          color: '#fff',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          fontSize: '0.7rem'
+                        }}>
+                          Cited Chunk
+                        </span>
+                      )}
+                    </div>
+                    <p style={{
+                      margin: 0,
+                      fontSize: '0.85rem',
+                      lineHeight: 1.5,
+                      color: 'var(--foreground)'
+                    }}>
+                      {para.chunk_text}
+                    </p>
+                  </div>
+                )
+              })
+            )}
           </div>
         </div>
       )}

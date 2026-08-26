@@ -45,7 +45,7 @@
   --font-sans: 'DM Sans', sans-serif;
   --font-serif: 'DM Serif Display', serif;
   --font-mono: JetBrains Mono, monospace;
-  --radius: 0.5rem;
+  --radius: 0px;
   --shadow-x: 0px;
   --shadow-y: 4px;
   --shadow-blur: 10px;
@@ -179,11 +179,15 @@ body {
   --page-max-width: 1200px; /* max width for centered content */
   --section-gap-min: 64px;  /* vertical gap between sections (min) */
   --section-gap-max: 80px;  /* vertical gap between sections (max) */
-  --radius-nav: 14px;
-  --radius-card: 32px;
-  --radius-button: 14px;
-  --radius-pill: 1000px; /* fully rounded */
+  --radius-nav: 0px;
+  --radius-card: 0px;
+  --radius-button: 0px;
+  --radius-pill: 0px; /* fully sharp */
   --spacing-unit: 8px;
+}
+
+*, *::before, *::after {
+  border-radius: 0 !important;
 }
 
 /* Utility classes */

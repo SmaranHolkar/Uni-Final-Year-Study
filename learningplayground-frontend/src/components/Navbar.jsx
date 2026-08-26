@@ -31,17 +31,6 @@ export default function Navbar({ onOpenSessions, toolsQuota }) {
           </svg>
         </Link>
 
-        {/* Center Links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm">
-          <Link
-            to="/tools"
-            className="flex items-center gap-1.5 text-white font-semibold transition-colors py-1 px-3 rounded-lg bg-[#5A7D99]/20 border border-[#5A7D99]/40 hover:bg-[#5A7D99]/30"
-          >
-            <Wrench className="w-4 h-4 text-[#5A7D99]" />
-            Tools Studio
-          </Link>
-        </nav>
-
         {/* Right Section / Auth */}
         <div className="flex items-center gap-3">
           {toolsQuota && (

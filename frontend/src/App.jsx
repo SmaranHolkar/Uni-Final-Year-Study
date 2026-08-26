@@ -48,7 +48,9 @@ function AppContent() {
         <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/learningpage" element={<PrivateRoute><Learn /></PrivateRoute>} />
         <Route path="/Learningplayground" element={<PrivateRoute><Learningplayground /></PrivateRoute>} />
-        <Route path="/grounded-studio" element={<PrivateRoute><GroundedChatHub /></PrivateRoute>} />
+        <Route path="/learningplayground" element={<PrivateRoute><Learningplayground /></PrivateRoute>} />
+        <Route path="/playground" element={<PrivateRoute><Learningplayground /></PrivateRoute>} />
+        <Route path="/grounded-studio" element={<Navigate to="/Learningplayground?mode=grounded" replace />} />
         <Route path="/marketplace" element={<PrivateRoute><Marketplace /></PrivateRoute>} />
         <Route path="/history" element={<PrivateRoute><History /></PrivateRoute>} />
         <Route path="/Profile" element={<PrivateRoute><Profile /></PrivateRoute>} />

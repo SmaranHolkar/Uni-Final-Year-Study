@@ -52,6 +52,14 @@ import {
   Copy,
   Shuffle,
   Volume2,
+  Timer,
+  Package,
+  Brain,
+  CheckSquare,
+  Compass,
+  Scale,
+  Activity,
+  Target,
 } from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import Vela from '../components/Vela'
@@ -112,7 +120,7 @@ function extractToolMetadata(toolObj) {
 }
 
 export default function Learningplayground() {
-  const { user, session } = useAuth()
+  const { user, session, signOut } = useAuth()
 
   const [messages, setMessages] = useState([])
   const [suggestions, setSuggestions] = useState(defaultSuggestions)
@@ -128,24 +136,44 @@ export default function Learningplayground() {
   const [marketplaceTools, setMarketplaceTools] = useState([])
   const [isLoadingMarketplaceTools, setIsLoadingMarketplaceTools] = useState(false)
 
-  // Persistent Chat History (Recents) State
-  const [chatHistory, setChatHistory] = useState(() => {
-    try {
-      const saved = localStorage.getItem('learning_playground_chat_history')
-      return saved ? JSON.parse(saved) : []
-    } catch {
-      return []
-    }
-  })
+  // Persistent Chat History (Recents) State — strictly scoped to logged-in user
+  const [chatHistory, setChatHistory] = useState([])
   const [activeChatId, setActiveChatId] = useState(null)
 
+  // Load chat history ONLY when authenticated with a valid user
   useEffect(() => {
-    try {
-      localStorage.setItem('learning_playground_chat_history', JSON.stringify(chatHistory))
-    } catch (err) {
-      console.error('Failed to save chat history:', err)
+    if (user?.id) {
+      try {
+        const userKey = `learning_playground_chat_history_${user.id}`
+        const saved = localStorage.getItem(userKey)
+        setChatHistory(saved ? JSON.parse(saved) : [])
+      } catch {
+        setChatHistory([])
+      }
+    } else {
+      // User is logged out — clear all in-memory chats and remove any legacy unauthenticated cache
+      setChatHistory([])
+      setActiveChatId(null)
+      setMessages([])
+      setGeneratedTool(null)
+      setAttachedDocument(null)
+      try {
+        localStorage.removeItem('learning_playground_chat_history')
+      } catch {}
     }
-  }, [chatHistory])
+  }, [user?.id])
+
+  // Save chat history ONLY when logged in
+  useEffect(() => {
+    if (user?.id) {
+      try {
+        const userKey = `learning_playground_chat_history_${user.id}`
+        localStorage.setItem(userKey, JSON.stringify(chatHistory))
+      } catch (err) {
+        console.error('Failed to save chat history:', err)
+      }
+    }
+  }, [chatHistory, user?.id])
 
   // Document & Multi-Modal RAG State
   const [attachedDocument, setAttachedDocument] = useState(null) // { id, title }
@@ -717,7 +745,7 @@ export default function Learningplayground() {
     if (!target) return
     const shareUrl = `${window.location.origin}/?toolId=${target.id || ''}`
     navigator.clipboard.writeText(shareUrl)
-    setShareToastMessage('🔗 Direct study link copied to clipboard!')
+    setShareToastMessage('Direct study link copied to clipboard')
     setTimeout(() => setShareToastMessage(''), 2500)
   }
 
@@ -844,7 +872,7 @@ export default function Learningplayground() {
         {
           id: Date.now(),
           role: 'assistant',
-          content: `📎 **Attached "${docObj.title}" to this session!**\n\nWhat would you like to create from this? You can type any request in the chat bar (e.g. *2D Crossword*, *Feynman Grader*, *Cloze Notes*, *Flashcards*, *Quiz*, or ask specific questions).`
+          content: `**Attached "${docObj.title}" to this session.**\n\nWhat would you like to create from this? You can type any request in the chat bar (e.g. *2D Crossword*, *Feynman Grader*, *Cloze Notes*, *Flashcards*, *Quiz*, or ask specific questions).`
         }
       ])
     }
@@ -1278,7 +1306,7 @@ export default function Learningplayground() {
       const pubData = await pubRes.json()
       if (!pubRes.ok) throw new Error(pubData.error || 'Failed to publish to marketplace')
 
-      setPublishSuccessMessage('🎉 Tool successfully published to Community Marketplace!')
+      setPublishSuccessMessage('Tool successfully published to Community Marketplace!')
       fetchSavedTools()
       fetchMarketplaceTools()
       setTimeout(() => {
@@ -1367,7 +1395,7 @@ export default function Learningplayground() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to fork tool')
 
-      alert(`🍴 Successfully forked "${meta.title}" to your Saved Tools!`)
+      alert(`Successfully saved "${meta.title}" to your Saved Tools!`)
       fetchSavedTools()
       fetchMarketplaceTools()
     } catch (err) {
@@ -1413,7 +1441,7 @@ export default function Learningplayground() {
   }
 
   const saveOrUpdateChatSession = (updatedMessages, currentTool = generatedTool, doc = attachedDocument) => {
-    if (!updatedMessages || updatedMessages.length === 0) return
+    if (!updatedMessages || updatedMessages.length === 0 || !user?.id) return
 
     const firstUserMsg = updatedMessages.find((m) => m.role === 'user')
     const rawContent = firstUserMsg ? firstUserMsg.content : 'Study Session'
@@ -1497,27 +1525,51 @@ export default function Learningplayground() {
     <div className="flex-1 h-0 w-full relative bg-[#171717] text-[#ECECF1] flex overflow-hidden font-sans">
       <DotGrid />
 
-      {/* Left Claude-Style Collapsible Sidebar */}
+      {/* Left Collapsible Sidebar */}
       <aside
         className={`relative z-30 bg-[#171717] border-r border-[#2F2F2F] flex flex-col transition-all duration-300 ${sidebarOpen ? 'w-64 sm:w-72' : 'w-0 border-r-0 overflow-hidden'
           }`}
       >
-        {/* Top Header Action (+ New chat) */}
+        {/* Top Header in Sidebar */}
         <div className="p-3 border-b border-[#2F2F2F] flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Vela size={22} className="flex-shrink-0" />
+            <span className="font-bold text-xs sm:text-sm text-white tracking-tight truncate">
+              Learning Playground
+            </span>
+          </div>
+
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="p-1.5 rounded-[6px] hover:bg-[#212121] text-[#8E8E93] hover:text-white transition-colors flex-shrink-0"
+            title="Close Sidebar"
+          >
+            <PanelLeftClose className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Primary Action Buttons (+ New chat & Toggle Canvas) */}
+        <div className="p-2 border-b border-[#2F2F2F] space-y-1.5">
           <button
             onClick={handleStartNewSession}
-            className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl bg-[#212121] hover:bg-[#282E38] border border-[#2F2F2F] text-xs font-semibold text-white transition-all group shadow-sm"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-[6px] bg-[#212121] hover:bg-[#282E38] border border-[#2F2F2F] text-xs font-semibold text-white transition-all group shadow-sm"
           >
             <Plus className="w-4 h-4 text-[#5A7D99] group-hover:scale-110 transition-transform" />
             <span>New chat</span>
           </button>
 
           <button
-            onClick={() => setSidebarOpen(false)}
-            className="p-2 rounded-lg hover:bg-[#212121] text-[#8E8E93] hover:text-white transition-colors flex-shrink-0"
-            title="Close Sidebar"
+            onClick={() => setRightPanelOpen(!rightPanelOpen)}
+            className="w-full flex items-center justify-between px-3 py-1.5 rounded-[6px] bg-[#212121]/60 hover:bg-[#282E38] border border-[#2F2F2F] text-xs font-medium text-[#C5C5D2] hover:text-white transition-all"
+            title={rightPanelOpen ? 'Hide Tool Canvas' : 'Show Tool Canvas'}
           >
-            <PanelLeftClose className="w-4 h-4" />
+            <div className="flex items-center gap-2">
+              <PanelRight className="w-3.5 h-3.5 text-[#5A7D99]" />
+              <span>Canvas Panel</span>
+            </div>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${rightPanelOpen ? 'bg-[#5A7D99]/20 text-[#8BB0D1]' : 'bg-[#2F2F2F] text-[#8E8E93]'}`}>
+              {rightPanelOpen ? 'Open' : 'Hidden'}
+            </span>
           </button>
         </div>
 
@@ -1525,9 +1577,9 @@ export default function Learningplayground() {
         <div className="px-2 pt-2 space-y-0.5 border-b border-[#2F2F2F] pb-2">
           <button
             onClick={() => setActiveNavSection('chats')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'chats'
-                ? 'bg-[#212121] text-white font-semibold'
-                : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
+            className={`w-full px-3 py-2 rounded-[6px] text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'chats'
+              ? 'bg-[#212121] text-white font-semibold'
+              : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
               }`}
           >
             <div className="flex items-center gap-2.5">
@@ -1535,7 +1587,7 @@ export default function Learningplayground() {
               <span>Chats</span>
             </div>
             {chatHistory.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#5A7D99]/20 text-[#5A7D99] font-mono">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[#5A7D99]/20 text-[#5A7D99] font-mono">
                 {chatHistory.length}
               </span>
             )}
@@ -1543,40 +1595,54 @@ export default function Learningplayground() {
 
           <Link
             to="/tools"
-            className="w-full px-3 py-2 rounded-lg text-xs font-medium text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white flex items-center gap-2.5 transition-all"
+            className="w-full px-3 py-2 rounded-[6px] text-xs font-medium text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white flex items-center gap-2.5 transition-all"
           >
             <Wrench className="w-4 h-4 text-[#5A7D99]" />
             <span>Tools Studio</span>
           </Link>
 
           <button
+            onClick={() => setShowMarketplaceExplorer(true)}
+            className="w-full px-3 py-2 rounded-[6px] text-xs font-medium text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white flex items-center justify-between transition-all"
+            title="Browse Community Marketplace Tools"
+          >
+            <div className="flex items-center gap-2.5">
+              <Globe className="w-4 h-4 text-[#5A7D99]" />
+              <span>Marketplace</span>
+            </div>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[#5A7D99]/20 text-[#5A7D99] font-mono">
+              {marketplaceTools.length}
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveNavSection('saved-tools')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'saved-tools'
-                ? 'bg-[#212121] text-white font-semibold'
-                : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
+            className={`w-full px-3 py-2 rounded-[6px] text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'saved-tools'
+              ? 'bg-[#212121] text-white font-semibold'
+              : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
               }`}
           >
             <div className="flex items-center gap-2.5">
               <Bookmark className="w-4 h-4 text-[#5A7D99]" />
               <span>Saved Tools</span>
             </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#2F2F2F] text-[#8E8E93] font-mono">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[#2F2F2F] text-[#8E8E93] font-mono">
               {savedTools.length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveNavSection('community')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'community'
-                ? 'bg-[#212121] text-white font-semibold'
-                : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
+            className={`w-full px-3 py-2 rounded-[6px] text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'community'
+              ? 'bg-[#212121] text-white font-semibold'
+              : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
               }`}
           >
             <div className="flex items-center gap-2.5">
               <Sparkles className="w-4 h-4 text-[#5A7D99]" />
-              <span>Community</span>
+              <span>Community Library</span>
             </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#2F2F2F] text-[#8E8E93] font-mono">
+            <span className="text-[10px] px-1.5 py-0.5 rounded-[4px] bg-[#2F2F2F] text-[#8E8E93] font-mono">
               {marketplaceTools.length}
             </span>
           </button>
@@ -1597,7 +1663,7 @@ export default function Learningplayground() {
                     ? 'Search saved tools...'
                     : 'Search community...'
               }
-              className="w-full bg-[#212121] border border-[#2F2F2F] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#8E8E93] focus:outline-none focus:border-[#5A7D99]"
+              className="w-full bg-[#212121] border border-[#2F2F2F] rounded-[6px] pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#8E8E93] focus:outline-none focus:border-[#5A7D99]"
             />
           </div>
         </div>
@@ -1622,9 +1688,9 @@ export default function Learningplayground() {
                     <div
                       key={chat.id}
                       onClick={() => loadChatSession(chat)}
-                      className={`group px-3 py-2 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
-                          ? 'bg-[#212121] text-white font-medium border border-[#2F2F2F]'
-                          : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
+                      className={`group px-3 py-2 rounded-[6px] text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
+                        ? 'bg-[#212121] text-white font-medium border border-[#2F2F2F]'
+                        : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
                         }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 pr-2">
@@ -1634,7 +1700,7 @@ export default function Learningplayground() {
 
                       <button
                         onClick={(e) => deleteChatSession(chat.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-[#8E8E93] transition-opacity rounded"
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-[#8E8E93] transition-opacity rounded-[4px]"
                         title="Delete chat thread"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1665,9 +1731,9 @@ export default function Learningplayground() {
                     <div
                       key={tool.id}
                       onClick={() => selectTool(tool)}
-                      className={`group px-3 py-2 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
-                          ? 'bg-[#212121] text-white font-medium border border-[#2F2F2F]'
-                          : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
+                      className={`group px-3 py-2 rounded-[6px] text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
+                        ? 'bg-[#212121] text-white font-medium border border-[#2F2F2F]'
+                        : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
                         }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 pr-2">
@@ -1677,7 +1743,7 @@ export default function Learningplayground() {
 
                       <button
                         onClick={(e) => handleDeleteTool(tool.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-[#8E8E93] transition-opacity rounded"
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-[#8E8E93] transition-opacity rounded-[4px]"
                         title="Delete tool"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1708,9 +1774,9 @@ export default function Learningplayground() {
                     <div
                       key={mTool.id}
                       onClick={() => selectTool(mTool)}
-                      className={`group px-3 py-2 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
-                          ? 'bg-[#212121] text-white font-medium border border-[#2F2F2F]'
-                          : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
+                      className={`group px-3 py-2 rounded-[6px] text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
+                        ? 'bg-[#212121] text-white font-medium border border-[#2F2F2F]'
+                        : 'text-[#C5C5D2] hover:bg-[#212121]/60 hover:text-white'
                         }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 pr-2">
@@ -1718,7 +1784,7 @@ export default function Learningplayground() {
                         <span className="truncate">{meta.title}</span>
                       </div>
 
-                      <button className="opacity-0 group-hover:opacity-100 px-2 py-0.5 text-[10px] font-semibold rounded bg-[#5A7D99]/20 text-[#5A7D99] transition-opacity">
+                      <button className="opacity-0 group-hover:opacity-100 px-2 py-0.5 text-[10px] font-semibold rounded-[4px] bg-[#5A7D99]/20 text-[#5A7D99] transition-opacity">
                         Load
                       </button>
                     </div>
@@ -1729,10 +1795,10 @@ export default function Learningplayground() {
           )}
         </div>
 
-        {/* Claude-Style Bottom User Profile Footer */}
+        {/* Bottom User Profile Footer */}
         <div className="p-3 border-t border-[#2F2F2F] bg-[#171717] flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#5A7D99] to-[#3D6660] border border-[#5A7D99]/40 flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm">
+            <div className="w-7 h-7 rounded-[6px] bg-[#212121] border border-[#2F2F2F] flex items-center justify-center text-white font-bold text-xs flex-shrink-0">
               {user?.email ? user.email.charAt(0).toUpperCase() : 'S'}
             </div>
             <div className="min-w-0">
@@ -1747,12 +1813,17 @@ export default function Learningplayground() {
 
           <button
             onClick={async () => {
+              setChatHistory([])
+              setActiveChatId(null)
+              setMessages([])
+              setGeneratedTool(null)
+              setAttachedDocument(null)
               if (signOut) await signOut()
             }}
-            className="p-1.5 rounded-lg hover:bg-[#212121] text-[#8E8E93] hover:text-red-400 transition-colors"
+            className="p-1.5 rounded-[6px] hover:bg-[#212121] text-[#8E8E93] hover:text-red-400 transition-colors"
             title="Sign Out"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
       </aside>
@@ -1760,84 +1831,46 @@ export default function Learningplayground() {
       {/* Main Center & Canvas Workspace */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative z-10">
 
-        {/* Top Control Subheader */}
-        <header className="h-11 border-b border-[#2F2F2F] bg-[#171717] px-3 flex items-center justify-between flex-shrink-0 z-20">
-          <div className="flex items-center gap-2">
-            {!sidebarOpen && (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="p-1.5 rounded-lg hover:bg-[#212121] text-[#8E8E93] hover:text-white transition-colors"
-                title="Open Sidebar"
-              >
-                <PanelLeft className="w-4 h-4" />
-              </button>
-            )}
+        {/* Unobtrusive Floating Sidebar Opener when closed */}
+        {!sidebarOpen && (
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="absolute top-3 left-3 z-30 p-2 rounded-[6px] bg-[#212121]/90 hover:bg-[#282E38] text-[#8E8E93] hover:text-white border border-[#2F2F2F] shadow-lg transition-all"
+            title="Open Sidebar"
+          >
+            <PanelLeft className="w-4 h-4" />
+          </button>
+        )}
 
-            <div className="flex items-center gap-2.5 flex-shrink-0">
-              <Vela size={22} className="flex-shrink-0" />
-              <span className="font-bold text-xs sm:text-sm text-white tracking-tight whitespace-nowrap">
-                Learning Playground
-              </span>
-            </div>
-          </div>
-
-          {/* Center Tabs for Mobile/Tablet View (< lg screens) */}
-          <div className="flex lg:hidden items-center bg-[#212121] p-0.5 rounded-lg border border-[#2F2F2F]">
-            <button
-              onClick={() => setMobileTab('chat')}
-              className={`px-3 py-1 text-[11px] font-semibold rounded-md flex items-center gap-1.5 transition-all ${mobileTab === 'chat'
-                  ? 'bg-[#2F2F2F] text-white shadow-sm'
-                  : 'text-[#8E8E93] hover:text-white'
-                }`}
-            >
-              <MessageSquare className="w-3 h-3" />
-              <span>Chat</span>
-            </button>
-            <button
-              onClick={() => setMobileTab('tool')}
-              className={`px-3 py-1 text-[11px] font-semibold rounded-md flex items-center gap-1.5 transition-all ${mobileTab === 'tool'
-                  ? 'bg-[#5A7D99] text-white shadow-sm'
-                  : 'text-[#8E8E93] hover:text-white'
-                }`}
-            >
-              <Wrench className="w-3 h-3" />
-              <span>Tool Canvas</span>
-              {generatedTool && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
-            </button>
-          </div>
-
-          {/* Right Action Controls (Global Top Bar) */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowMarketplaceExplorer(true)}
-              className="px-2.5 py-1 rounded-lg bg-[#212121] hover:bg-[#2F2F2F] border border-[#2F2F2F] text-[11px] font-semibold text-[#ECECF1] hover:text-white flex items-center gap-1.5 transition-all shadow-sm"
-              title="Browse Community Marketplace Tools"
-            >
-              <Globe className="w-3.5 h-3.5 text-[#5A7D99]" />
-              <span className="hidden sm:inline">Marketplace</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#5A7D99]/20 text-[#5A7D99] font-mono">
-                {marketplaceTools.length}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setRightPanelOpen(!rightPanelOpen)}
-              className={`p-1.5 px-2.5 rounded-lg transition-colors hidden lg:flex items-center gap-1.5 text-[11px] font-medium ${rightPanelOpen
-                  ? 'bg-[#5A7D99]/20 text-[#8BB0D1] border border-[#5A7D99]/40'
-                  : 'text-[#8E8E93] hover:text-white hover:bg-[#212121] border border-[#2F2F2F]'
-                }`}
-              title={rightPanelOpen ? 'Hide Tool Canvas' : 'Show Tool Canvas'}
-            >
-              <PanelRight className="w-4 h-4 text-[#5A7D99]" />
-              <span>{rightPanelOpen ? 'Hide Canvas' : 'Show Canvas'}</span>
-            </button>
-          </div>
-        </header>
+        {/* Center Tabs for Mobile/Tablet View (< lg screens) */}
+        <div className="lg:hidden absolute top-3 right-3 z-30 flex items-center bg-[#212121]/90 p-0.5 rounded-[6px] border border-[#2F2F2F] shadow-lg">
+          <button
+            onClick={() => setMobileTab('chat')}
+            className={`px-2.5 py-1 text-[11px] font-semibold rounded-[4px] flex items-center gap-1.5 transition-all ${mobileTab === 'chat'
+              ? 'bg-[#2F2F2F] text-white shadow-sm'
+              : 'text-[#8E8E93] hover:text-white'
+              }`}
+          >
+            <MessageSquare className="w-3 h-3" />
+            <span>Chat</span>
+          </button>
+          <button
+            onClick={() => setMobileTab('tool')}
+            className={`px-2.5 py-1 text-[11px] font-semibold rounded-[4px] flex items-center gap-1.5 transition-all ${mobileTab === 'tool'
+              ? 'bg-[#5A7D99] text-white shadow-sm'
+              : 'text-[#8E8E93] hover:text-white'
+              }`}
+          >
+            <Wrench className="w-3 h-3" />
+            <span>Canvas</span>
+            {generatedTool && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+          </button>
+        </div>
 
         {/* Center Workspace (Chat Stream + Interactive Canvas) */}
         <div className="flex-1 flex overflow-hidden min-h-0 relative">
 
-          {/* Left Chat Stream Column (Deep Focused Tone) */}
+          {/* Left Chat Stream Column */}
           <div
             className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden min-w-0 bg-[#0E1015] relative z-10 transition-all ${mobileTab === 'tool' ? 'hidden lg:flex' : 'flex'
               }`}
@@ -1852,13 +1885,13 @@ export default function Learningplayground() {
                     Attach course notes, PDFs, or slides for <strong>RAG Vector Context</strong>, or ask Vela to create a custom revision tool.
                   </p>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full max-w-xl">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full max-w-xl text-left">
                     <button
                       onClick={() => setShowUploadModal(true)}
-                      className="p-3 rounded-xl bg-[#212121] border border-[#2F2F2F] hover:border-[#5A7D99]/80 text-left transition-all hover:scale-[1.02] group"
+                      className="p-3 rounded-[8px] bg-[#1A1E24] border border-[#282E38] hover:border-[#5A7D99] text-left transition-all group"
                     >
                       <Paperclip className="w-4 h-4 text-[#5A7D99] mb-1.5 group-hover:scale-110 transition-transform" />
-                      <p className="font-semibold text-xs text-white mb-0.5">📄 Attach File (RAG)</p>
+                      <p className="font-semibold text-xs text-white mb-0.5">Attach File (RAG)</p>
                       <p className="text-[10px] text-[#8E8E93] line-clamp-2">Upload PDF, DOCX, or TXT to ground generated tools in your notes.</p>
                     </button>
 
@@ -1868,7 +1901,7 @@ export default function Learningplayground() {
                         <button
                           key={s.id}
                           onClick={() => handleSendMessage(s.prompt)}
-                          className="p-3 rounded-xl bg-[#212121] border border-[#2F2F2F] hover:border-[#5A7D99]/50 text-left transition-all hover:scale-[1.02] group"
+                          className="p-3 rounded-[8px] bg-[#1A1E24] border border-[#282E38] hover:border-[#5A7D99] text-left transition-all group"
                         >
                           <IconComponent className="w-4 h-4 text-[#5A7D99] mb-1.5 group-hover:scale-110 transition-transform" />
                           <p className="font-semibold text-xs text-white mb-0.5">{s.title}</p>
@@ -1886,12 +1919,12 @@ export default function Learningplayground() {
                   >
                     {m.role === 'assistant' && <Vela size={26} className="mt-1 flex-shrink-0" />}
                     <div
-                      className={`max-w-xl px-4 py-3 rounded-2xl text-xs leading-relaxed ${m.role === 'user'
-                          ? 'bg-[#3B82F6] text-white rounded-br-none shadow-md shadow-[#3B82F6]/20'
-                          : 'bg-[#212121] border border-[#2F2F2F] text-[#ECECF1] rounded-bl-none'
+                      className={`max-w-xl px-4 py-3 rounded-[8px] text-xs leading-relaxed ${m.role === 'user'
+                        ? 'bg-[#5A7D99] text-white shadow-md'
+                        : 'bg-[#1A1E24] border border-[#282E38] text-[#ECECF1]'
                         }`}
                     >
-                      <div>{m.content}</div>
+                      <div className="whitespace-pre-wrap">{m.content}</div>
                       {m.attachedTool && (
                         <div className="mt-2.5 flex items-center gap-2">
                           <button
@@ -1899,9 +1932,9 @@ export default function Learningplayground() {
                               selectTool(m.attachedTool)
                               setRightPanelOpen(true)
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#5A7D99] hover:bg-[#3D5E7A] text-white font-semibold text-[11px] transition-all shadow-sm"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-white font-semibold text-[11px] transition-all shadow-sm"
                           >
-                            <Sparkles className="w-3.5 h-3.5" />
+                            <Sparkles className="w-3.5 h-3.5 text-white" />
                             <span>Open in Canvas</span>
                           </button>
                         </div>
@@ -1914,9 +1947,9 @@ export default function Learningplayground() {
               {isLoading && (
                 <div className="flex gap-3 justify-start items-center animate-fade-in py-1">
                   <Vela size={26} loading={true} className="flex-shrink-0" />
-                  <div className="px-4 py-2.5 rounded-2xl rounded-bl-none bg-[#212121] border border-[#2F2F2F] text-xs text-[#CDD1D6] flex items-center gap-2 shadow-sm">
+                  <div className="px-4 py-2.5 rounded-[8px] bg-[#1A1E24] border border-[#282E38] text-xs text-white flex items-center gap-2 shadow-sm">
                     <span className="w-2 h-2 rounded-full bg-[#5A7D99] animate-ping" />
-                    <span>{generationStage || 'Crafting your interactive tool on the canvas...'}</span>
+                    <span>{generationStage || 'Vela is crafting your interactive tool on the canvas...'}</span>
                   </div>
                 </div>
               )}
@@ -1924,11 +1957,11 @@ export default function Learningplayground() {
             </div>
 
             {/* Pinned Input Bar */}
-            <div className="p-3 border-t border-[#2F2F2F]/60 bg-[#171717] flex-shrink-0">
+            <div className="p-3 border-t border-[#2F2F2F] bg-[#171717] flex-shrink-0">
               <div className="max-w-3xl mx-auto w-full">
                 {/* Share Link Toast */}
                 {shareToastMessage && (
-                  <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-xs text-emerald-300 max-w-fit shadow-md animate-fade-in">
+                  <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-[6px] bg-emerald-500/20 border border-emerald-500/40 text-xs text-emerald-300 max-w-fit shadow-md animate-fade-in">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                     <span>{shareToastMessage}</span>
                   </div>
@@ -1936,7 +1969,7 @@ export default function Learningplayground() {
 
                 {/* Pasted YouTube Video Quick Detection Banner */}
                 {pastedYouTubeUrl && (
-                  <div className="flex items-center justify-between gap-3 mb-2 px-3.5 py-2 rounded-xl bg-red-500/15 border border-red-500/30 text-xs text-white shadow-md animate-fade-in">
+                  <div className="flex items-center justify-between gap-3 mb-2 px-3.5 py-2 rounded-[6px] bg-red-500/15 border border-red-500/30 text-xs text-white shadow-md animate-fade-in">
                     <div className="flex items-center gap-2 truncate">
                       <Video className="w-4 h-4 text-red-400 flex-shrink-0" />
                       <span className="truncate">Detected YouTube Link: <strong>{pastedYouTubeUrl}</strong></span>
@@ -1949,13 +1982,13 @@ export default function Learningplayground() {
                           setShowUploadModal(true)
                           setPastedYouTubeUrl('')
                         }}
-                        className="px-3 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold shadow-sm transition-all"
+                        className="px-3 py-1 rounded-[6px] bg-red-500 hover:bg-red-600 text-white text-xs font-semibold shadow-sm transition-all"
                       >
                         Ingest Video
                       </button>
                       <button
                         onClick={() => setPastedYouTubeUrl('')}
-                        className="p-1 rounded-md text-[#8E8E93] hover:text-white"
+                        className="p-1 rounded-[4px] text-[#8E8E93] hover:text-white"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -1965,15 +1998,15 @@ export default function Learningplayground() {
 
                 {/* Voice Listening Active Badge */}
                 {isChatListening && (
-                  <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 text-xs text-red-300 max-w-fit shadow-sm animate-pulse">
+                  <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-[6px] bg-red-500/20 border border-red-500/40 text-xs text-red-300 max-w-fit shadow-sm animate-pulse">
                     <Mic className="w-3.5 h-3.5 text-red-400 animate-bounce" />
-                    <span>🎙️ Listening to your voice... Speak now (click red mic to stop)</span>
+                    <span>Listening to your voice... Speak now (click red mic to stop)</span>
                   </div>
                 )}
 
                 {/* RAG Context Active Document Badge */}
                 {attachedDocument && (
-                  <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-lg bg-[#5A7D99]/20 border border-[#5A7D99]/40 text-xs text-white max-w-fit shadow-sm animate-fade-in">
+                  <div className="flex items-center gap-2 mb-2 px-3 py-1.5 rounded-[6px] bg-[#5A7D99]/20 border border-[#5A7D99]/40 text-xs text-white max-w-fit shadow-sm animate-fade-in">
                     <FileText className="w-4 h-4 text-[#5A7D99]" />
                     <span>RAG Context Active: <strong>{attachedDocument.title}</strong></span>
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-1" title="RAG Vector Search Active" />
@@ -1987,9 +2020,9 @@ export default function Learningplayground() {
                   </div>
                 )}
 
-                {/* Quick Tool Format & Co-Pilot Action Tray in Chat Box */}
+                {/* Quick Tool Format & Action Tray in Chat Box */}
                 <div className="relative mb-2">
-                  <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 px-1 text-[11px]">
+                  <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1 px-0.5 text-[11px]">
                     {generatedTool ? (
                       <>
                         <span className="text-[#8E8E93] font-semibold flex items-center gap-1 flex-shrink-0 text-[10px] uppercase tracking-wider pr-0.5">
@@ -1997,29 +2030,32 @@ export default function Learningplayground() {
                           <span>Morph:</span>
                         </span>
                         {[
-                          { id: 'flashcards', label: '🗂️ Cards' },
-                          { id: 'timeline', label: '⏳ Timeline' },
-                          { id: 'crossword', label: '🧩 Crossword' },
-                          { id: 'quiz', label: '🎯 Quiz' },
-                          { id: 'memory', label: '🧠 Palace' },
-                          { id: 'cloze', label: '⚡ Cloze' },
-                          { id: 'feynman', label: '🎙️ Feynman' },
-                          { id: 'revision-kit', label: '📦 Kit' },
-                        ].map((fmt) => (
-                          <button
-                            key={fmt.id}
-                            type="button"
-                            onClick={() => handleMorphTool(fmt.id)}
-                            className={`px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all flex-shrink-0 flex items-center gap-1 whitespace-nowrap ${
-                              activeMorphFormat === fmt.id || activeMeta.toolType?.toLowerCase().includes(fmt.id)
-                                ? 'bg-[#5A7D99] text-white border-[#5A7D99] shadow-sm'
-                                : 'bg-[#212121] text-[#CDD1D6] hover:text-white border-[#2F2F2F] hover:border-[#5A7D99]/50'
-                            }`}
-                            title={`Instantly morph active tool into ${fmt.label}`}
-                          >
-                            <span>{fmt.label}</span>
-                          </button>
-                        ))}
+                          { id: 'flashcards', label: 'Cards', icon: Layers },
+                          { id: 'timeline', label: 'Timeline', icon: Clock },
+                          { id: 'crossword', label: 'Crossword', icon: CheckSquare },
+                          { id: 'quiz', label: 'Quiz', icon: Target },
+                          { id: 'memory', label: 'Palace', icon: Compass },
+                          { id: 'cloze', label: 'Cloze', icon: Zap },
+                          { id: 'feynman', label: 'Feynman', icon: Mic },
+                          { id: 'revision-kit', label: 'Revision Kit', icon: Package },
+                        ].map((fmt) => {
+                          const IconComp = fmt.icon
+                          return (
+                            <button
+                              key={fmt.id}
+                              type="button"
+                              onClick={() => handleMorphTool(fmt.id)}
+                              className={`px-2.5 py-1 rounded-[6px] border text-[11px] font-semibold transition-all flex-shrink-0 flex items-center gap-1.5 whitespace-nowrap ${activeMorphFormat === fmt.id || activeMeta.toolType?.toLowerCase().includes(fmt.id)
+                                  ? 'bg-[#5A7D99] text-white border-[#5A7D99] shadow-sm'
+                                  : 'bg-[#212121] text-[#8E8E93] hover:text-white border-[#2F2F2F] hover:border-[#5A7D99]/60'
+                                }`}
+                              title={`Instantly morph active tool into ${fmt.label}`}
+                            >
+                              <IconComp className="w-3 h-3 text-[#5A7D99]" />
+                              <span>{fmt.label}</span>
+                            </button>
+                          )
+                        })}
 
                         <span className="w-px h-3.5 bg-[#2F2F2F] flex-shrink-0 mx-0.5" />
 
@@ -2030,30 +2066,34 @@ export default function Learningplayground() {
                         <button
                           type="button"
                           onClick={() => handleSendMessage(`Make this "${activeMeta.title}" revision tool more challenging with advanced exam questions and hard problem-solving scenarios.`)}
-                          className="px-2.5 py-1 rounded-lg bg-[#212121] hover:bg-[#5A7D99] text-[#CDD1D6] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99] transition-all flex items-center gap-1 flex-shrink-0 text-[11px] whitespace-nowrap"
+                          className="px-2.5 py-1 rounded-[6px] bg-[#212121] hover:bg-[#282E38] text-[#8E8E93] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99] transition-all flex items-center gap-1.5 flex-shrink-0 text-[11px] whitespace-nowrap"
                         >
-                          <span>⚡ Harder</span>
+                          <Zap className="w-3 h-3 text-[#5A7D99]" />
+                          <span>Harder</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleSendMessage(`Convert this "${activeMeta.title}" topic into a fast-paced 60-second timed speed drill assessment.`)}
-                          className="px-2.5 py-1 rounded-lg bg-[#212121] hover:bg-[#5A7D99] text-[#CDD1D6] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99] transition-all flex items-center gap-1 flex-shrink-0 text-[11px] whitespace-nowrap"
+                          className="px-2.5 py-1 rounded-[6px] bg-[#212121] hover:bg-[#282E38] text-[#8E8E93] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99] transition-all flex items-center gap-1.5 flex-shrink-0 text-[11px] whitespace-nowrap"
                         >
-                          <span>⏱️ Speed Drill</span>
+                          <Timer className="w-3 h-3 text-[#5A7D99]" />
+                          <span>Speed Drill</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleSendMessage(`Convert this "${activeMeta.title}" topic into an interactive Spatial Memory Palace with loci anchors and active recall walk-throughs.`)}
-                          className="px-2.5 py-1 rounded-lg bg-[#212121] hover:bg-[#5A7D99] text-[#CDD1D6] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99] transition-all flex items-center gap-1 flex-shrink-0 text-[11px] whitespace-nowrap"
+                          className="px-2.5 py-1 rounded-[6px] bg-[#212121] hover:bg-[#282E38] text-[#8E8E93] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99] transition-all flex items-center gap-1.5 flex-shrink-0 text-[11px] whitespace-nowrap"
                         >
-                          <span>🧠 Memory Palace</span>
+                          <Compass className="w-3 h-3 text-[#5A7D99]" />
+                          <span>Memory Palace</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => handleSendMessage(`Convert this "${activeMeta.title}" subject into a Feynman Active Recall Audio/Text Grader with key rubrics.`)}
-                          className="px-2.5 py-1 rounded-lg bg-[#212121] hover:bg-[#5A7D99] text-[#CDD1D6] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99] transition-all flex items-center gap-1 flex-shrink-0 text-[11px] whitespace-nowrap"
+                          className="px-2.5 py-1 rounded-[6px] bg-[#212121] hover:bg-[#282E38] text-[#8E8E93] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99] transition-all flex items-center gap-1.5 flex-shrink-0 text-[11px] whitespace-nowrap"
                         >
-                          <span>🎙️ Feynman Grader</span>
+                          <Mic className="w-3 h-3 text-[#5A7D99]" />
+                          <span>Feynman Grader</span>
                         </button>
                       </>
                     ) : (
@@ -2063,43 +2103,46 @@ export default function Learningplayground() {
                           <span>Create:</span>
                         </span>
                         {[
-                          { label: '⏳ Timeline', prompt: 'Create a chronological timeline drag and drop on ' },
-                          { label: '🗂️ Flashcards', prompt: 'Create interactive 3D flashcards on ' },
-                          { label: '🧩 2D Crossword', prompt: 'Create an interlocking 2D crossword puzzle on ' },
-                          { label: '🎯 MCQ Quiz', prompt: 'Generate a timed multiple-choice quiz on ' },
-                          { label: '🧠 Memory Palace', prompt: 'Create an interactive spatial memory palace on ' },
-                          { label: '⚡ Cloze Blurter', prompt: 'Create active recall fill-in-the-blank blurting notes on ' },
-                          { label: '🎙️ Feynman Grader', prompt: 'Create a Feynman active recall audio grader on ' },
-                          { label: '📦 3-in-1 Kit', prompt: 'Generate a comprehensive Cornell revision kit on ' },
-                        ].map((chip, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              setInputValue(chip.prompt)
-                              textareaRef.current?.focus()
-                            }}
-                            className="px-2.5 py-1 rounded-lg bg-[#212121] hover:bg-[#282E38] text-[#CDD1D6] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99]/60 transition-all flex items-center gap-1 flex-shrink-0 text-[11px] whitespace-nowrap"
-                          >
-                            <span>{chip.label}</span>
-                          </button>
-                        ))}
+                          { label: 'Timeline', icon: Clock, prompt: 'Create a chronological timeline drag and drop on ' },
+                          { label: 'Flashcards', icon: Layers, prompt: 'Create interactive 3D flashcards on ' },
+                          { label: '2D Crossword', icon: CheckSquare, prompt: 'Create an interlocking 2D crossword puzzle on ' },
+                          { label: 'MCQ Quiz', icon: Target, prompt: 'Generate a timed multiple-choice quiz on ' },
+                          { label: 'Memory Palace', icon: Compass, prompt: 'Create an interactive spatial memory palace on ' },
+                          { label: 'Cloze Blurter', icon: Zap, prompt: 'Create active recall fill-in-the-blank blurting notes on ' },
+                          { label: 'Feynman Grader', icon: Mic, prompt: 'Create a Feynman active recall audio grader on ' },
+                          { label: '3-in-1 Kit', icon: Package, prompt: 'Generate a comprehensive Cornell revision kit on ' },
+                        ].map((chip, idx) => {
+                          const IconComp = chip.icon
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setInputValue(chip.prompt)
+                                textareaRef.current?.focus()
+                              }}
+                              className="px-2.5 py-1 rounded-[6px] bg-[#212121] hover:bg-[#282E38] text-[#8E8E93] hover:text-white border border-[#2F2F2F] hover:border-[#5A7D99]/60 transition-all flex items-center gap-1.5 flex-shrink-0 text-[11px] whitespace-nowrap"
+                            >
+                              <IconComp className="w-3 h-3 text-[#5A7D99]" />
+                              <span>{chip.label}</span>
+                            </button>
+                          )
+                        })}
                       </>
                     )}
                   </div>
-                  {/* Subtle right gradient fade for overflow indication */}
-                  <div className="absolute right-0 top-0 bottom-1 w-8 bg-gradient-to-l from-[#171717] to-transparent pointer-events-none" />
                 </div>
 
-                <div className="glass-panel rounded-2xl p-2.5 sm:p-3 border border-[#2F2F2F] bg-[#212121]/95 shadow-2xl focus-within:border-[#5A7D99] transition-all">
-                  <div className="flex items-center gap-2.5 sm:gap-3">
+                {/* Input Container */}
+                <div className="rounded-[8px] p-2 sm:p-2.5 bg-[#212121] border border-[#2F2F2F] focus-within:border-[#5A7D99] shadow-lg transition-all">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setShowUploadModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#282E38] hover:bg-[#323946] border border-[#3A4250] text-xs font-semibold text-[#CDD1D6] hover:text-white transition-all shadow-sm group flex-shrink-0"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] bg-[#282E38] hover:bg-[#323946] border border-[#3A4250] text-xs font-semibold text-[#CDD1D6] hover:text-white transition-all shadow-sm flex-shrink-0"
                       title="Attach a PDF, DOCX, or TXT file to give Vela context"
                     >
-                      <Paperclip className="w-3.5 h-3.5 text-[#5A7D99] group-hover:rotate-12 transition-transform" />
+                      <Paperclip className="w-3.5 h-3.5 text-[#5A7D99]" />
                       <span className="hidden sm:inline">Attach File</span>
                     </button>
 
@@ -2118,15 +2161,16 @@ export default function Learningplayground() {
                           ? `Ask Vela to generate a tool based on "${attachedDocument.title}"...`
                           : "Message Vela to generate a revision tool (or attach a file)..."
                       }
-                      className="flex-1 bg-transparent border-none focus:outline-none text-xs text-white placeholder-[#8E8E93] resize-none px-2 py-2 max-h-24 min-h-[38px]"
+                      className="flex-1 bg-transparent border-none focus:outline-none text-xs text-white placeholder-[#8E8E93] resize-none px-2 py-1 max-h-24 min-h-[34px]"
                       rows={1}
                     />
+
                     <button
                       type="button"
                       onClick={toggleChatVoiceInput}
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all flex-shrink-0 ${isChatListening
-                          ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse shadow-md shadow-red-500/40'
-                          : 'bg-[#282E38] hover:bg-[#323946] text-[#CDD1D6] hover:text-white border border-[#3A4250]'
+                      className={`w-7 h-7 rounded-[6px] flex items-center justify-center transition-all flex-shrink-0 ${isChatListening
+                        ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
+                        : 'bg-[#282E38] hover:bg-[#323946] text-[#CDD1D6] hover:text-white border border-[#3A4250]'
                         }`}
                       title={isChatListening ? 'Listening... Click to stop recording' : 'Voice Input: Click to speak your prompt'}
                     >
@@ -2136,7 +2180,7 @@ export default function Learningplayground() {
                     <button
                       onClick={() => handleSendMessage()}
                       disabled={isLoading || !inputValue.trim()}
-                      className="w-8 h-8 rounded-xl bg-[#5A7D99] hover:bg-[#3D5E7A] flex items-center justify-center text-white transition-all disabled:opacity-30 flex-shrink-0"
+                      className="w-7 h-7 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-white flex items-center justify-center font-bold transition-all disabled:opacity-30 flex-shrink-0"
                       title="Send message (Enter)"
                     >
                       <Send className="w-3.5 h-3.5" />
@@ -2148,24 +2192,24 @@ export default function Learningplayground() {
 
           </div>
 
-          {/* Right Interactive Tool Viewer Canvas Panel (Active Workbench) */}
+          {/* Right Interactive Tool Viewer Canvas Panel */}
           <div
             ref={toolContainerRef}
             className={`bg-[#141820] flex flex-col overflow-hidden transition-all duration-300 relative ${isToolMaximized
-                ? 'fixed inset-0 z-50 bg-[#141820]'
-                : rightPanelOpen
-                  ? 'flex-1 border-l border-[#21262D] min-w-0 shadow-2xl'
-                  : 'w-0 border-l-0 overflow-hidden hidden'
+              ? 'fixed inset-0 z-50 bg-[#141820]'
+              : rightPanelOpen
+                ? 'flex-1 border-l border-[#21262D] min-w-0 shadow-2xl'
+                : 'w-0 border-l-0 overflow-hidden hidden'
               } ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex'}`}
           >
             {/* Always-visible Floating Minimize Badge when Maximized */}
             {isToolMaximized && (
               <button
                 onClick={() => setIsToolMaximized(false)}
-                className="fixed top-3 right-4 z-50 px-4 py-2 rounded-xl bg-[#5A7D99] hover:bg-[#3D5E7A] text-white text-xs font-bold shadow-2xl border border-white/20 backdrop-blur-md flex items-center gap-2 transition-all hover:scale-105"
+                className="fixed top-3 right-4 z-50 px-3 py-1.5 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-white text-xs font-bold shadow-2xl border border-white/20 flex items-center gap-1.5 transition-all"
                 title="Exit Fullscreen (Escape)"
               >
-                <Minimize2 className="w-4 h-4" />
+                <Minimize2 className="w-3.5 h-3.5" />
                 <span>Minimize (Esc)</span>
               </button>
             )}
@@ -2178,7 +2222,7 @@ export default function Learningplayground() {
                   {activeMeta.title || 'Interactive Workspace'}
                 </span>
                 {generatedTool && (
-                  <span className="capitalize text-[10px] px-2 py-0.5 rounded-full bg-[#5A7D99]/15 border border-[#5A7D99]/30 text-[#8BB0D1] font-mono font-semibold flex-shrink-0">
+                  <span className="capitalize text-[10px] px-2 py-0.5 rounded-[4px] bg-[#5A7D99]/15 border border-[#5A7D99]/30 text-[#8BB0D1] font-mono font-semibold flex-shrink-0">
                     {activeMeta.toolType}
                   </span>
                 )}
@@ -2188,7 +2232,7 @@ export default function Learningplayground() {
                 <div className="flex items-center gap-1.5 text-xs text-[#CDD1D6] flex-shrink-0">
                   <button
                     onClick={openInlineEditor}
-                    className="p-1 px-2.5 rounded-lg bg-[#21262D] hover:bg-[#2A313C] text-[#CDD1D6] hover:text-white transition-colors flex items-center gap-1 text-[11px] border border-[#2F3746]"
+                    className="p-1 px-2.5 rounded-[6px] bg-[#21262D] hover:bg-[#2A313C] text-[#CDD1D6] hover:text-white transition-colors flex items-center gap-1 text-[11px] border border-[#2F3746]"
                     title="Edit questions, cards, and content in canvas"
                   >
                     <Edit3 className="w-3.5 h-3.5 text-[#5A7D99]" />
@@ -2197,7 +2241,7 @@ export default function Learningplayground() {
 
                   <button
                     onClick={() => handleCopyShareLink(generatedTool)}
-                    className="p-1 px-2.5 rounded-lg bg-[#21262D] hover:bg-[#2A313C] text-[#CDD1D6] hover:text-white transition-all flex items-center gap-1 text-[11px] border border-[#2F3746]"
+                    className="p-1 px-2.5 rounded-[6px] bg-[#21262D] hover:bg-[#2A313C] text-[#CDD1D6] hover:text-white transition-all flex items-center gap-1 text-[11px] border border-[#2F3746]"
                     title="Copy direct shareable study link"
                   >
                     <Share2 className="w-3.5 h-3.5 text-[#5A7D99]" />
@@ -2207,7 +2251,7 @@ export default function Learningplayground() {
                   <div className="relative">
                     <button
                       onClick={() => setShowExportMenu(!showExportMenu)}
-                      className="p-1 px-2.5 rounded-lg bg-[#21262D] hover:bg-[#2A313C] text-[#CDD1D6] hover:text-white transition-all flex items-center gap-1 text-[11px] border border-[#2F3746]"
+                      className="p-1 px-2.5 rounded-[6px] bg-[#21262D] hover:bg-[#2A313C] text-[#CDD1D6] hover:text-white transition-all flex items-center gap-1 text-[11px] border border-[#2F3746]"
                       title="Export to Anki / Quizlet or Print Study Sheet"
                     >
                       <Download className="w-3.5 h-3.5 text-[#5A7D99]" />
@@ -2215,10 +2259,10 @@ export default function Learningplayground() {
                     </button>
 
                     {showExportMenu && (
-                      <div className="absolute right-0 mt-1.5 w-52 bg-[#1A1E24] border border-[#282E38] rounded-xl shadow-2xl p-1.5 z-50 animate-fade-in space-y-1">
+                      <div className="absolute right-0 mt-1.5 w-52 bg-[#1A1E24] border border-[#282E38] rounded-[8px] shadow-2xl p-1.5 z-50 animate-fade-in space-y-1">
                         <button
                           onClick={handleExportAnkiCsv}
-                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#21262E] text-xs font-semibold text-white flex items-center gap-2 transition-colors"
+                          className="w-full text-left px-3 py-2 rounded-[6px] hover:bg-[#21262E] text-xs font-semibold text-white flex items-center gap-2 transition-colors"
                         >
                           <Download className="w-3.5 h-3.5 text-[#5A7D99]" />
                           <div>
@@ -2229,7 +2273,7 @@ export default function Learningplayground() {
 
                         <button
                           onClick={handlePrintStudySheet}
-                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#21262E] text-xs font-semibold text-white flex items-center gap-2 transition-colors"
+                          className="w-full text-left px-3 py-2 rounded-[6px] hover:bg-[#21262E] text-xs font-semibold text-white flex items-center gap-2 transition-colors"
                         >
                           <Printer className="w-3.5 h-3.5 text-[#3D6660]" />
                           <div>
@@ -2243,7 +2287,7 @@ export default function Learningplayground() {
 
                   <button
                     onClick={() => openPublishModal(generatedTool)}
-                    className="p-1 px-2.5 rounded-lg bg-[#5A7D99]/20 hover:bg-[#5A7D99] text-[#8BB0D1] hover:text-white transition-all flex items-center gap-1.5 text-[11px] border border-[#5A7D99]/40 hover:border-[#5A7D99] font-medium shadow-sm group"
+                    className="p-1 px-2.5 rounded-[6px] bg-[#5A7D99]/20 hover:bg-[#5A7D99] text-[#8BB0D1] hover:text-white transition-all flex items-center gap-1.5 text-[11px] border border-[#5A7D99]/40 hover:border-[#5A7D99] font-medium shadow-sm group"
                     title="Publish this tool to the Community Marketplace"
                   >
                     <Globe className="w-3.5 h-3.5 text-[#5A7D99] group-hover:text-white" />
@@ -2252,9 +2296,9 @@ export default function Learningplayground() {
 
                   <button
                     onClick={() => setIsToolMaximized(!isToolMaximized)}
-                    className={`p-1 px-2.5 rounded-lg transition-all flex items-center gap-1 text-[11px] font-medium border ${isToolMaximized
-                        ? 'bg-[#5A7D99] hover:bg-[#3D5E7A] text-white border-[#5A7D99] shadow-md'
-                        : 'bg-[#21262D] hover:bg-[#2A313C] text-[#CDD1D6] hover:text-white border-[#2F3746]'
+                    className={`p-1 px-2.5 rounded-[6px] transition-all flex items-center gap-1 text-[11px] font-medium border ${isToolMaximized
+                      ? 'bg-[#5A7D99] hover:bg-[#3D5E7A] text-white border-[#5A7D99] shadow-md'
+                      : 'bg-[#21262D] hover:bg-[#2A313C] text-[#CDD1D6] hover:text-white border-[#2F3746]'
                       }`}
                     title={isToolMaximized ? 'Minimize Workspace (Esc)' : 'Expand Fullscreen'}
                   >
@@ -2264,7 +2308,7 @@ export default function Learningplayground() {
 
                   <button
                     onClick={handleUnloadTool}
-                    className="p-1 px-1.5 rounded-lg hover:bg-red-500/20 text-[#8E8E93] hover:text-red-400 transition-colors flex items-center gap-1 text-[11px]"
+                    className="p-1 px-1.5 rounded-[6px] hover:bg-red-500/20 text-[#8E8E93] hover:text-red-400 transition-colors flex items-center gap-1 text-[11px]"
                     title="Close tool and return to canvas idle"
                   >
                     <X className="w-3.5 h-3.5" />
@@ -2284,7 +2328,7 @@ export default function Learningplayground() {
                   <iframe
                     srcDoc={activeHtml}
                     title="Interactive Tool Sandbox"
-                    className="w-full h-full min-h-[450px] border-none rounded-2xl bg-white flex-1 shadow-2xl"
+                    className="w-full h-full min-h-[450px] border-none rounded-[8px] bg-white flex-1 shadow-2xl"
                     allow="microphone"
                     sandbox="allow-scripts allow-modals allow-forms"
                   />
@@ -2295,7 +2339,7 @@ export default function Learningplayground() {
                     {Array.isArray(activeMeta.items) && activeMeta.items.length > 0 && (
                       <div className="grid gap-3 grid-cols-1">
                         {activeMeta.items.map((item, idx) => (
-                          <div key={idx} className="p-3.5 rounded-xl bg-[#212121] border border-[#2F2F2F]">
+                          <div key={idx} className="p-3.5 rounded-[6px] bg-[#212121] border border-[#2F2F2F]">
                             <p className="font-medium text-xs text-white mb-1">
                               {item.question || item.title || item.concept || item.front}
                             </p>
@@ -2310,7 +2354,7 @@ export default function Learningplayground() {
                 )
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-8 my-auto">
-                  <Vela size={68} className="mb-4 opacity-40 hover:opacity-100 transition-opacity" />
+                  <Vela size={56} className="mb-3 opacity-40 hover:opacity-100 transition-opacity" />
                   <h4 className="text-sm font-semibold text-white mb-1">Interactive Canvas</h4>
                   <p className="text-xs text-[#8E8E93] max-w-xs">
                     Select a tool from your left sidebar or ask Vela in the chat to generate an interactive revision tool.
@@ -2326,23 +2370,23 @@ export default function Learningplayground() {
       {/* In-Canvas Direct Inline Editor Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="w-full max-w-2xl bg-[#1A1E24] border border-[#282E38] rounded-2xl p-6 shadow-2xl space-y-5 max-h-[85vh] flex flex-col">
+          <div className="w-full max-w-2xl bg-[#1A1E24] border border-[#282E38] rounded-[8px] p-6 shadow-2xl space-y-5 max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between border-b border-[#282E38] pb-3 flex-shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#5A7D99]/20 border border-[#5A7D99]/40 flex items-center justify-center text-[#5A7D99]">
-                  <Edit3 className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-[6px] bg-[#5A7D99]/20 border border-[#5A7D99]/40 flex items-center justify-center text-[#5A7D99]">
+                  <Edit3 className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-serif font-bold text-base text-white">Edit Tool in Canvas</h3>
+                  <h3 className="font-bold text-sm text-white">Edit Tool in Canvas</h3>
                   <p className="text-[11px] text-[#6E7580]">Customize cards, questions, and answers before saving</p>
                 </div>
               </div>
 
               <button
                 onClick={() => setShowEditModal(false)}
-                className="p-1 rounded-lg text-[#6E7580] hover:text-white hover:bg-[#21262E]"
+                className="p-1 rounded-[6px] text-[#6E7580] hover:text-white hover:bg-[#21262E]"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
@@ -2353,7 +2397,7 @@ export default function Learningplayground() {
                   type="text"
                   value={editingTitle}
                   onChange={(e) => setEditingTitle(e.target.value)}
-                  className="w-full bg-[#131519] border border-[#282E38] rounded-xl px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                  className="w-full bg-[#131519] border border-[#282E38] rounded-[6px] px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
                 />
               </div>
 
@@ -2363,7 +2407,7 @@ export default function Learningplayground() {
                   type="text"
                   value={editingDesc}
                   onChange={(e) => setEditingDesc(e.target.value)}
-                  className="w-full bg-[#131519] border border-[#282E38] rounded-xl px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                  className="w-full bg-[#131519] border border-[#282E38] rounded-[6px] px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
                 />
               </div>
 
@@ -2374,7 +2418,7 @@ export default function Learningplayground() {
                   </label>
                   <button
                     onClick={handleAddEditorItem}
-                    className="px-2.5 py-1 rounded-lg bg-[#21262E] hover:bg-[#5A7D99] text-xs font-semibold text-white border border-[#282E38] transition-all flex items-center gap-1"
+                    className="px-2.5 py-1 rounded-[6px] bg-[#21262E] hover:bg-[#5A7D99] text-xs font-semibold text-white border border-[#282E38] transition-all flex items-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add Item</span>
@@ -2383,9 +2427,9 @@ export default function Learningplayground() {
 
                 <div className="space-y-3">
                   {editingItems.map((item, idx) => (
-                    <div key={idx} className="p-3.5 rounded-xl bg-[#131519] border border-[#282E38] space-y-2 relative group">
+                    <div key={idx} className="p-3 rounded-[6px] bg-[#131519] border border-[#282E38] space-y-2 relative group">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-mono text-[#5A7D99] font-bold">Item {idx + 1}</span>
+                        <span className="text-[10px] font-mono text-[#5A7D99] font-bold">ITEM {idx + 1}</span>
                         <button
                           onClick={() => handleDeleteEditorItem(idx)}
                           className="p-1 text-[#6E7580] hover:text-red-400 rounded transition-colors"
@@ -2400,7 +2444,7 @@ export default function Learningplayground() {
                         value={item.front || item.question || item.concept || item.title || ''}
                         onChange={(e) => handleUpdateEditorItem(idx, item.front !== undefined ? 'front' : (item.question !== undefined ? 'question' : 'title'), e.target.value)}
                         placeholder="Front / Question / Term"
-                        className="w-full bg-[#1A1E24] border border-[#282E38] rounded-lg px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                        className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
                       />
 
                       <textarea
@@ -2408,7 +2452,7 @@ export default function Learningplayground() {
                         onChange={(e) => handleUpdateEditorItem(idx, item.back !== undefined ? 'back' : (item.answer !== undefined ? 'answer' : 'explanation'), e.target.value)}
                         placeholder="Back / Answer / Explanation"
                         rows={2}
-                        className="w-full bg-[#1A1E24] border border-[#282E38] rounded-lg px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99] resize-none"
+                        className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99] resize-none"
                       />
                     </div>
                   ))}
@@ -2420,14 +2464,14 @@ export default function Learningplayground() {
               <button
                 type="button"
                 onClick={() => setShowEditModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#6E7580] hover:text-white"
+                className="px-4 py-2 rounded-[6px] text-xs font-semibold text-[#8E8E93] hover:text-white"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSaveInlineEdit}
-                className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#5A7D99] to-[#3D6660] hover:from-[#3D5E7A] hover:to-[#4A6B52] text-xs font-semibold text-white flex items-center gap-2 transition-all shadow-md"
+                className="px-5 py-2 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-xs font-bold text-white flex items-center gap-2 transition-all shadow-md"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Apply Changes</span>
@@ -2440,56 +2484,56 @@ export default function Learningplayground() {
       {/* Upgraded Multi-Modal RAG Upload Modal */}
       {showUploadModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="w-full max-w-lg bg-[#1A1E24] border border-[#282E38] rounded-2xl p-6 shadow-2xl space-y-5">
+          <div className="w-full max-w-lg bg-[#1A1E24] border border-[#282E38] rounded-[8px] p-6 shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-[#282E38] pb-4">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#5A7D99]/20 border border-[#5A7D99]/40 flex items-center justify-center text-[#5A7D99]">
-                  <Upload className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-[6px] bg-[#5A7D99]/20 border border-[#5A7D99]/40 flex items-center justify-center text-[#5A7D99]">
+                  <Upload className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-serif font-bold text-base text-white">Multi-Modal Ingestion</h3>
-                  <p className="text-[11px] text-[#6E7580]">Create revision tools from documents, YouTube, audio, or photo notes</p>
+                  <h3 className="font-bold text-sm text-white">Attach Course Material (RAG)</h3>
+                  <p className="text-[11px] text-[#8E8E93]">Extract context from documents, YouTube, or handwritten notes</p>
                 </div>
               </div>
 
               <button
                 onClick={() => setShowUploadModal(false)}
-                className="p-1 rounded-lg text-[#6E7580] hover:text-white hover:bg-[#21262E]"
+                className="p-1 rounded-[6px] text-[#8E8E93] hover:text-white hover:bg-[#21262E]"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Ingestion Source Tabs (3 friction-free sources: Document, YouTube, Photo OCR) */}
-            <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#131519] rounded-xl border border-[#282E38]">
+            {/* Ingestion Source Tabs */}
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#131519] rounded-[6px] border border-[#282E38]">
               <button
                 onClick={() => { setUploadTab('document'); setUploadError(''); }}
-                className={`py-2 text-[11px] font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${uploadTab === 'document' ? 'bg-[#5A7D99] text-white shadow' : 'text-[#6E7580] hover:text-white'
+                className={`py-2 text-[11px] font-semibold rounded-[4px] transition-all flex flex-col items-center gap-1 ${uploadTab === 'document' ? 'bg-[#5A7D99] text-white shadow' : 'text-[#8E8E93] hover:text-white'
                   }`}
               >
-                <FileText className="w-4 h-4" />
-                <span>Document / Slides</span>
+                <FileText className="w-3.5 h-3.5" />
+                <span>Document</span>
               </button>
               <button
                 onClick={() => { setUploadTab('youtube'); setUploadError(''); }}
-                className={`py-2 text-[11px] font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${uploadTab === 'youtube' ? 'bg-[#5A7D99] text-white shadow' : 'text-[#6E7580] hover:text-white'
+                className={`py-2 text-[11px] font-semibold rounded-[4px] transition-all flex flex-col items-center gap-1 ${uploadTab === 'youtube' ? 'bg-[#5A7D99] text-white shadow' : 'text-[#8E8E93] hover:text-white'
                   }`}
               >
-                <Video className="w-4 h-4" />
-                <span>YouTube Video</span>
+                <Video className="w-3.5 h-3.5" />
+                <span>YouTube</span>
               </button>
               <button
                 onClick={() => { setUploadTab('image-ocr'); setUploadError(''); }}
-                className={`py-2 text-[11px] font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${uploadTab === 'image-ocr' ? 'bg-[#5A7D99] text-white shadow' : 'text-[#6E7580] hover:text-white'
+                className={`py-2 text-[11px] font-semibold rounded-[4px] transition-all flex flex-col items-center gap-1 ${uploadTab === 'image-ocr' ? 'bg-[#5A7D99] text-white shadow' : 'text-[#8E8E93] hover:text-white'
                   }`}
               >
-                <Camera className="w-4 h-4" />
-                <span>Photo Notes OCR</span>
+                <Camera className="w-3.5 h-3.5" />
+                <span>Photo OCR</span>
               </button>
             </div>
 
             {uploadError && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
+              <div className="p-3 rounded-[6px] bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 <span>{uploadError}</span>
               </div>
@@ -2505,7 +2549,7 @@ export default function Learningplayground() {
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
                   placeholder="e.g. Organic Chemistry Chapter 4 or Contract Law"
-                  className="w-full bg-[#131519] border border-[#282E38] rounded-xl px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                  className="w-full bg-[#131519] border border-[#282E38] rounded-[6px] px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
                 />
               </div>
 
@@ -2517,9 +2561,9 @@ export default function Learningplayground() {
                     onDragLeave={handleDragLeave}
                     onDrop={handleDropFile}
                     onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-2xl p-5 text-center cursor-pointer transition-all ${isDraggingOver
-                        ? 'border-[#5A7D99] bg-[#5A7D99]/20 shadow-lg'
-                        : 'border-[#282E38] hover:border-[#5A7D99] bg-[#131519]/50 hover:bg-[#131519]'
+                    className={`border border-dashed rounded-[8px] p-5 text-center cursor-pointer transition-all ${isDraggingOver
+                      ? 'border-[#5A7D99] bg-[#5A7D99]/10 shadow-lg'
+                      : 'border-[#282E38] hover:border-[#5A7D99] bg-[#131519]/60 hover:bg-[#131519]'
                       }`}
                   >
                     <input
@@ -2532,7 +2576,7 @@ export default function Learningplayground() {
                       }}
                       className="hidden"
                     />
-                    <FileText className="w-7 h-7 text-[#5A7D99] mx-auto mb-1.5" />
+                    <FileText className="w-6 h-6 text-[#5A7D99] mx-auto mb-1.5" />
                     {uploadFile ? (
                       <div>
                         <p className="font-semibold text-xs text-white truncate">{uploadFile.name}</p>
@@ -2541,7 +2585,7 @@ export default function Learningplayground() {
                     ) : (
                       <div>
                         <p className="text-xs text-white font-medium">Drag &amp; drop PDF, DOCX, or TXT (up to 15MB)</p>
-                        <p className="text-[10px] text-[#6E7580] mt-1">Or click to browse files</p>
+                        <p className="text-[10px] text-[#6E7580] mt-1">Or click to browse file system</p>
                       </div>
                     )}
                   </div>
@@ -2551,17 +2595,17 @@ export default function Learningplayground() {
               {/* TAB 2: YouTube Ingestion */}
               {uploadTab === 'youtube' && (
                 <div className="space-y-3">
-                  <div className="p-4 rounded-xl bg-[#131519] border border-[#282E38] space-y-2">
-                    <label className="block text-xs font-semibold text-[#CDD1D6]">YouTube Video Link</label>
+                  <div className="p-3.5 rounded-[6px] bg-[#131519] border border-[#282E38] space-y-2">
+                    <label className="block text-xs font-semibold text-[#CDD1D6]">YouTube URL</label>
                     <input
                       type="url"
                       value={youtubeUrl}
                       onChange={(e) => setYoutubeUrl(e.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=... or youtu.be/..."
-                      className="w-full bg-[#1A1E24] border border-[#282E38] rounded-xl px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
                     />
                     <p className="text-[10px] text-[#6E7580]">
-                      Vela will extract video captions, key definitions, and generate custom revision tools.
+                      Extracts video transcripts and embeds context for tool synthesis.
                     </p>
                   </div>
                 </div>
@@ -2572,7 +2616,7 @@ export default function Learningplayground() {
                 <div className="space-y-3">
                   <div
                     onClick={() => imageInputRef.current?.click()}
-                    className="border-2 border-dashed border-[#282E38] hover:border-[#5A7D99] rounded-2xl p-5 text-center cursor-pointer bg-[#131519]/50 hover:bg-[#131519] transition-all"
+                    className="border border-dashed border-[#282E38] hover:border-[#5A7D99] rounded-[8px] p-5 text-center cursor-pointer bg-[#131519]/60 hover:bg-[#131519] transition-all"
                   >
                     <input
                       ref={imageInputRef}
@@ -2587,7 +2631,7 @@ export default function Learningplayground() {
                       }}
                       className="hidden"
                     />
-                    <Camera className="w-7 h-7 text-[#5A7D99] mx-auto mb-1.5" />
+                    <Camera className="w-6 h-6 text-[#5A7D99] mx-auto mb-1.5" />
                     {ocrImageFile ? (
                       <div>
                         <p className="font-semibold text-xs text-white truncate">{ocrImageFile.name}</p>
@@ -2596,7 +2640,7 @@ export default function Learningplayground() {
                     ) : (
                       <div>
                         <p className="text-xs text-white font-medium">Upload photo of notebook page, whiteboard, or diagram</p>
-                        <p className="text-[10px] text-[#6E7580] mt-1">Supports PNG, JPG, JPEG (Vision OCR extraction)</p>
+                        <p className="text-[10px] text-[#6E7580] mt-1">Vision OCR extraction</p>
                       </div>
                     )}
                   </div>
@@ -2606,22 +2650,22 @@ export default function Learningplayground() {
               {/* Interactive Tool / Prompt Choice */}
               <div className="pt-2 border-t border-[#282E38] space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-[#CDD1D6] flex items-center gap-1.5">
-                    <span>What would you like to create?</span>
+                  <label className="text-xs font-semibold text-[#CDD1D6]">
+                    Desired Tool Output
                   </label>
-                  <span className="text-[10px] text-[#6E7580]">Optional</span>
+                  <span className="text-[10px] text-[#6E7580]">OPTIONAL</span>
                 </div>
 
                 {/* Quick-pick tool format chips */}
                 <div className="flex flex-wrap gap-1.5">
                   {[
-                    { id: 'chat', label: '💬 Just Attach & Prompt in Chat' },
-                    { id: 'crossword', label: '🧩 2D Crossword', prompt: 'Generate an interactive 2D Crossword puzzle' },
-                    { id: 'feynman', label: '🧠 Feynman Grader', prompt: 'Create a Feynman Active Recall Audio/Text Grader with rubrics' },
-                    { id: 'cloze', label: '⚡ Cloze Blurting', prompt: 'Generate interactive Cloze Deletion blurting notes' },
-                    { id: 'revision-kit', label: '📦 3-in-1 Kit', prompt: 'Generate a comprehensive 3-in-1 Revision Kit (Notes + Flashcards + Timed Quiz)' },
-                    { id: 'flashcards', label: '🗂️ Flashcards', prompt: 'Generate a deck of interactive flip flashcards' },
-                    { id: 'quiz', label: '🎯 MCQ Quiz', prompt: 'Create a multiple-choice practice quiz with explanations' },
+                    { id: 'chat', label: 'Ask in Chat' },
+                    { id: 'crossword', label: '2D Crossword', prompt: 'Generate an interactive 2D Crossword puzzle' },
+                    { id: 'feynman', label: 'Feynman Grader', prompt: 'Create a Feynman Active Recall Audio/Text Grader with rubrics' },
+                    { id: 'cloze', label: 'Cloze Blurting', prompt: 'Generate interactive Cloze Deletion blurting notes' },
+                    { id: 'revision-kit', label: '3-in-1 Kit', prompt: 'Generate a comprehensive 3-in-1 Revision Kit (Notes + Flashcards + Timed Quiz)' },
+                    { id: 'flashcards', label: 'Flashcards', prompt: 'Generate a deck of interactive flip flashcards' },
+                    { id: 'quiz', label: 'MCQ Quiz', prompt: 'Create a multiple-choice practice quiz with explanations' },
                   ].map((fmt) => (
                     <button
                       key={fmt.id}
@@ -2639,9 +2683,9 @@ export default function Learningplayground() {
                           }
                         }
                       }}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-medium border transition-all ${selectedIngestFormat === fmt.id
-                          ? 'bg-[#5A7D99] text-white border-[#5A7D99] shadow-sm'
-                          : 'bg-[#131519] text-[#A0AEC0] border-[#282E38] hover:border-[#5A7D99] hover:text-white'
+                      className={`px-2.5 py-1 rounded-[6px] text-[11px] font-medium border transition-all ${selectedIngestFormat === fmt.id
+                        ? 'bg-[#5A7D99] text-white border-[#5A7D99] shadow-sm'
+                        : 'bg-[#131519] text-[#8E8E93] border-[#282E38] hover:border-[#5A7D99] hover:text-white'
                         }`}
                     >
                       {fmt.label}
@@ -2657,10 +2701,38 @@ export default function Learningplayground() {
                     setUploadInstruction(e.target.value)
                     setSelectedIngestFormat('custom')
                   }}
-                  placeholder="e.g. Create a 12-bone crossword, make a speed drill, or leave blank to prompt in chat..."
-                  className="w-full bg-[#131519] border border-[#282E38] rounded-xl px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                  placeholder="e.g. Create a 12-clue crossword, speed drill, or prompt directive..."
+                  className="w-full bg-[#131519] border border-[#282E38] rounded-[6px] px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
                 />
               </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#282E38]">
+              <button
+                type="button"
+                onClick={() => setShowUploadModal(false)}
+                className="px-3.5 py-1.5 rounded-[6px] text-xs font-semibold text-[#8E8E93] hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUploadDocument}
+                disabled={isUploading || (!uploadFile && !youtubeUrl && !ocrImageFile)}
+                className="px-4 py-1.5 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md disabled:opacity-30"
+              >
+                {isUploading ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Attaching Source...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Attach &amp; Process</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -2669,28 +2741,28 @@ export default function Learningplayground() {
       {/* PUBLISH TO MARKETPLACE MODAL */}
       {showPublishModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-lg bg-[#171A1F] border border-[#282E38] rounded-2xl shadow-2xl p-6 space-y-5">
+          <div className="w-full max-w-lg bg-[#1A1E24] border border-[#282E38] rounded-[8px] shadow-2xl p-6 space-y-5">
             <div className="flex items-center justify-between border-b border-[#282E38] pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-[#5A7D99]/20 border border-[#5A7D99]/40 flex items-center justify-center">
+                <div className="w-7 h-7 rounded-[6px] bg-[#5A7D99]/20 border border-[#5A7D99]/40 flex items-center justify-center">
                   <Globe className="w-4 h-4 text-[#5A7D99]" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-white">Publish to Community Marketplace</h3>
-                  <p className="text-[11px] text-[#8E8E93]">Share your revision tool with learners worldwide</p>
+                  <h3 className="font-bold text-sm text-white">Publish Tool</h3>
+                  <p className="text-[11px] text-[#8E8E93]">Share revision tool to the Community Marketplace</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowPublishModal(false)}
-                className="p-1 rounded-lg text-[#8E8E93] hover:text-white hover:bg-[#21262E] transition-colors"
+                className="p-1 rounded-[6px] text-[#8E8E93] hover:text-white hover:bg-[#21262E] transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {publishSuccessMessage ? (
-              <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold text-center animate-fade-in flex flex-col items-center gap-2">
-                <CheckCircle2 className="w-7 h-7 text-emerald-400" />
+              <div className="p-4 rounded-[6px] bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold text-center animate-fade-in flex flex-col items-center gap-2">
+                <CheckCircle2 className="w-6 h-6 text-emerald-400" />
                 <span>{publishSuccessMessage}</span>
               </div>
             ) : (
@@ -2701,8 +2773,8 @@ export default function Learningplayground() {
                     type="text"
                     value={publishTitle}
                     onChange={(e) => setPublishTitle(e.target.value)}
-                    placeholder="e.g. Human Bones 2D Crossword or Quantum Physics Grader"
-                    className="w-full bg-[#131519] border border-[#282E38] rounded-xl px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                    placeholder="e.g. Human Bones 2D Crossword"
+                    className="w-full bg-[#131519] border border-[#282E38] rounded-[6px] px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
                   />
                 </div>
 
@@ -2712,8 +2784,8 @@ export default function Learningplayground() {
                     rows={3}
                     value={publishDescription}
                     onChange={(e) => setPublishDescription(e.target.value)}
-                    placeholder="Describe key concepts, study goals, or target exams..."
-                    className="w-full bg-[#131519] border border-[#282E38] rounded-xl px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99] resize-none"
+                    placeholder="Describe concepts, study goals, or syllabus..."
+                    className="w-full bg-[#131519] border border-[#282E38] rounded-[6px] px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99] resize-none"
                   />
                 </div>
 
@@ -2723,30 +2795,30 @@ export default function Learningplayground() {
                     <select
                       value={publishCategory}
                       onChange={(e) => setPublishCategory(e.target.value)}
-                      className="w-full bg-[#131519] border border-[#282E38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#5A7D99]"
+                      className="w-full bg-[#131519] border border-[#282E38] rounded-[6px] px-3 py-2 text-xs text-white focus:outline-none focus:border-[#5A7D99]"
                     >
-                      <option value="STEM & Medicine">🔬 STEM &amp; Medicine</option>
-                      <option value="Law & Humanities">⚖️ Law &amp; Humanities</option>
-                      <option value="Computer Science">💻 Computer Science</option>
-                      <option value="Languages & Literature">📚 Languages &amp; Literature</option>
-                      <option value="Economics & Business">📈 Economics &amp; Business</option>
-                      <option value="General Revision">🎯 General Revision</option>
+                      <option value="STEM & Medicine">STEM &amp; Medicine</option>
+                      <option value="Law & Humanities">Law &amp; Humanities</option>
+                      <option value="Computer Science">Computer Science</option>
+                      <option value="Languages & Literature">Languages &amp; Literature</option>
+                      <option value="Economics & Business">Economics &amp; Business</option>
+                      <option value="General Revision">General Revision</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-[#CDD1D6] mb-1.5">Tags (Comma-separated)</label>
+                    <label className="block text-xs font-semibold text-[#CDD1D6] mb-1.5">Tags</label>
                     <input
                       type="text"
                       value={publishTags}
                       onChange={(e) => setPublishTags(e.target.value)}
                       placeholder="e.g. bones, anatomy, revision"
-                      className="w-full bg-[#131519] border border-[#282E38] rounded-xl px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                      className="w-full bg-[#131519] border border-[#282E38] rounded-[6px] px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
                     />
                   </div>
                 </div>
 
-                <label className="flex items-center gap-2.5 p-3 rounded-xl bg-[#131519] border border-[#282E38] cursor-pointer">
+                <label className="flex items-center gap-2.5 p-3 rounded-[6px] bg-[#131519] border border-[#282E38] cursor-pointer">
                   <input
                     type="checkbox"
                     checked={publishIsPublic}
@@ -2763,7 +2835,7 @@ export default function Learningplayground() {
                   <button
                     type="button"
                     onClick={() => setShowPublishModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-[#8E8E93] hover:text-white"
+                    className="px-4 py-1.5 rounded-[6px] text-xs font-semibold text-[#8E8E93] hover:text-white"
                   >
                     Cancel
                   </button>
@@ -2772,17 +2844,17 @@ export default function Learningplayground() {
                     type="button"
                     onClick={handlePublishToMarketplace}
                     disabled={isPublishing || !publishTitle.trim()}
-                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#5A7D99] to-[#3D6660] hover:from-[#3D5E7A] hover:to-[#4A6B52] text-xs font-semibold text-white flex items-center gap-2 disabled:opacity-40 transition-all shadow-md"
+                    className="px-4 py-1.5 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-white text-xs font-bold flex items-center gap-2 disabled:opacity-40 transition-all shadow-md"
                   >
                     {isPublishing ? (
                       <>
                         <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        <span>Publishing Tool...</span>
+                        <span>Publishing...</span>
                       </>
                     ) : (
                       <>
                         <Globe className="w-3.5 h-3.5" />
-                        <span>Publish to Marketplace</span>
+                        <span>Publish Tool</span>
                       </>
                     )}
                   </button>
@@ -2796,51 +2868,51 @@ export default function Learningplayground() {
       {/* COMMUNITY MARKETPLACE EXPLORER MODAL */}
       {showMarketplaceExplorer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-5xl h-[88vh] bg-[#171A1F] border border-[#282E38] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+          <div className="w-full max-w-5xl h-[88vh] bg-[#1A1E24] border border-[#282E38] rounded-[8px] shadow-2xl flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-[#282E38] bg-[#1A1E24] flex items-center justify-between flex-shrink-0">
+            <div className="px-6 py-3.5 border-b border-[#282E38] bg-[#161B22] flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#5A7D99] to-[#3D6660] flex items-center justify-center text-white shadow-md">
-                  <Globe className="w-5 h-5" />
+                <div className="w-8 h-8 rounded-[6px] bg-[#5A7D99] flex items-center justify-center text-white shadow-md">
+                  <Globe className="w-4 h-4" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="font-bold text-base text-white">Community Marketplace</h2>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#5A7D99]/20 text-[#5A7D99] font-mono font-semibold">
-                      {marketplaceTools.length} Live Tools
+                    <h2 className="font-bold text-sm text-white">Community Marketplace</h2>
+                    <span className="text-[10px] px-2 py-0.5 rounded-[4px] bg-[#5A7D99]/20 text-[#8BB0D1] font-mono font-semibold">
+                      {marketplaceTools.length} Tools
                     </span>
                   </div>
-                  <p className="text-xs text-[#8E8E93]">Explore, play, and fork interactive study tools created by students and educators</p>
+                  <p className="text-xs text-[#8E8E93]">Explore, play, and fork interactive study tools created by learners</p>
                 </div>
               </div>
 
               <button
                 onClick={() => setShowMarketplaceExplorer(false)}
-                className="p-1.5 rounded-xl text-[#8E8E93] hover:text-white hover:bg-[#21262E] transition-colors"
+                className="p-1.5 rounded-[6px] text-[#8E8E93] hover:text-white hover:bg-[#21262E] transition-colors"
                 title="Close Marketplace"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Filter & Search Toolbar */}
-            <div className="px-6 py-3 border-b border-[#282E38] bg-[#131519] flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+            <div className="px-6 py-2.5 border-b border-[#282E38] bg-[#131519] flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
               {/* Category Chips */}
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-thin py-0.5">
                 {[
                   { id: 'all', label: 'All Tools' },
-                  { id: 'STEM & Medicine', label: '🔬 STEM & Medicine' },
-                  { id: 'Law & Humanities', label: '⚖️ Law & Humanities' },
-                  { id: 'Computer Science', label: '💻 Computer Science' },
-                  { id: 'Languages & Literature', label: '📚 Languages' },
-                  { id: 'General Revision', label: '🎯 General Revision' },
+                  { id: 'STEM & Medicine', label: 'STEM & Medicine' },
+                  { id: 'Law & Humanities', label: 'Law & Humanities' },
+                  { id: 'Computer Science', label: 'Computer Science' },
+                  { id: 'Languages & Literature', label: 'Languages' },
+                  { id: 'General Revision', label: 'General Revision' },
                 ].map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => setMarketplaceFilterCategory(cat.id)}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${marketplaceFilterCategory === cat.id
-                        ? 'bg-[#5A7D99] text-white shadow-sm font-semibold'
-                        : 'bg-[#1E222A] text-[#8E8E93] hover:text-white hover:bg-[#282E38]'
+                    className={`px-3 py-1 rounded-[6px] text-xs font-medium transition-all whitespace-nowrap ${marketplaceFilterCategory === cat.id
+                      ? 'bg-[#5A7D99] text-white shadow-sm'
+                      : 'bg-[#21262E] text-[#8E8E93] hover:text-white hover:bg-[#282E38]'
                       }`}
                   >
                     {cat.label}
@@ -2850,13 +2922,13 @@ export default function Learningplayground() {
 
               {/* Search Bar */}
               <div className="relative min-w-[240px] flex-1 sm:flex-initial">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[#8E8E93]" />
+                <Search className="w-3.5 h-3.5 absolute left-3 top-2 text-[#8E8E93]" />
                 <input
                   type="text"
                   value={marketplaceSearchQuery}
                   onChange={(e) => setMarketplaceSearchQuery(e.target.value)}
                   placeholder="Search marketplace tools..."
-                  className="w-full bg-[#1E222A] border border-[#282E38] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#8E8E93] focus:outline-none focus:border-[#5A7D99]"
+                  className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] pl-8 pr-3 py-1 text-xs text-white placeholder-[#8E8E93] focus:outline-none focus:border-[#5A7D99]"
                 />
               </div>
             </div>
@@ -2865,8 +2937,8 @@ export default function Learningplayground() {
             <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
               {isLoadingMarketplaceTools ? (
                 <div className="h-full flex flex-col items-center justify-center text-center">
-                  <span className="w-8 h-8 border-2 border-[#5A7D99]/30 border-t-[#5A7D99] rounded-full animate-spin mb-3" />
-                  <p className="text-xs text-[#8E8E93]">Fetching live marketplace tools...</p>
+                  <span className="w-6 h-6 border-2 border-[#5A7D99]/30 border-t-[#5A7D99] rounded-full animate-spin mb-3" />
+                  <p className="text-xs text-[#8E8E93]">Fetching tools from community registry...</p>
                 </div>
               ) : (() => {
                 const filtered = marketplaceTools.filter((t) => {
@@ -2886,8 +2958,8 @@ export default function Learningplayground() {
                 if (filtered.length === 0) {
                   return (
                     <div className="h-full flex flex-col items-center justify-center text-center py-12">
-                      <Globe className="w-12 h-12 text-[#282E38] mb-3" />
-                      <h4 className="text-sm font-semibold text-white mb-1">No Marketplace Tools Found</h4>
+                      <Globe className="w-10 h-10 text-[#282E38] mb-3" />
+                      <h4 className="text-xs font-semibold text-white mb-1">No Tools Found</h4>
                       <p className="text-xs text-[#8E8E93] max-w-sm">
                         {marketplaceSearchQuery
                           ? `No tools matched "${marketplaceSearchQuery}". Try clearing search or selecting another category.`
@@ -2898,7 +2970,7 @@ export default function Learningplayground() {
                 }
 
                 return (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
                     {filtered.map((mTool) => {
                       const meta = extractToolMetadata(mTool)
                       const isUpvoted = mTool.my_vote === 1
@@ -2907,12 +2979,12 @@ export default function Learningplayground() {
                       return (
                         <div
                           key={mTool.id}
-                          className="bg-[#1A1E24] border border-[#282E38] hover:border-[#5A7D99]/60 rounded-2xl p-4 flex flex-col justify-between transition-all hover:shadow-xl group"
+                          className="bg-[#131519] border border-[#282E38] hover:border-[#5A7D99] rounded-[8px] p-4 flex flex-col justify-between transition-all group"
                         >
                           <div>
                             <div className="flex items-center justify-between gap-2 mb-2">
-                              <span className="capitalize text-[10px] px-2 py-0.5 rounded-full bg-[#5A7D99]/15 border border-[#5A7D99]/30 text-[#5A7D99] font-mono font-semibold">
-                                {meta.toolType || 'Study Tool'}
+                              <span className="capitalize text-[10px] px-2 py-0.5 rounded-[4px] bg-[#5A7D99]/15 border border-[#5A7D99]/30 text-[#8BB0D1] font-mono font-semibold">
+                                {meta.toolType || 'Tool'}
                               </span>
                               {mTool.category && (
                                 <span className="text-[10px] text-[#8E8E93] truncate max-w-[120px]">
@@ -2921,18 +2993,18 @@ export default function Learningplayground() {
                               )}
                             </div>
 
-                            <h4 className="font-bold text-sm text-white mb-1.5 line-clamp-1 group-hover:text-[#5A7D99] transition-colors">
+                            <h4 className="font-bold text-xs sm:text-sm text-white mb-1 line-clamp-1 group-hover:text-[#8BB0D1] transition-colors">
                               {meta.title}
                             </h4>
 
                             <p className="text-xs text-[#8E8E93] line-clamp-2 mb-3 leading-relaxed">
-                              {meta.description || 'Interactive educational revision tool generated with AI.'}
+                              {meta.description || 'Interactive educational tool sandbox.'}
                             </p>
 
                             {Array.isArray(mTool.tags) && mTool.tags.length > 0 && (
                               <div className="flex flex-wrap gap-1 mb-3">
                                 {mTool.tags.slice(0, 3).map((tag, i) => (
-                                  <span key={i} className="text-[9px] px-1.5 py-0.5 rounded bg-[#131519] text-[#6E7580] font-mono">
+                                  <span key={i} className="text-[9px] px-1.5 py-0.5 rounded-[4px] bg-[#21262E] text-[#8E8E93] font-mono">
                                     #{tag}
                                   </span>
                                 ))}
@@ -2946,26 +3018,26 @@ export default function Learningplayground() {
                               <div className="flex items-center gap-1.5">
                                 <button
                                   onClick={(e) => handleVoteTool(mTool.id, isUpvoted ? 0 : 1, e)}
-                                  className={`p-1 rounded hover:bg-[#21262E] transition-colors flex items-center gap-1 ${isUpvoted ? 'text-emerald-400 font-bold' : 'hover:text-emerald-400'
+                                  className={`p-1 rounded-[4px] hover:bg-[#21262E] transition-colors flex items-center gap-1 ${isUpvoted ? 'text-emerald-400 font-bold' : 'hover:text-emerald-400'
                                     }`}
                                   title="Upvote tool"
                                 >
-                                  <ThumbsUp className="w-3.5 h-3.5" />
-                                  <span>{mTool.upvote_count || 0}</span>
+                                  <ThumbsUp className="w-3 h-3" />
+                                  <span className="font-mono text-[10px]">{mTool.upvote_count || 0}</span>
                                 </button>
 
                                 <button
                                   onClick={(e) => handleVoteTool(mTool.id, isDownvoted ? 0 : -1, e)}
-                                  className={`p-1 rounded hover:bg-[#21262E] transition-colors flex items-center gap-1 ${isDownvoted ? 'text-red-400 font-bold' : 'hover:text-red-400'
+                                  className={`p-1 rounded-[4px] hover:bg-[#21262E] transition-colors flex items-center gap-1 ${isDownvoted ? 'text-red-400 font-bold' : 'hover:text-red-400'
                                     }`}
                                   title="Downvote tool"
                                 >
-                                  <ThumbsDown className="w-3.5 h-3.5" />
+                                  <ThumbsDown className="w-3 h-3" />
                                 </button>
                               </div>
 
-                              <div className="flex items-center gap-1 text-[11px]">
-                                <GitFork className="w-3 h-3 text-[#6E7580]" />
+                              <div className="flex items-center gap-1 text-[10px] font-mono">
+                                <GitFork className="w-3 h-3 text-[#8E8E93]" />
                                 <span>{mTool.fork_count || 0} forks</span>
                               </div>
                             </div>
@@ -2977,18 +3049,18 @@ export default function Learningplayground() {
                                   selectTool(mTool)
                                   setShowMarketplaceExplorer(false)
                                 }}
-                                className="flex-1 py-1.5 rounded-xl bg-[#5A7D99] hover:bg-[#3D5E7A] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                                className="flex-1 py-1.5 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-sm"
                               >
                                 <Play className="w-3 h-3 fill-current" />
-                                <span>Play in Canvas</span>
+                                <span>Open in Canvas</span>
                               </button>
 
                               <button
                                 onClick={(e) => handleForkTool(mTool, e)}
-                                className="p-1.5 px-2.5 rounded-xl bg-[#21262E] hover:bg-[#282E38] border border-[#282E38] text-[#CDD1D6] hover:text-white text-xs font-semibold transition-all flex items-center gap-1"
+                                className="p-1.5 px-2.5 rounded-[6px] bg-[#21262E] hover:bg-[#282E38] border border-[#282E38] text-[#CDD1D6] hover:text-white text-xs transition-all flex items-center gap-1"
                                 title="Fork to My Saved Tools"
                               >
-                                <GitFork className="w-3.5 h-3.5" />
+                                <GitFork className="w-3 h-3" />
                                 <span className="hidden sm:inline">Fork</span>
                               </button>
                             </div>
@@ -3006,12 +3078,12 @@ export default function Learningplayground() {
 
       {/* FULL-SCREEN GLOBAL DRAG & DROP OVERLAY */}
       {isGlobalDragging && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 border-4 border-dashed border-[#5A7D99] pointer-events-none animate-fade-in">
-          <div className="w-20 h-20 rounded-3xl bg-[#5A7D99]/20 border border-[#5A7D99]/50 flex items-center justify-center text-white mb-4 animate-bounce">
-            <Upload className="w-10 h-10 text-[#5A7D99]" />
+        <div className="fixed inset-0 z-50 bg-[#131519]/90 backdrop-blur-md flex flex-col items-center justify-center p-6 border-2 border-dashed border-[#5A7D99] pointer-events-none animate-fade-in">
+          <div className="w-16 h-16 rounded-[8px] bg-[#1A1E24] border border-[#5A7D99]/40 flex items-center justify-center text-[#5A7D99] mb-3 animate-pulse">
+            <Upload className="w-8 h-8 text-[#5A7D99]" />
           </div>
-          <h2 className="text-xl font-bold text-white mb-1">Drop notes, PDFs, or photos anywhere</h2>
-          <p className="text-xs text-[#8E8E93]">Vela will instantly parse your material into interactive revision tools</p>
+          <h2 className="text-base font-bold text-white mb-1">Drop Files for RAG Context</h2>
+          <p className="text-xs text-[#8E8E93]">Release to attach PDF, DOCX, or TXT file</p>
         </div>
       )}
     </div>

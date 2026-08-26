@@ -347,9 +347,9 @@ ${trimmedContext}
 // Generic chat completion — base function reused by toolGenAI and aiMindmapNode
 export async function getChatCompletion(
   prompt,
-  model = 'qwen/qwen3.6-27b',
+  model = 'llama-3.3-70b-versatile',
   temperature = 0.7,
-  maxTokens = 1200,
+  maxTokens = 2000,
   options = {}
 ) {
   if (!GROQ_KEY) {
@@ -365,21 +365,26 @@ export async function getChatCompletion(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${GROQ_KEY}`,
       },
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(25000),
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: 'You are an advanced academic learning engine. Do not output any thought process or <think> tags. Directly return the requested content or valid JSON.' },
+          { role: 'system', content: 'You are Vela, an advanced academic study assistant with deep pedagogical intelligence. Deliver sharp, clear, accurate, and deeply helpful explanations and tools.' },
           { role: 'user', content: prompt }
         ],
         temperature,
-        max_tokens: Math.min(maxTokens || 2500, 3500),
+        max_tokens: Math.min(maxTokens || 3000, 4500),
         ...(forceJson ? { response_format: { type: 'json_object' } } : {}),
       }),
     });
 
     if (!res.ok) {
       const errText = await res.text();
+      // If 70b hits rate limit, fallback to qwen
+      if (model !== 'qwen/qwen3.6-27b') {
+        console.warn(`[ML ENGINE] Retrying with secondary model due to error: ${errText.slice(0, 100)}`);
+        return getChatCompletion(prompt, 'qwen/qwen3.6-27b', temperature, maxTokens, options);
+      }
       throw new Error(`Groq API error (${res.status}): ${errText}`);
     }
 
@@ -390,15 +395,15 @@ export async function getChatCompletion(
   }, 3, 1200);
 }
 
-// toolGenAI: routes all AI calls to Groq via getChatCompletion using qwen/qwen3.6-27b.
+// toolGenAI: routes all AI calls to Groq via getChatCompletion using high-intelligence model.
 export async function toolGenAI(
   prompt,
-  model = 'qwen/qwen3.6-27b',
+  model = 'llama-3.3-70b-versatile',
   temperature = 0.7,
-  maxTokens = 2000,
+  maxTokens = 2500,
   options = {}
 ) {
-  const groqModel = model || 'qwen/qwen3.6-27b';
+  const groqModel = model || 'llama-3.3-70b-versatile';
   return getChatCompletion(prompt, groqModel, temperature, maxTokens, options);
 }
 
@@ -720,17 +725,17 @@ const TOOL_THEME_CSS = `
     --border: rgba(255, 255, 255, 0.09);
     --input: #12141f;
     --ring: #6366f1;
-    --radius: 0.75rem;
+    --radius: 0px;
     --font-sans: 'Plus Jakarta Sans', Inter, -apple-system, sans-serif;
   }
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0 !important; }
   html, body { height: 100%; overflow: hidden; }
   body { background: var(--background); color: var(--foreground); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
   #app { display: flex; flex-direction: column; height: 100vh; width: 100vw; background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 70%); }
   #app-header { background: rgba(12, 14, 24, 0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); padding: 1.1rem 1.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
   #app-header h1 { font-size: 1.15rem; font-weight: 700; color: #ffffff; letter-spacing: -0.01em; display: flex; align-items: center; gap: 0.5rem; }
   #app-header p  { font-size: 0.825rem; color: var(--muted-foreground); line-height: 1.4; }
-  #app-progress  { font-size: 0.75rem; font-weight: 600; color: var(--accent); background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); padding: 0.25rem 0.65rem; border-radius: 9999px; }
+  #app-progress  { font-size: 0.75rem; font-weight: 600; color: var(--accent); background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); padding: 0.25rem 0.65rem; border-radius: 0; }
   #app-main { flex: 1; overflow-y: auto; padding: 1.75rem; display: flex; flex-direction: column; align-items: center; gap: 1.25rem; }
   #app-footer { background: rgba(12, 14, 24, 0.9); backdrop-filter: blur(12px); border-top: 1px solid var(--border); padding: 0.85rem 1.75rem; display: flex; justify-content: center; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
   .card { background: var(--card); backdrop-filter: blur(16px); color: var(--card-foreground); border-radius: var(--radius); border: 1px solid var(--border); padding: 1.5rem; transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s; box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
@@ -745,13 +750,13 @@ const TOOL_THEME_CSS = `
   .btn-destructive { background: var(--destructive); color: var(--destructive-foreground); }
   input, select, textarea { background: var(--input); color: var(--foreground); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 0.85rem; outline: none; width: 100%; font-size: 0.9rem; transition: border-color 0.2s; }
   input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25); }
-  .badge { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 9999px; padding: 0.15rem 0.65rem; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; }
+  .badge { background: rgba(99, 102, 241, 0.15); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 0; padding: 0.15rem 0.65rem; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem; }
   .correct { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
   .incorrect { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
   .divider { width: 100%; height: 1px; background: var(--border); margin: 0.75rem 0; }
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 0; }
   ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
 `;
 

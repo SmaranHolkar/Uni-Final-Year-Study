@@ -193,20 +193,44 @@ export async function getUserDocuments(req, res) {
       return res.status(401).json({ error: 'User authentication required' });
     }
 
-    const { rows } = await pool.query(
-      `
-      SELECT 
-        title,
-        COUNT(*) as chunk_count,
-        MAX(paragraph_index) as max_paragraph,
-        MIN(created_at) as created_at
-      FROM public.w_embeddings
-      WHERE user_id = $1
-      GROUP BY title
-      ORDER BY created_at DESC
-      `,
-      [userId]
-    );
+    let rows = [];
+    try {
+      const result = await pool.query(
+        `
+        SELECT 
+          title,
+          COUNT(*) as chunk_count,
+          MAX(COALESCE(paragraph_index, 1)) as max_paragraph,
+          MIN(created_at) as created_at
+        FROM public.w_embeddings
+        WHERE user_id = $1
+        GROUP BY title
+        ORDER BY created_at DESC
+        `,
+        [userId]
+      );
+      rows = result.rows;
+    } catch (dbErr) {
+      if (dbErr.message?.includes('paragraph_index')) {
+        const fallbackRes = await pool.query(
+          `
+          SELECT 
+            title,
+            COUNT(*) as chunk_count,
+            1 as max_paragraph,
+            MIN(created_at) as created_at
+          FROM public.w_embeddings
+          WHERE user_id = $1
+          GROUP BY title
+          ORDER BY created_at DESC
+          `,
+          [userId]
+        );
+        rows = fallbackRes.rows;
+      } else {
+        throw dbErr;
+      }
+    }
 
     res.json({
       success: true,
@@ -215,7 +239,7 @@ export async function getUserDocuments(req, res) {
         chunkCount: parseInt(r.chunk_count, 10),
         maxParagraph: parseInt(r.max_paragraph || 1, 10),
         createdAt: r.created_at,
-        isDeepResearch: r.title.startsWith('[Deep Research]')
+        isDeepResearch: r.title ? r.title.startsWith('[Deep Research]') : false
       }))
     });
 

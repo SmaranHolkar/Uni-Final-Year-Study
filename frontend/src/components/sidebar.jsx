@@ -121,12 +121,7 @@ const Sidebar = () => {
             </NavLink>
           )}
 
-          {/* Grounded Studio */}
-          {user && (
-            <NavLink to="/grounded-studio" className="sidebar-link" onClick={closeSidebar}>
-              <BookOpen size={18} /> Grounded Studio
-            </NavLink>
-          )}
+
 
           {/* Start Study Session */}
           {user && (
@@ -145,7 +140,7 @@ const Sidebar = () => {
           {/* Learning playground */}
           {user && (
             <NavLink to="/Learningplayground" className="sidebar-link" onClick={closeSidebar}>
-              <Lightbulb size={18} /> Playground
+              <Lightbulb size={18} /> Learning Playground
             </NavLink>
           )}
 

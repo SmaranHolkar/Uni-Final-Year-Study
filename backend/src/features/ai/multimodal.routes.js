@@ -197,4 +197,85 @@ router.post('/multimodal/image-ocr', requireAuth, upload.single('image'), async 
   }
 });
 
+/**
+ * POST /api/ai/vision-chat
+ * Direct conversational multimodal vision with Vela.
+ */
+router.post('/ai/vision-chat', requireAuth, upload.single('image'), async (req, res) => {
+  const filePath = req.file?.path;
+  try {
+    const userPrompt = req.body.prompt?.trim() || 'Analyze this image and explain what is depicted in academic detail.';
+    const GROQ_KEY = process.env.GROQ_API;
+
+    if (!GROQ_KEY) {
+      return res.status(500).json({ error: 'GROQ_API key is not configured' });
+    }
+
+    let dataUri = '';
+    if (filePath && fs.existsSync(filePath)) {
+      const imageBuffer = fs.readFileSync(filePath);
+      const base64Image = imageBuffer.toString('base64');
+      const mimeType = req.file.mimetype || 'image/jpeg';
+      dataUri = `data:${mimeType};base64,${base64Image}`;
+    } else if (req.body.imageBase64) {
+      dataUri = req.body.imageBase64;
+    } else {
+      return res.status(400).json({ error: 'No image provided for vision chat' });
+    }
+
+    const visionRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${GROQ_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.2-11b-vision-preview',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are Vela, an advanced multimodal academic study assistant. When given an image (e.g. diagrams, whiteboard notes, formulas, charts, textbook problems), thoroughly analyze the visual elements, transcribe formulas, explain underlying principles step-by-step, and offer constructive next revision steps.'
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: userPrompt },
+              { type: 'image_url', image_url: { url: dataUri } }
+            ]
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 3000,
+      })
+    });
+
+    if (!visionRes.ok) {
+      const errText = await visionRes.text();
+      throw new Error(`Vision API error (${visionRes.status}): ${errText}`);
+    }
+
+    const visionData = await visionRes.json();
+    const answer = visionData.choices?.[0]?.message?.content || 'I could not analyze the image.';
+
+    res.json({
+      success: true,
+      answer,
+      tool: {
+        toolType: 'chat',
+        title: 'Image Analysis',
+        description: 'Multimodal Vision Response',
+        render: 'chat',
+        data: { message: answer }
+      }
+    });
+  } catch (err) {
+    console.error('[MULTIMODAL] Vision Chat Error:', err);
+    res.status(500).json({ error: err.message || 'Failed to process vision query' });
+  } finally {
+    if (filePath && fs.existsSync(filePath)) {
+      fs.unlink(filePath, () => {});
+    }
+  }
+});
+
 export default router;
