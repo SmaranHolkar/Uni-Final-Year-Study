@@ -10,7 +10,9 @@ import {
   deleteTool,
   shareToolToUser,
   getSharedToolsWithMe,
+  getToolById,
 } from './marketplace.controller.js';
+
 
 const router = express.Router();
 
@@ -79,6 +81,10 @@ const deleteLimiter = createMarketplaceRateLimiter({
 
 // Public marketplace listing (allows read access to public tools)
 router.get('/marketplace/tools/public', optionalAuth, getPublicTools);
+
+// Get single tool by ID (for direct sharing and loading)
+router.get('/marketplace/tools/:id', optionalAuth, getToolById);
+
 
 // Live marketplace updates stream
 router.get('/marketplace/tools/stream', requireAuth, streamMarketplaceEvents);

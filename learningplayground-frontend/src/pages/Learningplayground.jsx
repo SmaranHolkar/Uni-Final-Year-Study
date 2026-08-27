@@ -166,7 +166,7 @@ export default function Learningplayground() {
       setAttachedDocument(null)
       try {
         localStorage.removeItem('learning_playground_chat_history')
-      } catch {}
+      } catch { }
     }
   }, [user?.id])
 
@@ -208,6 +208,7 @@ export default function Learningplayground() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingTitle, setEditingTitle] = useState('')
   const [editingDesc, setEditingDesc] = useState('')
+  const [editingItems, setEditingItems] = useState([])
   // Marketplace & Publishing State
   const [showMarketplaceExplorer, setShowMarketplaceExplorer] = useState(false)
   const [showPublishModal, setShowPublishModal] = useState(false)
@@ -227,6 +228,14 @@ export default function Learningplayground() {
   const [pastedYouTubeUrl, setPastedYouTubeUrl] = useState('')
   const [shareToastMessage, setShareToastMessage] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [sharedTools, setSharedTools] = useState([])
+  const [isLoadingSharedTools, setIsLoadingSharedTools] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [shareModalTargetTool, setShareModalTargetTool] = useState(null)
+  const [shareEmailRecipient, setShareEmailRecipient] = useState('')
+  const [isSharingEmail, setIsSharingEmail] = useState(false)
+  const [shareError, setShareError] = useState('')
+
 
   const audioInputRef = useRef(null)
   const imageInputRef = useRef(null)
@@ -485,22 +494,31 @@ export default function Learningplayground() {
 
   const handleSaveInlineEdit = () => {
     if (!generatedTool) return
+    const meta = extractToolMetadata(generatedTool)
+    const newHtml = morphToolToHtml(meta.toolType || 'flashcards', editingTitle, editingDesc, editingItems)
+
     const updated = {
       ...generatedTool,
       title: editingTitle,
       description: editingDesc,
       items: editingItems,
+      html: newHtml,
+      app: { html: newHtml },
       data: {
         ...(generatedTool.data || {}),
         title: editingTitle,
         description: editingDesc,
         items: editingItems,
+        html: newHtml,
       },
     }
     setGeneratedTool(updated)
     saveOrUpdateChatSession(messages, updated)
+    setShareToastMessage('Tool updated and saved successfully!')
+    setTimeout(() => setShareToastMessage(''), 3000)
     setShowEditModal(false)
   }
+
 
   const handleAddEditorItem = () => {
     setEditingItems((prev) => [
@@ -746,15 +764,75 @@ export default function Learningplayground() {
     setShowExportMenu(false)
   }
 
+  // Markdown Study Guide Exporter
+  const handleExportMarkdown = () => {
+    if (!generatedTool) return
+    const meta = extractToolMetadata(generatedTool)
+    const items = meta.items || []
+    const mdLines = [
+      `# ${meta.title || 'Interactive Study Tool'}`,
+      `> ${meta.description || 'Study revision guide & key concepts'}`,
+      '',
+      `**Tool Format:** ${meta.toolType || 'Study Tool'}`,
+      `**Exported:** ${new Date().toLocaleDateString()}`,
+      '',
+      '---',
+      '',
+      '## Key Concepts & Review Cards',
+      '',
+    ]
+
+    items.forEach((it, idx) => {
+      const q = it.front || it.concept || it.word || it.question || it.left || `Concept ${idx + 1}`
+      const a = it.back || it.answer || it.definition || it.explanation || it.detail || it.right || ''
+      mdLines.push(`### ${idx + 1}. ${q}`)
+      if (a) mdLines.push(a)
+      mdLines.push('')
+    })
+
+    const blob = new Blob([mdLines.join('\n')], { type: 'text/markdown;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${(meta.title || 'Study_Notes').replace(/[^a-z0-9]/gi, '_')}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    setShowExportMenu(false)
+    setShareToastMessage('Markdown file downloaded successfully!')
+    setTimeout(() => setShareToastMessage(''), 3000)
+  }
+
   // 1-Click Direct Tool Share Link Generator
-  const handleCopyShareLink = (tool) => {
+  const handleCopyShareLink = async (tool) => {
     const target = tool || generatedTool
     if (!target) return
-    const shareUrl = `${window.location.origin}/?toolId=${target.id || ''}`
-    navigator.clipboard.writeText(shareUrl)
-    setShareToastMessage('Direct study link copied to clipboard')
-    setTimeout(() => setShareToastMessage(''), 2500)
+    const meta = extractToolMetadata(target)
+    const urlParams = target.id
+      ? `?toolId=${target.id}`
+      : (activeChatId ? `?sessionId=${activeChatId}` : '')
+
+    const shareUrl = `${window.location.origin}${window.location.pathname}${urlParams}`
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl)
+      } else {
+        const temp = document.createElement('input')
+        temp.value = shareUrl
+        document.body.appendChild(temp)
+        temp.select()
+        document.execCommand('copy')
+        document.body.removeChild(temp)
+      }
+      setShareToastMessage(`Direct share link copied to clipboard!`)
+      setTimeout(() => setShareToastMessage(''), 3500)
+    } catch {
+      prompt('Copy shareable study link:', shareUrl)
+    }
   }
+
 
   const fetchTierStatus = async () => {
     if (!session?.access_token) return
@@ -818,6 +896,243 @@ export default function Learningplayground() {
       setIsLoadingMarketplaceTools(false)
     }
   }
+
+  const fetchSharedTools = async () => {
+    if (!session?.access_token) return
+    setIsLoadingSharedTools(true)
+    try {
+      const response = await fetch(`${API_BASE}/api/marketplace/tools/shared-with-me`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        credentials: 'include',
+      })
+      if (!response.ok) return
+      const data = await response.json()
+      setSharedTools(data.data || [])
+    } catch (err) {
+      console.error('Failed to fetch shared tools:', err)
+    } finally {
+      setIsLoadingSharedTools(false)
+    }
+  }
+
+  // Ensure tool is saved to backend to get an ID before sharing
+  const handleOpenShareModal = async (tool) => {
+    const target = tool || generatedTool
+    if (!target) return
+    setShareError('')
+    setShareEmailRecipient('')
+
+    // If tool already has a database ID, open modal directly
+    if (target.id && String(target.id).includes('-')) {
+      setShareModalTargetTool(target)
+      setShowShareModal(true)
+      return
+    }
+
+    // Otherwise, automatically save it with shared-link visibility so it gets a UUID
+    if (session?.access_token) {
+      const meta = extractToolMetadata(target)
+      try {
+        const res = await fetch(`${API_BASE}/api/marketplace/tools/save`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            title: meta.title || 'Interactive Learning Tool',
+            description: meta.description || 'Study revision guide',
+            tool_type: meta.toolType || 'flashcards',
+            category: 'General Revision',
+            tags: ['shared', meta.toolType || 'study'],
+            generated_tool: target,
+            visibility: 'shared-link',
+          }),
+        })
+        const data = await res.json()
+        if (res.ok && data.tool?.id) {
+          const updated = { ...target, id: data.tool.id }
+          setGeneratedTool(updated)
+          setShareModalTargetTool(updated)
+          setShowShareModal(true)
+          fetchSavedTools()
+          return
+        }
+      } catch (e) {
+        console.warn('Auto-save for share failed:', e)
+      }
+    }
+
+    setShareModalTargetTool(target)
+    setShowShareModal(true)
+  }
+
+  const handleShareToolToEmail = async () => {
+    if (!shareEmailRecipient.trim()) {
+      setShareError('Please enter a valid recipient email address.')
+      return
+    }
+    if (!session?.access_token) {
+      setShareError('Please sign in to share tools with other users.')
+      return
+    }
+
+    let targetId = shareModalTargetTool?.id
+    if (!targetId) {
+      // Auto-save tool first
+      const meta = extractToolMetadata(shareModalTargetTool || generatedTool)
+      try {
+        const res = await fetch(`${API_BASE}/api/marketplace/tools/save`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            title: meta.title || 'Interactive Learning Tool',
+            description: meta.description || 'Study revision guide',
+            tool_type: meta.toolType || 'flashcards',
+            category: 'General Revision',
+            tags: ['shared', meta.toolType || 'study'],
+            generated_tool: shareModalTargetTool || generatedTool,
+            visibility: 'private',
+          }),
+        })
+        const data = await res.json()
+        if (data.tool?.id) {
+          targetId = data.tool.id
+        }
+      } catch (e) {
+        console.warn('Auto-save before email share failed:', e)
+      }
+    }
+
+    if (!targetId) {
+      setShareError('Unable to prepare tool for sharing. Please try saving it first.')
+      return
+    }
+
+    setIsSharingEmail(true)
+    setShareError('')
+
+    try {
+      const res = await fetch(`${API_BASE}/api/marketplace/tools/share-to-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          tool_id: targetId,
+          recipient_email: shareEmailRecipient.trim().toLowerCase(),
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to share tool')
+
+      setShareToastMessage(`Tool shared directly with ${shareEmailRecipient}!`)
+      setTimeout(() => setShareToastMessage(''), 3500)
+      setShowShareModal(false)
+      setShareEmailRecipient('')
+    } catch (err) {
+      console.error('Email share error:', err)
+      setShareError(err.message || 'Failed to share tool with recipient.')
+    } finally {
+      setIsSharingEmail(false)
+    }
+  }
+
+  const handleSaveActiveToolToLibrary = async (targetTool) => {
+    const toolToSave = targetTool || generatedTool
+    if (!toolToSave) return
+    if (!session?.access_token) {
+      alert('Please sign in to save tools to your library!')
+      return
+    }
+
+    const meta = extractToolMetadata(toolToSave)
+    try {
+      const res = await fetch(`${API_BASE}/api/marketplace/tools/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: meta.title || 'Interactive Study Tool',
+          description: meta.description || 'Study revision tool',
+          tool_type: meta.toolType || 'flashcards',
+          category: 'General Revision',
+          tags: ['saved', meta.toolType || 'study'],
+          generated_tool: toolToSave,
+          forked_from_tool_id: toolToSave.id || null,
+          visibility: 'private',
+        }),
+      })
+
+      const data = await res.json()
+      if (res.status === 409 && data.duplicate_tool_id) {
+        setShareToastMessage(`"${meta.title}" is already in your Saved Tools library!`)
+      } else if (!res.ok) {
+        throw new Error(data.error || 'Failed to save tool')
+      } else {
+        setShareToastMessage(`Saved "${meta.title}" to your Saved Tools!`)
+      }
+      fetchSavedTools()
+      setTimeout(() => setShareToastMessage(''), 3500)
+    } catch (err) {
+      console.error('Save to library error:', err)
+      alert(err.message || 'Could not save tool to your library.')
+    }
+  }
+
+  // Load shared tool from URL query parameter (?toolId=... or ?sharedToolId=...)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const toolId = params.get('toolId') || params.get('sharedToolId')
+    if (toolId) {
+      const loadSharedTool = async () => {
+        try {
+          const headers = {}
+          if (session?.access_token) {
+            headers.Authorization = `Bearer ${session.access_token}`
+          }
+          const res = await fetch(`${API_BASE}/api/marketplace/tools/${toolId}`, {
+            headers,
+            credentials: 'include',
+          })
+          if (res.ok) {
+            const data = await res.json()
+            if (data.data?.generated_tool) {
+              const loadedTool = {
+                ...data.data.generated_tool,
+                id: data.data.id,
+                title: data.data.title,
+                description: data.data.description,
+                is_shared: true,
+                author_email: data.data.author_email,
+                owner_user_id: data.data.owner_user_id,
+              }
+              setGeneratedTool(loadedTool)
+              setRightPanelOpen(true)
+              setMobileTab('tool')
+              setShareToastMessage(`Loaded shared tool: "${data.data.title}"`)
+              setTimeout(() => setShareToastMessage(''), 3500)
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to load tool by id:', err)
+        }
+      }
+      loadSharedTool()
+    }
+  }, [session?.access_token])
+
 
   const startMicRecording = async () => {
     try {
@@ -1634,6 +1949,27 @@ export default function Learningplayground() {
           </button>
 
           <button
+            onClick={() => {
+              setActiveNavSection('shared-with-me')
+              fetchSharedTools()
+            }}
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'shared-with-me'
+              ? 'bg-[#131c2e] text-white font-semibold'
+              : 'hover:bg-[#131c2e]/70 hover:text-white'
+              }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Share2 className="w-4 h-4 text-[#38bdf8]" />
+              <span>Shared with me</span>
+            </div>
+            {sharedTools.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono">
+                {sharedTools.length}
+              </span>
+            )}
+          </button>
+
+          <button
             onClick={() => setActiveNavSection('community')}
             className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'community'
               ? 'bg-[#131c2e] text-white font-semibold'
@@ -1649,6 +1985,7 @@ export default function Learningplayground() {
             </span>
           </button>
         </div>
+
 
         {/* Search Bar (Collapsible) */}
         {showSidebarSearch && (
@@ -1760,7 +2097,60 @@ export default function Learningplayground() {
             </div>
           )}
 
+          {activeNavSection === 'shared-with-me' && (
+            <div>
+              <div className="px-2 pt-1 pb-1.5 flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-[#8493a8] uppercase tracking-wider">
+                  Shared With Me
+                </span>
+                <Share2 className="w-3 h-3 text-[#64748b]" />
+              </div>
+              {isLoadingSharedTools ? (
+                <p className="px-3 py-2 text-xs text-[#64748b]">Loading shared tools...</p>
+              ) : sharedTools.length === 0 ? (
+                <div className="px-3 py-4 text-center">
+                  <p className="text-xs text-[#64748b] mb-1">No tools shared with you yet.</p>
+                  <p className="text-[10px] text-[#475569]">When classmates share a tool with your email, it appears here!</p>
+                </div>
+              ) : (
+                sharedTools.map((sTool) => {
+                  const meta = extractToolMetadata(sTool.generated_tool || sTool)
+                  const isActive = generatedTool?.id === sTool.id
+                  return (
+                    <div
+                      key={sTool.id || sTool.share_id}
+                      onClick={() => selectTool(sTool.generated_tool || sTool)}
+                      className={`group px-3 py-2 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
+                        ? 'bg-[#131c2e] text-white font-medium border border-[#1e2b45]'
+                        : 'text-[#94a3b8] hover:bg-[#131c2e]/60 hover:text-white'
+                        }`}
+                    >
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <span className="truncate font-semibold text-white">{sTool.title || meta.title}</span>
+                        {sTool.sender_email && (
+                          <span className="text-[10px] text-[#38bdf8]/80 truncate">From: {sTool.sender_email}</span>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleSaveActiveToolToLibrary(sTool.generated_tool || sTool)
+                        }}
+                        className="p-1 px-2 text-[10px] rounded-md bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-white transition-all font-semibold shadow-sm flex-shrink-0"
+                        title="Save to My Library"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          )}
+
           {activeNavSection === 'community' && (
+
             <div>
               <div className="px-2 pt-1 pb-1.5">
                 <span className="text-[11px] font-semibold text-[#8493a8] uppercase tracking-wider">
@@ -2131,13 +2521,23 @@ export default function Learningplayground() {
                   </button>
 
                   <button
-                    onClick={() => handleCopyShareLink(generatedTool)}
+                    onClick={() => handleSaveActiveToolToLibrary(generatedTool)}
+                    className="p-1 px-2.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-white transition-all flex items-center gap-1.5 text-[11px] border border-emerald-500/30 hover:border-emerald-500 font-medium"
+                    title="Save this tool to your personal Saved Tools library"
+                  >
+                    <Bookmark className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Save to Library</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleOpenShareModal(generatedTool)}
                     className="p-1 px-2.5 rounded-lg bg-[#131c2e] hover:bg-[#1a253c] text-[#cbd5e1] hover:text-white transition-all flex items-center gap-1 text-[11px] border border-[#1e2d45]"
-                    title="Copy direct shareable study link"
+                    title="Share with another student or copy direct link"
                   >
                     <Share2 className="w-3.5 h-3.5 text-[#38bdf8]" />
                     <span className="hidden md:inline">Share</span>
                   </button>
+
 
                   <div className="relative">
                     <button
@@ -2967,11 +3367,230 @@ export default function Learningplayground() {
         </div>
       )}
 
+      {/* FLOATING ACTION NOTIFICATION TOAST */}
+      {shareToastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-[#0f172a] text-white px-4 py-3 rounded-xl border border-[#38bdf8]/40 shadow-2xl animate-fade-in text-xs font-semibold">
+          <CheckCircle2 className="w-4 h-4 text-[#38bdf8]" />
+          <span>{shareToastMessage}</span>
+        </div>
+      )}
+
+      {/* INLINE TOOL EDITOR MODAL */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in">
+            {/* Modal Header */}
+            <div className="p-4 px-6 border-b border-[#1e293b] flex items-center justify-between bg-[#0b1120]">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#38bdf8]/15 border border-[#38bdf8]/30 flex items-center justify-center text-[#38bdf8]">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Edit Interactive Tool</h3>
+                  <p className="text-[11px] text-[#94a3b8]">Modify titles, definitions, questions, and flashcard content</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="p-1 rounded-lg text-[#94a3b8] hover:text-white hover:bg-[#1e293b] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-[#cbd5e1] mb-1.5">Tool Title</label>
+                <input
+                  type="text"
+                  value={editingTitle}
+                  onChange={(e) => setEditingTitle(e.target.value)}
+                  className="w-full bg-[#1e293b] border border-[#334155] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#38bdf8] transition-colors"
+                  placeholder="e.g., Photosynthesis Flashcards"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#cbd5e1] mb-1.5">Description</label>
+                <input
+                  type="text"
+                  value={editingDesc}
+                  onChange={(e) => setEditingDesc(e.target.value)}
+                  className="w-full bg-[#1e293b] border border-[#334155] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#38bdf8] transition-colors"
+                  placeholder="e.g., Core light-dependent and light-independent mechanisms"
+                />
+              </div>
+
+              <div className="pt-2 border-t border-[#1e293b]">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold text-[#cbd5e1]">Study Items & Cards ({editingItems.length})</h4>
+                  <button
+                    onClick={handleAddEditorItem}
+                    className="px-2.5 py-1 rounded-lg bg-[#38bdf8]/15 hover:bg-[#38bdf8]/25 text-[#38bdf8] text-xs font-semibold flex items-center gap-1 border border-[#38bdf8]/30 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Card / Item</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {editingItems.map((item, idx) => (
+                    <div key={idx} className="p-3.5 rounded-xl bg-[#1e293b]/70 border border-[#334155] space-y-2 relative group">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-[#38bdf8]">Card {idx + 1}</span>
+                        <button
+                          onClick={() => handleDeleteEditorItem(idx)}
+                          className="p-1 text-[#ef4444] hover:bg-[#ef4444]/15 rounded-md transition-colors"
+                          title="Delete Item"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div>
+                        <input
+                          type="text"
+                          value={item.front || item.question || item.concept || item.word || item.left || ''}
+                          onChange={(e) => handleUpdateEditorItem(idx, 'front', e.target.value)}
+                          placeholder="Front / Term / Question"
+                          className="w-full bg-[#0f172a] border border-[#334155] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#38bdf8]"
+                        />
+                      </div>
+
+                      <div>
+                        <textarea
+                          rows={2}
+                          value={item.back || item.answer || item.definition || item.explanation || item.detail || item.right || ''}
+                          onChange={(e) => handleUpdateEditorItem(idx, 'back', e.target.value)}
+                          placeholder="Back / Definition / Detailed Explanation"
+                          className="w-full bg-[#0f172a] border border-[#334155] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#38bdf8] resize-none"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 px-6 border-t border-[#1e293b] flex items-center justify-end gap-2.5 bg-[#0b1120]">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#94a3b8] hover:text-white hover:bg-[#1e293b] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveInlineEdit}
+                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#38bdf8] to-[#2563eb] hover:opacity-90 shadow-lg shadow-sky-500/20 transition-all flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Save Changes</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SHARE & COLLABORATE MODAL */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-fade-in">
+            {/* Header */}
+            <div className="p-4 px-6 border-b border-[#1e293b] flex items-center justify-between bg-[#0b1120]">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#38bdf8]/15 border border-[#38bdf8]/30 flex items-center justify-center text-[#38bdf8]">
+                  <Share2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Share Interactive Tool</h3>
+                  <p className="text-[11px] text-[#94a3b8]">Share with a classmate or save directly to their library</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="p-1 rounded-lg text-[#94a3b8] hover:text-white hover:bg-[#1e293b] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5">
+              {/* Option 1: Direct Link */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-[#cbd5e1]">1. Direct Shareable Link</label>
+                <p className="text-[11px] text-[#94a3b8]">Anyone with this link can interact with the tool and save it to their library:</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${window.location.origin}/?toolId=${shareModalTargetTool?.id || ''}`}
+                    className="flex-1 bg-[#1e293b] border border-[#334155] rounded-xl px-3 py-2 text-xs text-white select-all font-mono"
+                  />
+                  <button
+                    onClick={() => handleCopyShareLink(shareModalTargetTool)}
+                    className="px-3.5 py-2 rounded-xl bg-[#38bdf8] hover:bg-[#0284c7] text-white text-xs font-bold transition-all flex items-center gap-1 shadow-md flex-shrink-0"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-[#1e293b]" />
+                <span className="text-[10px] text-[#64748b] uppercase font-bold tracking-wider">OR</span>
+                <div className="flex-1 h-px bg-[#1e293b]" />
+              </div>
+
+              {/* Option 2: Send Directly to User Email */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-[#cbd5e1]">2. Send Directly to Classmate (Saves in their Library)</label>
+                <p className="text-[11px] text-[#94a3b8]">Enter their account email to deliver the tool directly into their "Saved Tools" collection:</p>
+                <div className="space-y-2">
+                  <input
+                    type="email"
+                    value={shareEmailRecipient}
+                    onChange={(e) => setShareEmailRecipient(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleShareToolToEmail()
+                    }}
+                    placeholder="classmate@university.edu"
+                    className="w-full bg-[#1e293b] border border-[#334155] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#38bdf8] transition-colors"
+                  />
+                  {shareError && (
+                    <p className="text-[11px] text-[#ef4444] font-medium">{shareError}</p>
+                  )}
+                  <button
+                    onClick={handleShareToolToEmail}
+                    disabled={isSharingEmail || !shareEmailRecipient.trim()}
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#38bdf8] to-[#2563eb] hover:opacity-90 disabled:opacity-40 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20"
+                  >
+                    {isSharingEmail ? (
+                      <span>Sharing Tool...</span>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Send to Classmate</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       {/* FULL-SCREEN GLOBAL DRAG & DROP OVERLAY */}
       {isGlobalDragging && (
         <div className="fixed inset-0 z-50 bg-[#131519]/90 backdrop-blur-md flex flex-col items-center justify-center p-6 border-2 border-dashed border-[#5A7D99] pointer-events-none animate-fade-in">
           <div className="w-16 h-16 rounded-[8px] bg-[#1A1E24] border border-[#5A7D99]/40 flex items-center justify-center text-[#5A7D99] mb-3 animate-pulse">
             <Upload className="w-8 h-8 text-[#5A7D99]" />
+
           </div>
           <h2 className="text-base font-bold text-white mb-1">Drop Files for RAG Context</h2>
           <p className="text-xs text-[#8E8E93]">Release to attach PDF, DOCX, or TXT file</p>
@@ -2980,3 +3599,4 @@ export default function Learningplayground() {
     </div>
   )
 }
+

@@ -81,17 +81,17 @@ const envAllowed = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.tri
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    
+
     // Check explicit whitelist
     if (allowedOrigins.includes(origin) || envAllowed.includes(origin)) {
       return callback(null, true);
     }
-    
+
     // Allow all onrender.com subdomains for frontend and preview deployments
     if (origin.endsWith('.onrender.com')) {
       return callback(null, true);
     }
-    
+
     // Allow local development on localhost/127.0.0.1
     if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
       return callback(null, true);
@@ -170,3 +170,4 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`SUPABASE_ANON_KEY set: ${!!process.env.SUPABASE_ANON_KEY}`);
   console.log(`SUPABASE_SERVICE_ROLE_KEY set: ${!!process.env.SUPABASE_SERVICE_ROLE_KEY}`);
 });
+

@@ -48,8 +48,8 @@ export async function generateSimilarTopic(req, res) {
 
     // Retrieve grounding context via vector similarity
     const embedding = await getEmbedding(topic);
-    const chunks = Array.isArray(embedding) 
-      ? await getTopChunks(embedding, 3, userId) 
+    const chunks = Array.isArray(embedding)
+      ? await getTopChunks(embedding, 3, userId)
       : [];
 
     const context = chunks.length
@@ -75,7 +75,7 @@ Return ONLY valid JSON matching this exact schema (no markdown, no preamble):
 }`;
 
     const raw = await getChatCompletion(prompt, 'llama-3.3-70b-versatile', 0.4, 400, { forceJson: false });
-    
+
     const parsed = extractAndParseJson(raw, {
       label: `${topic} Concepts`,
       description: `Key mechanisms, principles, and applications related to ${topic}.`,
@@ -111,8 +111,8 @@ export async function generateMCQForTopic(req, res) {
     const description = sanitizeInput(rawDescription, 300);
 
     const embedding = await getEmbedding(topic);
-    const chunks = Array.isArray(embedding) 
-      ? await getTopChunks(embedding, 3, userId) 
+    const chunks = Array.isArray(embedding)
+      ? await getTopChunks(embedding, 3, userId)
       : [];
 
     const context = chunks.length
@@ -158,15 +158,15 @@ Rules:
     const rawChoices = Array.isArray(parsed.choices) && parsed.choices.length === 4
       ? parsed.choices.map(c => String(c).trim())
       : [
-          'Primary functional mechanism and regulation',
-          'Secondary non-essential pathway',
-          'Passive structural degradation',
-          'None of the above'
-        ];
+        'Primary functional mechanism and regulation',
+        'Secondary non-essential pathway',
+        'Passive structural degradation',
+        'None of the above'
+      ];
 
     const validAnswers = new Set(['A', 'B', 'C', 'D']);
-    const answer = validAnswers.has(parsed.answer?.toUpperCase()) 
-      ? parsed.answer.toUpperCase() 
+    const answer = validAnswers.has(parsed.answer?.toUpperCase())
+      ? parsed.answer.toUpperCase()
       : 'A';
 
     return res.json({

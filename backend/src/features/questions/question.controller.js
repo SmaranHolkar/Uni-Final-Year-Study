@@ -1,4 +1,5 @@
-import { getEmbedding, getTopChunks, generateMCQs, aiMindmapNode, generateLearningTool as generateLearningToolUtil, toolGenAI } from '../ai/ml.engine.js';
+import { getEmbedding, getTopChunks, generateMCQs, aiMindmapNode, generateLearningTool as generateLearningToolUtil, toolGenAI, generateDeterministicFallbackHtml } from '../ai/ml.engine.js';
+
 import { generateStudySuggestions } from '../ai/ai.service.js';
 import { getCorrectAnswerText } from '../../shared/utils/quiz.utils.js';
 import pool from '../../shared/config/dbPool.js';
@@ -206,22 +207,38 @@ export async function generateLearningTool(req, res) {
   } catch (err) {
     console.error('TOOL GENERATOR CONTROLLER ERROR:', err);
     // Provide a resilient fallback tool so tool generation never crashes with HTTP 500
-    const lowerP = String(req.body?.prompt || '').toLowerCase();
+    const rawPrompt = String(req.body?.prompt || '').trim();
+    const lowerP = rawPrompt.toLowerCase();
     const isChem = lowerP.includes('chem') || lowerP.includes('titration') || lowerP.includes('beaker');
     const is3D = lowerP.includes('3d');
+    const isCrossword = lowerP.includes('crossword');
+    const isQuiz = lowerP.includes('quiz') || lowerP.includes('mcq');
+    const isGuide = lowerP.includes('guide') || lowerP.includes('notes');
+
+    const cleanTopic = rawPrompt.replace(/^(create|generate|make|build|give me|help me with|flashcards for|quiz on|crossword on|diagram of)\s+/i, '').trim() || 'Study Concept';
+    const fallbackToolType = isChem ? 'chemistry-simulator' : (is3D ? '3d-simulation' : (isCrossword ? 'crossword' : (isQuiz ? 'quiz' : (isGuide ? 'revision-kit' : 'flashcards'))));
+    const fallbackTitle = `${cleanTopic} Revision Tool`;
+    const fallbackDesc = `Interactive revision tool on ${cleanTopic}.`;
+    const fallbackHtml = generateDeterministicFallbackHtml(fallbackToolType, fallbackTitle, fallbackDesc, []);
 
     const fallbackTool = {
-      toolType: isChem ? 'chemistry-simulator' : is3D ? '3d-simulation' : 'flashcards',
-      title: isChem ? 'Interactive Chemistry Lab Simulator' : is3D ? '3D Interactive Model Viewer' : 'Study & Revision Guide',
-      description: 'Explore and interact with this live educational tool.',
-      chatResponse: "I've created your revision tool! Explore it on the canvas.",
+      toolType: fallbackToolType,
+      title: fallbackTitle,
+      description: fallbackDesc,
+      chatResponse: `I've prepared your interactive ${fallbackToolType} for **${cleanTopic}** on the canvas!`,
       render: 'iframe',
-      ui: isChem ? 'chemistry-simulator' : is3D ? '3d-simulation' : 'flashcards',
-      data: { items: [] }
+      ui: 'interactive',
+      app: { html: fallbackHtml },
+      html: fallbackHtml,
+      data: {
+        chatResponse: `I've prepared your interactive ${fallbackToolType} for **${cleanTopic}** on the canvas!`,
+        items: []
+      }
     };
     return res.json({ success: true, tool: fallbackTool });
   }
 }
+
 
 
 // Save a Learning Playground session (messages + latest generated tool)
@@ -268,7 +285,7 @@ export async function saveLearningPlaygroundSession(req, res) {
         sessionId,
         userId,
       ]);
-      
+
       if (rows.length > 0) {
         return res.status(200).json({ success: true, data: rows[0] });
       }
@@ -554,3 +571,4 @@ export async function markSpacedRepetitionReviewed(req, res) {
     return res.status(500).json({ success: false, error: 'Failed to update spaced repetition item' });
   }
 }
+

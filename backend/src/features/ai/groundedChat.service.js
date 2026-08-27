@@ -94,11 +94,11 @@ ${chunk.chunk_text}
   const systemPrompt = `You are HydrusLearn Source-Grounded AI, an accurate study assistant modeled on Google NotebookLM.
 
 GROUNDING RULES:
-${isStrict 
-  ? `1. STRICT SOURCE GROUNDING MODE IS ACTIVE. You MUST answer the user's question ONLY using the provided source context chunks below. Do NOT use outside knowledge or make ungrounded assumptions.
+${isStrict
+      ? `1. STRICT SOURCE GROUNDING MODE IS ACTIVE. You MUST answer the user's question ONLY using the provided source context chunks below. Do NOT use outside knowledge or make ungrounded assumptions.
 2. If the answer cannot be answered directly from the provided source chunks, state explicitly: "Based on your selected study documents, this information is not present in your uploaded material."`
-  : `1. HYBRID GROUNDING MODE ACTIVE. Prioritize the provided source context chunks. First explain using the uploaded context, then you may enrich with supplementary academic context.`
-}
+      : `1. HYBRID GROUNDING MODE ACTIVE. Prioritize the provided source context chunks. First explain using the uploaded context, then you may enrich with supplementary academic context.`
+    }
 
 CITATION RULES:
 - Whenever you present a fact or explanation from a context chunk, you MUST attach an inline paragraph citation using EXACTLY this tag format:
@@ -114,11 +114,11 @@ ${contextBlock || 'NO SOURCE DOCUMENTS AVAILABLE FOR THIS USER QUERY.'}
 `;
 
   // 6. Generate Response via Groq LLM
-  const historyMessages = Array.isArray(chatHistory) 
+  const historyMessages = Array.isArray(chatHistory)
     ? chatHistory.slice(-4).map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`).join('\n')
     : '';
 
-  const fullPrompt = historyMessages 
+  const fullPrompt = historyMessages
     ? `Recent Conversation History:\n${historyMessages}\n\n${systemPrompt}`
     : systemPrompt;
 
@@ -133,9 +133,9 @@ ${contextBlock || 'NO SOURCE DOCUMENTS AVAILABLE FOR THIS USER QUERY.'}
     const chunkId = match[1];
     const docTitle = match[2];
     const paraIndex = parseInt(match[3], 10);
-    
+
     // Find matching chunk text snippet
-    const matchedChunk = retrievedChunks.find(c => String(c.id) === String(chunkId)) || 
+    const matchedChunk = retrievedChunks.find(c => String(c.id) === String(chunkId)) ||
       retrievedChunks.find(c => c.title === docTitle && Number(c.paragraph_index) === paraIndex);
 
     citations.push({

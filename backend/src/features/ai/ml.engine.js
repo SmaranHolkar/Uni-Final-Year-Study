@@ -519,7 +519,7 @@ function safeParse(text) {
     if (jsonMatch) {
       try {
         return JSON.parse(jsonMatch[0]);
-      } catch {}
+      } catch { }
     }
   }
   return null;
@@ -670,7 +670,7 @@ function buildWordSearchLayout(wordItems) {
     for (let attempt = 0; attempt < 200 && !placed; attempt++) {
       const dir = Math.random() < 0.5 ? 'horizontal' : 'vertical';
       const maxR = dir === 'horizontal' ? SIZE - 1 : SIZE - word.length;
-      const maxC = dir === 'vertical'   ? SIZE - 1 : SIZE - word.length;
+      const maxC = dir === 'vertical' ? SIZE - 1 : SIZE - word.length;
       if (maxR < 0 || maxC < 0) continue;
       const sr = Math.floor(Math.random() * (maxR + 1));
       const sc = Math.floor(Math.random() * (maxC + 1));
@@ -678,13 +678,13 @@ function buildWordSearchLayout(wordItems) {
       let ok = true;
       for (let i = 0; i < word.length; i++) {
         const r = dir === 'horizontal' ? sr : sr + i;
-        const c = dir === 'vertical'   ? sc : sc + i;
+        const c = dir === 'vertical' ? sc : sc + i;
         if (grid[r][c] && grid[r][c] !== word[i]) { ok = false; break; }
       }
       if (ok) {
         for (let i = 0; i < word.length; i++) {
           const r = dir === 'horizontal' ? sr : sr + i;
-          const c = dir === 'vertical'   ? sc : sc + i;
+          const c = dir === 'vertical' ? sc : sc + i;
           grid[r][c] = word[i];
         }
         positions.push({ word, startRow: sr, startCol: sc, direction: dir });
@@ -1440,7 +1440,7 @@ export async function generateLearningTool(userId, prompt, context, options = {}
           ? options.chatHistory.slice(-4).map(m => String(m.content || m.text || '')).join(' ')
           : '';
         const searchQueryText = `${promptText} ${historyText} ${options.previousTool?.title || ''} ${targetDocTitle || ''}`.trim();
-        
+
         const queryVec = await Promise.race([
           getEmbedding(searchQueryText),
           new Promise(resolve => setTimeout(() => resolve(null), 1200))
@@ -1523,7 +1523,7 @@ export async function generateLearningTool(userId, prompt, context, options = {}
   if (Array.isArray(context) && context.length > 0) {
     contextString += `\n\nSTUDENT'S RECENT MISTAKES TO FOCUS ON:\n`;
     context.forEach((q, i) => {
-       contextString += `Q${i+1}: ${q.prompt}\n(Student answered: ${q.userAnswer}, Correct answer: ${q.correctAnswer})\n`;
+      contextString += `Q${i + 1}: ${q.prompt}\n(Student answered: ${q.userAnswer}, Correct answer: ${q.correctAnswer})\n`;
     });
     contextString += `\nINSTRUCTION: Ensure the content of the generated tool specifically targets and corrects these mistakes.`;
   }
@@ -1543,19 +1543,19 @@ export async function generateLearningTool(userId, prompt, context, options = {}
     if (!text || typeof text !== 'string') return null;
     const cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```json|```/gi, '').trim();
     try { return JSON.parse(cleaned); } catch { /* try extraction */ }
-    
+
     const first = cleaned.indexOf('{');
     if (first === -1) return null;
     const candidate = cleaned.slice(first);
-    
+
     const lastBrace = candidate.lastIndexOf('}');
     if (lastBrace > 0) {
       const sub = candidate.slice(0, lastBrace + 1);
-      try { return JSON.parse(sub); } catch {}
-      try { return JSON.parse(sub + ']}'); } catch {}
-      try { return JSON.parse(sub + '}'); } catch {}
+      try { return JSON.parse(sub); } catch { }
+      try { return JSON.parse(sub + ']}'); } catch { }
+      try { return JSON.parse(sub + '}'); } catch { }
     }
-    
+
     try {
       const toolTypeMatch = candidate.match(/"toolType"\s*:\s*"([^"]+)"/);
       if (toolTypeMatch) {
@@ -1570,8 +1570,8 @@ export async function generateLearningTool(userId, prompt, context, options = {}
           items: []
         };
       }
-    } catch {}
-    
+    } catch { }
+
     return null;
   };
 
@@ -1706,10 +1706,10 @@ ITEM SCHEMA (for interactive tool types):
     }
   }
 
-  const title       = String(plan.title === 'Conversation' ? 'Interactive Study Tool' : (plan.title || 'Learning Tool'));
+  const title = String(plan.title === 'Conversation' ? 'Interactive Study Tool' : (plan.title || 'Learning Tool'));
   const description = String(plan.description === 'Chat response' ? 'Explore and interact with this live educational revision tool' : (plan.description || 'Generated from your request.'));
-  const ui          = String(plan.ui              || 'cards').toLowerCase();
-  const brief       = String(plan.htmlDesignBrief || `An interactive ${toolType} learning tool that displays each item engagingly.`);
+  const ui = String(plan.ui || 'cards').toLowerCase();
+  const brief = String(plan.htmlDesignBrief || `An interactive ${toolType} learning tool that displays each item engagingly.`);
 
   // ── DYNAMIC SVG DIAGRAM SHORT-CIRCUIT ──────────────────────────────────────
   const isDiagramType = ['diagram', 'svg_diagram', 'svg-diagram', 'flowchart', 'anatomy', 'anatomy_flow', 'anatomy_labeling', 'data_structure', 'function_plot', 'circuit_logic', 'circuit'].some(d => toolType.includes(d));
@@ -1786,7 +1786,7 @@ ITEM SCHEMA (for interactive tool types):
   }
 
   let rawItems = Array.isArray(plan.items) ? plan.items.filter(it => it && typeof it === 'object' && it.front !== 'Review your notes').slice(0, 18) : [];
-  
+
   if (rawItems.length === 0 && !isImage && !isUtility) {
     // If the planner did not return items, attempt a focused generation for the real topic
     try {
@@ -1822,8 +1822,8 @@ Return ONLY valid JSON array with no extra text:
     };
   }
 
-  const items       = normalizeToolItems(toolType, rawItems);
-  const itemsJson   = JSON.stringify(items);
+  const items = normalizeToolItems(toolType, rawItems);
+  const itemsJson = JSON.stringify(items);
 
   // ── MINDMAP SHORT-CIRCUIT (Return ReactFlow nodes/edges instead of HTML) ──
   if (toolType === 'mindmap' || toolType === 'mind-map' || toolType === 'concept-map' || toolType === 'mind map') {
@@ -2027,9 +2027,9 @@ RULES:
     data: {
       chatResponse: plan?.chatResponse || `I've created **${title}** for you! Explore the interactive tool on the canvas, or let me know if you want to quiz yourself or try another format.`,
       items: items.map((it) => ({
-        id:      String(it.id   || ''),
-        title:   String(it.front || it.question || it.word || it.term || it.text || ''),
-        content: String(it.back  || it.answer   || it.definition || it.content || ''),
+        id: String(it.id || ''),
+        title: String(it.front || it.question || it.word || it.term || it.text || ''),
+        content: String(it.back || it.answer || it.definition || it.content || ''),
         metadata: { tags: Array.isArray(it.tags) ? it.tags : [] },
       })),
     },
@@ -2115,9 +2115,9 @@ export async function generateMetacognitiveAnalysis(quizData) {
 
   // --- Signature word extraction from wrong-answer prompts ---
   const stopWords = new Set([
-    'the','a','an','is','are','was','were','of','in','on','at','to','for',
-    'with','what','which','how','when','where','who','does','do','did','that',
-    'this','these','those','from','and','or','but','not',
+    'the', 'a', 'an', 'is', 'are', 'was', 'were', 'of', 'in', 'on', 'at', 'to', 'for',
+    'with', 'what', 'which', 'how', 'when', 'where', 'who', 'does', 'do', 'did', 'that',
+    'this', 'these', 'those', 'from', 'and', 'or', 'but', 'not',
   ]);
   const wordFreq = {};
   incorrectQuestions.forEach((q) => {
@@ -2152,8 +2152,8 @@ export async function generateMetacognitiveAnalysis(quizData) {
         .map((q, i) => {
           const status = q?.isCorrect ? 'Correct' : 'Incorrect';
           const conf = q?.confidence != null ? ` (confidence: ${q.confidence}/5)` : '';
-          const wrongAnswerInfo = !q?.isCorrect && q?.userAnswer && q?.correctAnswer 
-            ? `\n    - User answered: "${q.userAnswer}"\n    - Correct answer: "${q.correctAnswer}"` 
+          const wrongAnswerInfo = !q?.isCorrect && q?.userAnswer && q?.correctAnswer
+            ? `\n    - User answered: "${q.userAnswer}"\n    - Correct answer: "${q.correctAnswer}"`
             : '';
           return `Q${i + 1}: "${String(q?.prompt || '').slice(0, 150)}" — ${status}${conf}${wrongAnswerInfo}`;
         })

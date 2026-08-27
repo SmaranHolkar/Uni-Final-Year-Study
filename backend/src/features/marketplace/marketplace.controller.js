@@ -190,7 +190,65 @@ export async function getPublicTools(req, res) {
   }
 }
 
+/* ── GET /api/marketplace/tools/:id ────────────────────────────────────── */
+export async function getToolById(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    if (!id) return res.status(400).json({ error: 'Tool id is required' });
+
+    const result = await pool.query(
+      `SELECT
+         t.id, t.title, t.description, t.tool_type, t.category, t.tags,
+         t.generated_tool, t.fork_count, t.forked_from_tool_id,
+         t.is_published, t.visibility, t.owner_user_id, t.latest_prompt, t.created_at, t.updated_at,
+         COALESCE(u.email, 'Community Creator') AS author_email
+       FROM public.playground_marketplace_tools t
+       LEFT JOIN auth.users u ON u.id = t.owner_user_id
+       WHERE t.id = $1
+       LIMIT 1`,
+      [id]
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({ error: 'Tool not found' });
+    }
+
+    const tool = result.rows[0];
+    const isOwner = userId && tool.owner_user_id === userId;
+    const isAccessible = tool.is_published || tool.visibility === 'public' || tool.visibility === 'shared-link' || isOwner;
+
+    // Check if shared specifically with this user
+    if (!isAccessible && userId) {
+      const shareCheck = await pool.query(
+        `SELECT 1 FROM public.shared_assets WHERE asset_id = $1 AND recipient_user_id = $2 LIMIT 1`,
+        [id, userId]
+      );
+      if (shareCheck.rows.length) {
+        return res.json({ success: true, data: { ...tool, is_shared: true, is_owner: false } });
+      }
+    }
+
+    if (!isAccessible) {
+      return res.status(403).json({ error: 'This tool is private and cannot be accessed.' });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        ...tool,
+        is_owner: isOwner,
+      }
+    });
+  } catch (err) {
+    console.error('getToolById error:', err);
+    return res.status(500).json({ error: err.message });
+  }
+}
+
 /* ── GET /api/marketplace/tools/saved ───────────────────────────────────── */
+
 export async function getSavedTools(req, res) {
   try {
     const userId = req.user?.id;

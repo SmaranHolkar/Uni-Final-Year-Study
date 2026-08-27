@@ -30,7 +30,7 @@ async function searchWebContext(query) {
     while ((match = snippetRegex.exec(html)) !== null && count < 4) {
       const rawUrl = match[1];
       const rawSnippet = match[2].replace(/<[^>]+>/g, '').trim();
-      
+
       // Clean up URL
       const actualUrlMatch = rawUrl.match(/uddg=([^&]+)/);
       const cleanUrl = actualUrlMatch ? decodeURIComponent(actualUrlMatch[1]) : rawUrl;
@@ -81,7 +81,7 @@ Return ONLY valid JSON (no markdown formatting):
 }
 `;
 
-  let subQueries = [cleanTopic, `${cleanTopic} overview explanation`, `${cleanTopic} key concepts research` ];
+  let subQueries = [cleanTopic, `${cleanTopic} overview explanation`, `${cleanTopic} key concepts research`];
   try {
     const rawPlan = await getChatCompletion(planPrompt, 'llama-3.1-8b-instant', 0.2, 300, { forceJson: true });
     const parsedPlan = JSON.parse(rawPlan.replace(/```json|```/g, '').trim());

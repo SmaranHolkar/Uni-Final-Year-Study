@@ -41,7 +41,7 @@ const API_BASE = import.meta.env.DEV ? 'http://localhost:5000' : (import.meta.en
 function Learningplayground() {
   const { user, session } = useAuth()
   const location = useLocation()
-  
+
   // Extract quiz context if passed from StepTwo or Metacognitive Analysis
   const initialQuizResults = location.state?.quizResults || null
   const initialWrongQs = location.state?.mindmapData?.wrongQuestions || null
@@ -237,7 +237,8 @@ function Learningplayground() {
     }
 
     // If it's an image tool, pass it through directly
-    if (toolType === 'image') {      const localImageUrl = toText(tool?.data?.localImageUrl) || ''
+    if (toolType === 'image') {
+      const localImageUrl = toText(tool?.data?.localImageUrl) || ''
       const imageDataUrl = toText(tool?.data?.imageDataUrl) || ''
       const imageUrl = toText(tool?.data?.imageUrl) || ''
       const staleLegacyImageUrl = /\/prompt\//i.test(imageUrl)
@@ -599,9 +600,9 @@ function Learningplayground() {
           Authorization: `Bearer ${session.access_token}`,
         },
         credentials: 'include',
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           prompt: `I just loaded my past quiz session titled "${quizSession.title}". I scored ${score} out of ${total}. Please briefly analyze this performance in a friendly way and ask me how I would like to review or proceed.`,
-          context: wrongQuestions.length > 0 ? wrongQuestions : null, 
+          context: wrongQuestions.length > 0 ? wrongQuestions : null,
           metacognitiveAnalysis: null,
           documentTitle: quizSession.title
         }),
@@ -722,7 +723,7 @@ function Learningplayground() {
   useEffect(() => {
     if (messages.length === 0) {
       let greeting = "Hi! I'm **Vela**, your AI learning assistant. How can I help you today?"
-      
+
       if (activeAnalysis) {
         greeting = `Hi! I'm **Vela**. I've finished analyzing your recent quiz results.\n\nYou're doing great, but I noticed some ${activeAnalysis.patternSpecificity}. I've prepared a personalized action plan for you below. Which one should we start with?`
       } else if (initialPromptFromAnalysis) {
@@ -826,11 +827,11 @@ function Learningplayground() {
   const handleLoadSession = (sessionData) => {
     const safeMessages = Array.isArray(sessionData.messages)
       ? sessionData.messages.map((msg, index) => ({
-          id: msg?.id || `${Date.now()}-${index}`,
-          role: msg?.role === 'assistant' ? 'assistant' : 'user',
-          content: String(msg?.content || ''),
-          timestamp: msg?.timestamp ? new Date(msg.timestamp) : new Date(),
-        }))
+        id: msg?.id || `${Date.now()}-${index}`,
+        role: msg?.role === 'assistant' ? 'assistant' : 'user',
+        content: String(msg?.content || ''),
+        timestamp: msg?.timestamp ? new Date(msg.timestamp) : new Date(),
+      }))
       : []
 
     let restoredTool = null
@@ -840,7 +841,7 @@ function Learningplayground() {
 
     let restoredWrongQs = null
     let restoredAnalysis = null
-    
+
     if (Array.isArray(sessionData.context)) {
       restoredWrongQs = sessionData.context
     } else if (sessionData.context && typeof sessionData.context === 'object') {
@@ -858,7 +859,7 @@ function Learningplayground() {
     setGeneratedImageError(null)
     setGeneratedImageLoading(false)
     setShowSessionModal(false)
-    
+
     // Add a system message confirming the session was loaded
     const sysMessage = {
       id: Date.now(),
@@ -887,9 +888,9 @@ function Learningplayground() {
           latestPrompt,
           messages: nextMessages,
           generatedTool: tool,
-          context: { 
+          context: {
             wrongQuestions: activeWrongQs || [],
-            metacognitiveAnalysis: activeAnalysis 
+            metacognitiveAnalysis: activeAnalysis
           },
         }),
       })
@@ -909,7 +910,7 @@ function Learningplayground() {
   // Save generated tool to personal collection
   const saveToolToCollection = async () => {
     if (!session?.access_token || !generatedTool) return
-    
+
     try {
       const res = await fetch(`${API_BASE}/api/marketplace/tools/save`, {
         method: 'POST',
@@ -1506,9 +1507,9 @@ function Learningplayground() {
           Authorization: `Bearer ${session.access_token}`,
         },
         credentials: 'include',
-        body: JSON.stringify({ 
-          prompt: trimmedInput, 
-          context: activeWrongQs, 
+        body: JSON.stringify({
+          prompt: trimmedInput,
+          context: activeWrongQs,
           metacognitiveAnalysis: activeAnalysis,
           documentTitle: activeSessionTitle || null,
           previousTool: generatedTool || null,
@@ -1544,7 +1545,7 @@ function Learningplayground() {
       if (data?.tool) {
         setGenerationStage('Finalizing your response...')
         normalizedTool = normalizeToolPayload(data.tool)
-        
+
         if (normalizedTool.render === 'chat') {
           // If it's a chat response, just add it to the chat logs and do NOT open a tool pane.
           chatMessageText = normalizedTool.data.message
@@ -1568,7 +1569,7 @@ function Learningplayground() {
 
       const nextMessages = [...messages, userMessage, aiMessage]
       setMessages(nextMessages)
-      
+
       saveLearningSession({
         latestPrompt: userMessage.content,
         nextMessages,
@@ -1840,7 +1841,7 @@ function Learningplayground() {
               <span>Grounded in Quiz: <strong style={{ color: 'var(--primary)' }}>{activeSessionTitle}</strong></span>
               {activeWrongQs && <span style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>({activeWrongQs.length} mistake{activeWrongQs.length !== 1 ? 's' : ''} loaded)</span>}
             </div>
-            
+
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <button
                 onClick={() => {
@@ -1914,7 +1915,7 @@ function Learningplayground() {
               <p style={{ fontSize: '0.95rem' }}>
                 Build your own learning tools, explore ideas, or get help with any topic
               </p>
-              
+
             </div>
 
             {suggestions.length === 0 && user?.id && (
@@ -2047,9 +2048,9 @@ function Learningplayground() {
                 }}
               >
                 {message.role === 'assistant' && (
-                  <div style={{ 
-                    position: 'absolute', 
-                    left: '-55px', 
+                  <div style={{
+                    position: 'absolute',
+                    left: '-55px',
                     top: '0',
                     display: 'flex',
                     flexDirection: 'column',
@@ -2101,9 +2102,9 @@ function Learningplayground() {
                 position: 'relative'
               }}
             >
-              <div style={{ 
-                position: 'absolute', 
-                left: '-55px', 
+              <div style={{
+                position: 'absolute',
+                left: '-55px',
                 top: '0',
                 display: 'flex',
                 flexDirection: 'column',
@@ -2169,7 +2170,7 @@ function Learningplayground() {
             style={{ display: 'none' }}
             onChange={handleImageSelect}
           />
-          
+
           <button
             type="button"
             onClick={() => imageInputRef.current?.click()}
@@ -2337,9 +2338,9 @@ function Learningplayground() {
             aria-modal="true"
             aria-labelledby="learningplayground-session-modal-title"
             style={{
-            background: 'var(--background)', border: '1px solid var(--border)',
-            borderRadius: '1rem', padding: '2rem', width: '90%', maxWidth: '500px',
-            maxHeight: '80vh', overflowY: 'auto'
+              background: 'var(--background)', border: '1px solid var(--border)',
+              borderRadius: '1rem', padding: '2rem', width: '90%', maxWidth: '500px',
+              maxHeight: '80vh', overflowY: 'auto'
             }}
             tabIndex={-1}
             ref={sessionModalRef}
@@ -2907,9 +2908,9 @@ function Learningplayground() {
             aria-modal="true"
             aria-labelledby="learningplayground-share-modal-title"
             style={{
-            background: 'var(--background)', border: '1px solid var(--border)',
-            borderRadius: '1rem', width: '90%', maxWidth: '450px',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)'
+              background: 'var(--background)', border: '1px solid var(--border)',
+              borderRadius: '1rem', width: '90%', maxWidth: '450px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)'
             }}
             onClick={(e) => e.stopPropagation()}
             tabIndex={-1}
@@ -2919,7 +2920,7 @@ function Learningplayground() {
               <h3 id="learningplayground-share-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Share Learning Tool</h3>
               <button aria-label="Close share tool modal" onClick={() => setShowShareModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}><X size={20} /></button>
             </div>
-            
+
             <div style={{ padding: '1.5rem' }}>
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--foreground)' }}>
