@@ -95,7 +95,7 @@ export async function ingestYouTubeVideo(youtubeUrl) {
     ? `You are an expert academic educator. Transform the following transcript from the YouTube lecture "${videoTitle}" into a thorough, comprehensive study guide.\n\nTRANSCRIPT:\n${rawTranscript.slice(0, 20000)}\n\nInclude:\n1. Core Topic & Key Takeaways\n2. Key Definitions & Terminology\n3. Step-by-Step Concepts and Explanations\n4. Critical Exam Facts & Formulas`
     : `You are an expert academic educator. Provide a comprehensive, in-depth academic study guide and revision summary for the YouTube lecture topic: "${videoTitle}". Include core definitions, step-by-step principles, and key exam concepts.`;
 
-  const structuredSummary = await toolGenAI(prompt, 'llama-3.3-70b-versatile', 0.2, 2500);
+  const structuredSummary = await toolGenAI(prompt, undefined, 0.2, 2200);
 
   return {
     videoId,

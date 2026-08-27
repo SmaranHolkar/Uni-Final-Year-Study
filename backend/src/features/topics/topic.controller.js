@@ -74,7 +74,7 @@ Return ONLY valid JSON matching this exact schema (no markdown, no preamble):
   "category": "Related Topic"
 }`;
 
-    const raw = await getChatCompletion(prompt, 'llama-3.3-70b-versatile', 0.4, 400, { forceJson: false });
+    const raw = await getChatCompletion(prompt, undefined, 0.4, 400, { forceJson: false });
 
     const parsed = extractAndParseJson(raw, {
       label: `${topic} Concepts`,
@@ -141,7 +141,7 @@ Rules:
 - choices must be an array of exactly 4 strings without 'A.', 'B.', etc. prefixes
 - answer must be exactly one letter: 'A', 'B', 'C', or 'D'`;
 
-    const raw = await getChatCompletion(prompt, 'llama-3.3-70b-versatile', 0.6, 500, { forceJson: false });
+    const raw = await getChatCompletion(prompt, undefined, 0.6, 500, { forceJson: false });
 
     const parsed = extractAndParseJson(raw, {
       question: `What is the primary role of ${topic}?`,

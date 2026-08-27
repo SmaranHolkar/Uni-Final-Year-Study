@@ -137,7 +137,7 @@ Write in clear, authoritative, highly informative academic tone. Ensure paragrap
 Begin directly with "# Executive Summary":
 `;
 
-  const reportMarkdown = await getChatCompletion(reportPrompt, 'llama-3.3-70b-versatile', 0.3, 2000);
+  const reportMarkdown = await getChatCompletion(reportPrompt, undefined, 0.3, 2000);
 
   // STAGE 5: Ingest into User Knowledge Base (w_embeddings)
   let ingestedChunks = 0;
