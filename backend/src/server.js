@@ -17,8 +17,11 @@ import multimodalRouter from './features/ai/multimodal.routes.js';
 
 // Shared middleware
 import requireAuth from './shared/middleware/requireAuth.js';
+import securityHeaders from './shared/middleware/securityHeaders.js';
+import { globalApiLimiter, authBruteForceLimiter, aiGenerationLimiter } from './shared/middleware/rateLimiter.js';
 
 import pool from './shared/config/dbPool.js';
+
 
 // Auto-verify and run lightweight database migrations
 async function runAutoMigrations() {
@@ -106,22 +109,18 @@ app.use(cors({
 }));
 
 /* SECURITY HEADERS — applied to every response */
-app.use((req, res, next) => {
-  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()');
-  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  next();
-});
+app.use(securityHeaders);
 
-// 10 MB covers all legitimate use cases (embeddings, tool payloads). 50 MB enables DoS.
+// GLOBAL API RATE LIMITING (Layer 7 DoS Protection)
+app.use('/api', globalApiLimiter);
+
+// Strict body payload ceilings (10 MB prevents buffer/memory exhaustion attacks)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-// ROUTES — each feature mounts its own router
-app.use('/api/auth', authRouter);
+// ROUTES — each feature mounts its own router with dedicated rate limits where applicable
+app.use('/api/auth', authBruteForceLimiter, authRouter);
+app.use('/api/chat-tools', aiGenerationLimiter);
 app.use('/api', documentRouter);
 app.use('/api', marketplaceRouter);
 app.use('/api', questionRouter);
@@ -129,7 +128,6 @@ app.use('/api', quizRouter);
 app.use('/api', topicRouter);
 app.use('/api', groundedRouter);
 app.use('/api', multimodalRouter);
-
 
 // Health check endpoint for Render
 app.get('/api/health', (req, res) => {
@@ -156,6 +154,20 @@ app.get('/api/test-auth', requireAuth, (req, res) => {
     }
   });
 });
+
+// Centralized Safe Error Handling Middleware (Prevents Stack Trace & Schema Leaks)
+app.use((err, req, res, next) => {
+  console.error('[UNHANDLED ERROR]:', err?.message || err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  const isDev = process.env.NODE_ENV === 'development';
+  return res.status(err.status || 500).json({
+    success: false,
+    error: isDev ? (err.message || 'Internal Server Error') : 'An unexpected server error occurred. Please try again later.'
+  });
+});
+
 
 // Memory optimization: Force garbage collection periodically
 if (global.gc) {

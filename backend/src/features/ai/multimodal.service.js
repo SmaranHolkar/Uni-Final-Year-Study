@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 import FormData from 'form-data';
 import { toolGenAI } from './ml.engine.js';
+import { validateSafeUrl } from '../../shared/utils/ssrfGuard.js';
 
 const GROQ_KEY = process.env.GROQ_API;
 
@@ -19,10 +20,16 @@ export function extractYouTubeId(url) {
  * Ingest YouTube Video: extracts transcript / caption or metadata, then summarizes into study context.
  */
 export async function ingestYouTubeVideo(youtubeUrl) {
+  const ssrfCheck = validateSafeUrl(youtubeUrl, ['youtube.com', 'youtu.be', 'www.youtube.com', 'm.youtube.com']);
+  if (!ssrfCheck.isValid) {
+    throw new Error(`SSRF Security Guard: ${ssrfCheck.error}`);
+  }
+
   const videoId = extractYouTubeId(youtubeUrl);
   if (!videoId) {
     throw new Error('Invalid YouTube URL. Please provide a standard YouTube video link (e.g., https://www.youtube.com/watch?v=... or https://youtu.be/...)');
   }
+
 
   let videoTitle = 'YouTube Lecture';
   let rawTranscript = '';
