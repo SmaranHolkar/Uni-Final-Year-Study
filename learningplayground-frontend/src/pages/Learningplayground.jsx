@@ -1,74 +1,74 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { ReactFlow, Background, Controls, MiniMap, useNodesState } from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
+import { Link, useLocation } from 'react-router-dom'
 import {
   Send,
-  Sparkles,
-  Lightbulb,
-  TrendingUp,
-  AlertCircle,
+  LightBulb as Lightbulb,
+  GraphUp as TrendingUp,
+  WarningCircle as AlertCircle,
   X,
   Bookmark,
-  Maximize2,
-  Minimize2,
+  Expand as Maximize2,
+  Compress as Minimize2,
   Wrench,
-  Trash2,
+  Trash as Trash2,
   Plus,
   Search,
-  PanelLeft,
-  PanelLeftClose,
-  PanelRight,
-  PanelRightClose,
-  MessageSquare,
+  SidebarExpand as PanelLeft,
+  SidebarCollapse as PanelLeftClose,
+  LayoutRight as PanelRight,
+  LayoutLeft as PanelRightClose,
+  ChatBubble as MessageSquare,
   Play,
-  Share2,
+  ShareAndroid as Share2,
+  Globe,
   Check,
-  Zap,
-  Paperclip,
-  FileText,
+  Flash as Zap,
+  Attachment as Paperclip,
+  Page as FileText,
   Upload,
   LogOut,
   Clock,
-  Video,
-  Mic,
-  MicOff,
-  Image,
+  VideoCamera as Video,
+  Microphone as Mic,
+  MicrophoneMute as MicOff,
+  MediaImage as Image,
   Camera,
-  Edit3,
-  Save,
-  BookOpen,
-  Layers,
-  Flame,
-  RotateCcw,
-  CheckCircle2,
-  Globe,
+  EditPencil as Edit3,
+  FloppyDisk as Save,
+  OpenBook as BookOpen,
+  BookStack as Layers,
+  FireFlame as Flame,
+  Restart as RotateCcw,
+  CheckCircle as CheckCircle2,
   ThumbsUp,
   ThumbsDown,
   GitFork,
-  ExternalLink,
+  OpenNewWindow as ExternalLink,
   Eye,
-  Tag,
+  Label as Tag,
   Download,
   Printer,
   Copy,
   Shuffle,
-  Volume2,
+  SoundHigh as Volume2,
   Timer,
   Package,
   Brain,
   CheckSquare,
   Compass,
-  Scale,
-  SquarePen,
+  Weight as Scale,
+  PageEdit as SquarePen,
   Folder,
   Pin,
-  AudioLines,
-  MoreHorizontal,
+  Voice as AudioLines,
+  MoreHoriz as MoreHorizontal,
   Activity,
-  Target,
-} from 'lucide-react'
+  PositionAlign as Target,
+} from 'iconoir-react'
 import { useAuth } from '../AuthContext'
 import Vela from '../components/Vela'
-import { DotGrid } from '../components/Reveal.jsx'
 import PlaygroundLoader from '../components/PlaygroundLoader'
 import { morphToolToHtml } from '../utils/toolMorpher'
 
@@ -124,8 +124,571 @@ function extractToolMetadata(toolObj) {
   }
 }
 
+function WelcomeNode({ data }) {
+  return (
+    <div className="canvas-node canvas-node-welcome" style={{ width: 'min(32rem, 88vw)' }}>
+      <div className="flex items-center gap-2 text-xs font-semibold text-blue-400 mb-2">
+        <Compass className="w-4 h-4" />
+        <span>Study Playground</span>
+      </div>
+      <h2 className="text-xl font-semibold text-white leading-snug">
+        Build revision tools and organize your active recall workspace.
+      </h2>
+      <p className="mt-2 text-sm leading-relaxed text-slate-300">
+        Generate flashcards, interactive quizzes, formulas, and checklists or brainstorm directly with your study assistant.
+      </p>
+      <div className="mt-4 grid gap-2.5 sm:grid-cols-3">
+        {data.quickActions.map((action) => (
+          <button
+            key={action.id}
+            onClick={() => data.onSelectSuggestion(action.prompt)}
+            className="nodrag rounded-lg border border-slate-700 bg-slate-800/90 p-3 text-left text-xs text-slate-300 transition-colors hover:border-slate-500 hover:bg-slate-700/80 hover:text-white"
+          >
+            <div className="mb-1.5 flex items-center gap-2 text-white font-medium">
+              <action.icon className="w-4 h-4 text-blue-400" />
+              <span>{action.title}</span>
+            </div>
+            <span className="line-clamp-2 text-slate-400 text-[11px] leading-normal">{action.prompt}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ThreadNode({ data }) {
+  return (
+    <div className={`canvas-node canvas-node-thread ${data.role === 'assistant' ? 'canvas-node-thread-assistant' : 'canvas-node-thread-user'}`} style={{ width: 'min(24rem, 78vw)' }}>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-[#9fb0c5]">
+          {data.role === 'assistant' ? <Vela size={18} /> : <MessageSquare className="w-4 h-4 text-[#f8fafc]" />}
+          <span>{data.role === 'assistant' ? 'Canvas note' : 'Prompt note'}</span>
+        </div>
+        <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-[#94a3b8]">{data.indexLabel}</span>
+      </div>
+      <p className="whitespace-pre-wrap text-sm leading-6 text-white">{data.content}</p>
+      {data.attachedTool && (
+        <button
+          onClick={() => data.onOpenTool(data.attachedTool)}
+          className="nodrag mt-4 inline-flex items-center gap-2 rounded-lg border border-[#2563eb] bg-[#1d4ed8] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#2563eb]"
+        >
+          <Wrench className="w-3.5 h-3.5" />
+          Open tool on canvas
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ToolNode({ data }) {
+  const [nodeWidth, setNodeWidth] = useState(820)
+  const [nodeHeight, setNodeHeight] = useState(580)
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeRef = useRef({ startX: 0, startY: 0, startW: 820, startH: 580 })
+
+  const handleResizeStart = (e) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setIsResizing(true)
+    resizeRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: nodeWidth,
+      startH: nodeHeight,
+    }
+
+    const handleMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - resizeRef.current.startX
+      const deltaY = moveEvent.clientY - resizeRef.current.startY
+      const nextW = Math.max(500, Math.min(1400, resizeRef.current.startW + deltaX))
+      const nextH = Math.max(380, Math.min(920, resizeRef.current.startH + deltaY))
+      setNodeWidth(nextW)
+      setNodeHeight(nextH)
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
+  const setSizePreset = (w, h) => {
+    setNodeWidth(w)
+    setNodeHeight(h)
+  }
+
+  return (
+    <div
+      className="canvas-tool-node relative select-none"
+      style={{ width: `${nodeWidth}px` }}
+    >
+      {/* Node Header */}
+      <div className="canvas-node-drag-handle flex items-center justify-between gap-3 border-b border-[#18283e] px-4 py-2.5 bg-[#0e1626]">
+        <div className="min-w-0 flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-[#7dd3fc]">
+            <Layers className="w-3.5 h-3.5 text-[#5A7D99]" />
+            <span className="hidden sm:inline">Workspace</span>
+          </div>
+          <div className="h-3 w-px bg-[#282E38]" />
+          <h3 className="truncate text-xs sm:text-sm font-semibold text-white max-w-[180px] sm:max-w-[280px]">
+            {data.title}
+          </h3>
+          {data.toolType && (
+            <span className="rounded-full border border-[#282E38] bg-[#131519] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fb7ff]">
+              {data.toolType}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          {/* Quick Size Presets */}
+          <div className="hidden sm:flex items-center gap-1 bg-[#131519] border border-[#282E38] rounded-lg p-0.5 nodrag">
+            <button
+              onClick={() => setSizePreset(620, 480)}
+              className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${nodeWidth <= 680 ? 'bg-[#21262E] text-white' : 'text-[#8493a8] hover:text-white'}`}
+              title="Compact Size (620px)"
+            >
+              S
+            </button>
+            <button
+              onClick={() => setSizePreset(840, 580)}
+              className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${nodeWidth > 680 && nodeWidth <= 960 ? 'bg-[#21262E] text-white' : 'text-[#8493a8] hover:text-white'}`}
+              title="Standard Size (840px)"
+            >
+              M
+            </button>
+            <button
+              onClick={() => setSizePreset(1140, 700)}
+              className={`px-2 py-0.5 text-[10px] font-medium rounded transition-colors ${nodeWidth > 960 ? 'bg-[#21262E] text-white' : 'text-[#8493a8] hover:text-white'}`}
+              title="Wide Size (1140px)"
+            >
+              L
+            </button>
+          </div>
+
+          {/* Fullscreen Maximize */}
+          {data.onExpand && data.hasTool && (
+            <button
+              onClick={data.onExpand}
+              className="nodrag rounded-lg border border-[#282E38] bg-[#131519] p-1.5 text-[#cbd5e1] transition-colors hover:bg-[#21262E] hover:text-white flex items-center gap-1 text-[11px]"
+              title="Fullscreen Mode (Maximize)"
+            >
+              <Maximize2 className="w-3.5 h-3.5 text-[#5A7D99]" />
+              <span className="hidden md:inline font-medium">Fullscreen</span>
+            </button>
+          )}
+
+          {/* Close */}
+          {data.onClose && data.hasTool && (
+            <button
+              onClick={data.onClose}
+              className="nodrag rounded-lg border border-red-900/40 bg-red-950/20 p-1.5 text-red-400 transition-colors hover:bg-red-900/40 hover:text-white"
+              title="Close tool"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Surface Area */}
+      <div className="canvas-tool-surface relative" style={{ height: `${nodeHeight}px` }}>
+        {/* Invisible overlay while resizing to prevent iframe absorbing pointer events */}
+        {isResizing && <div className="absolute inset-0 z-30 cursor-se-resize bg-transparent" />}
+
+        {data.loading ? (
+          <div className="flex h-full items-center justify-center p-6">
+            <PlaygroundLoader stage={data.stage} phase={data.phase} />
+          </div>
+        ) : data.html ? (
+          <div className="p-3.5 h-full">
+            <iframe
+              srcDoc={data.html}
+              title="Interactive Tool Sandbox"
+              className="nodrag h-full w-full rounded-[18px] border-none bg-white shadow-[0_20px_50px_rgba(15,23,42,0.24)]"
+              allow="microphone"
+              sandbox="allow-scripts allow-modals allow-forms"
+            />
+          </div>
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+            <div className="w-full max-w-[420px] rounded-xl border border-dashed border-slate-700 bg-slate-900/80 p-6 flex flex-col items-center">
+              <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-blue-400 mb-3">
+                <Wrench className="w-5 h-5" />
+              </div>
+              <h4 className="text-xs font-semibold text-white mb-1">Interactive Study Tool Drop-Zone</h4>
+              <p className="text-[11px] text-slate-400 leading-relaxed max-w-xs mb-4">
+                Ask your assistant in the chat or pick a quick starter below to generate an interactive tool here.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <button
+                  onClick={() => data.onSelectSuggestion?.('Create interactive flashcards on my topics')}
+                  className="nodrag px-2.5 py-1 text-[11px] rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                >
+                  ⚡ Flashcards
+                </button>
+                <button
+                  onClick={() => data.onSelectSuggestion?.('Build a 10-question practice quiz with active recall')}
+                  className="nodrag px-2.5 py-1 text-[11px] rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                >
+                  📝 Practice Quiz
+                </button>
+                <button
+                  onClick={() => data.onSelectSuggestion?.('Generate a concept breakdown diagram')}
+                  className="nodrag px-2.5 py-1 text-[11px] rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                >
+                  🧠 Mind Map
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Interactive Bottom-Right Corner Resize Handle */}
+      <div
+        onMouseDown={handleResizeStart}
+        className="nodrag absolute bottom-1 right-1 z-20 flex h-6 w-6 cursor-se-resize items-center justify-center rounded-br-2xl text-[#64748b] hover:text-white transition-colors group"
+        title="Drag corner to resize tool window"
+      >
+        <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" className="opacity-60 group-hover:opacity-100">
+          <path d="M14 2 L2 14" strokeLinecap="round" />
+          <path d="M14 7 L7 14" strokeLinecap="round" />
+          <path d="M14 12 L12 14" strokeLinecap="round" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+function StickyNoteNode({ data, id }) {
+  const [title, setTitle] = useState(data.title || '')
+  const [content, setContent] = useState(data.content || '')
+  const [color, setColor] = useState(data.color || 'yellow')
+  const [isPinned, setIsPinned] = useState(Boolean(data.isPinned))
+  const [width, setWidth] = useState(data.width || 260)
+  const [height, setHeight] = useState(data.height || 220)
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeRef = useRef({ startX: 0, startY: 0, startW: 260, startH: 220 })
+
+  const colors = [
+    { id: 'yellow', label: 'Amber Yellow', bg: '#eab308' },
+    { id: 'cyan', label: 'Ice Cyan', bg: '#38bdf8' },
+    { id: 'green', label: 'Emerald Green', bg: '#34d399' },
+    { id: 'purple', label: 'Lavender Purple', bg: '#c084fc' },
+    { id: 'rose', label: 'Rose Pink', bg: '#fb7185' },
+  ]
+
+  const handleTitleChange = (e) => {
+    const val = e.target.value
+    setTitle(val)
+    data.onUpdate?.(id, { title: val, content, color, isPinned, width, height })
+  }
+
+  const handleContentChange = (e) => {
+    const val = e.target.value
+    setContent(val)
+    data.onUpdate?.(id, { title, content: val, color, isPinned, width, height })
+  }
+
+  const handleColorChange = (newColor) => {
+    setColor(newColor)
+    data.onUpdate?.(id, { title, content, color: newColor, isPinned, width, height })
+  }
+
+  const handlePinToggle = () => {
+    const newPinned = !isPinned
+    setIsPinned(newPinned)
+    data.onUpdate?.(id, { title, content, color, isPinned: newPinned, width, height })
+  }
+
+  const handleResizeStart = (e) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setIsResizing(true)
+    resizeRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: width,
+      startH: height,
+    }
+
+    const handleMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - resizeRef.current.startX
+      const deltaY = moveEvent.clientY - resizeRef.current.startY
+      const nextW = Math.max(200, Math.min(650, resizeRef.current.startW + deltaX))
+      const nextH = Math.max(160, Math.min(650, resizeRef.current.startH + deltaY))
+      setWidth(nextW)
+      setHeight(nextH)
+    }
+
+    const handleMouseUp = (upEvent) => {
+      setIsResizing(false)
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+      const deltaX = upEvent.clientX - resizeRef.current.startX
+      const deltaY = upEvent.clientY - resizeRef.current.startY
+      const finalW = Math.max(200, Math.min(650, resizeRef.current.startW + deltaX))
+      const finalH = Math.max(160, Math.min(650, resizeRef.current.startH + deltaY))
+      data.onUpdate?.(id, { title, content, color, isPinned, width: finalW, height: finalH })
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
+  return (
+    <div
+      className={`canvas-sticky-note canvas-sticky-${color} select-none`}
+      style={{ width: `${width}px`, minHeight: `${height}px` }}
+    >
+      {/* Header / Drag handle */}
+      <div className="canvas-sticky-header canvas-node-drag-handle flex items-center justify-between gap-2 px-3 py-2 cursor-grab active:cursor-grabbing">
+        <div className="flex items-center gap-1.5 nodrag">
+          {colors.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => handleColorChange(c.id)}
+              className={`w-3 h-3 rounded-full transition-transform ${color === c.id ? 'scale-125 ring-2 ring-white/60' : 'opacity-60 hover:opacity-100 hover:scale-110'}`}
+              style={{ backgroundColor: c.bg }}
+              title={c.label}
+            />
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1 nodrag">
+          <button
+            onClick={handlePinToggle}
+            className={`p-1 rounded-md transition-colors ${isPinned ? 'text-amber-400 bg-amber-400/20' : 'text-white/50 hover:text-white hover:bg-white/10'}`}
+            title={isPinned ? 'Unpin note' : 'Pin note'}
+          >
+            <Pin className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => data.onDelete?.(id)}
+            className="p-1 rounded-md text-white/50 hover:text-red-400 hover:bg-red-500/20 transition-colors"
+            title="Delete sticky note"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="p-3 space-y-2 flex flex-col" style={{ minHeight: `${height - 38}px` }}>
+        <input
+          type="text"
+          value={title}
+          onChange={handleTitleChange}
+          placeholder="Note title..."
+          className="w-full bg-transparent font-bold text-xs text-white placeholder-white/40 focus:outline-none border-b border-white/10 pb-1"
+        />
+        <textarea
+          value={content}
+          onChange={handleContentChange}
+          placeholder="Formulas, key takeaways, mnemonics..."
+          className="w-full flex-1 min-h-[90px] resize-none bg-transparent text-xs text-white/90 placeholder-white/35 focus:outline-none leading-relaxed"
+        />
+      </div>
+
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleResizeStart}
+        className="nodrag absolute bottom-1 right-1 z-20 flex h-4 w-4 cursor-se-resize items-center justify-center text-white/40 hover:text-white"
+        title="Resize note"
+      >
+        <svg viewBox="0 0 16 16" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M14 6 L6 14" strokeLinecap="round" />
+          <path d="M14 11 L11 14" strokeLinecap="round" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+function PinNode({ data, id }) {
+  const [title, setTitle] = useState(data.title || '')
+  const [content, setContent] = useState(data.content || '')
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard?.writeText(content || title)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="canvas-pin-node select-none p-3.5 w-64">
+      <div className="canvas-node-drag-handle flex items-center justify-between gap-2 border-b border-[#282E38] pb-2 mb-2 cursor-grab active:cursor-grabbing">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-400">
+          <Pin className="w-3.5 h-3.5" />
+          <span>Formula Pin</span>
+        </div>
+        <div className="flex items-center gap-1 nodrag">
+          <button
+            onClick={handleCopy}
+            className="p-1 text-[#8493a8] hover:text-white rounded transition-colors"
+            title="Copy formula/text"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+          <button
+            onClick={() => data.onDelete?.(id)}
+            className="p-1 text-[#8493a8] hover:text-red-400 rounded transition-colors"
+            title="Delete pin"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => {
+            const val = e.target.value
+            setTitle(val)
+            data.onUpdate?.(id, { title: val, content })
+          }}
+          placeholder="Concept / Formula name..."
+          className="w-full bg-slate-900/90 border border-slate-700/80 rounded-md px-2.5 py-1.5 font-semibold text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
+        />
+        <div className="rounded-md bg-slate-900 border border-slate-700/90 p-2.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/30">
+          <textarea
+            value={content}
+            onChange={(e) => {
+              const val = e.target.value
+              setContent(val)
+              data.onUpdate?.(id, { title, content: val })
+            }}
+            placeholder="e.g. E = mc² or PV = nRT"
+            className="w-full resize-none font-mono text-xs text-sky-300 placeholder-slate-500 bg-transparent focus:outline-none min-h-[56px] leading-relaxed"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ChecklistNode({ data, id }) {
+  const [title, setTitle] = useState(data.title || 'Study Checklist')
+  const [items, setItems] = useState(Array.isArray(data.items) && data.items.length > 0 ? data.items : [
+    { id: '1', text: 'Review core concepts', done: false },
+    { id: '2', text: 'Practice 10 flashcards', done: false },
+  ])
+
+  const toggleItem = (itemId) => {
+    const updated = items.map((it) => (it.id === itemId ? { ...it, done: !it.done } : it))
+    setItems(updated)
+    data.onUpdate?.(id, { title, items: updated })
+  }
+
+  const updateItemText = (itemId, text) => {
+    const updated = items.map((it) => (it.id === itemId ? { ...it, text } : it))
+    setItems(updated)
+    data.onUpdate?.(id, { title, items: updated })
+  }
+
+  const addItem = () => {
+    const newItem = { id: String(Date.now()), text: 'New task / milestone', done: false }
+    const updated = [...items, newItem]
+    setItems(updated)
+    data.onUpdate?.(id, { title, items: updated })
+  }
+
+  const deleteItem = (itemId) => {
+    const updated = items.filter((it) => it.id !== itemId)
+    setItems(updated)
+    data.onUpdate?.(id, { title, items: updated })
+  }
+
+  const completedCount = items.filter((i) => i.done).length
+
+  return (
+    <div className="canvas-checklist-node select-none p-3.5 w-72">
+      <div className="canvas-node-drag-handle flex items-center justify-between gap-2 border-b border-[#223247] pb-2 mb-2.5 cursor-grab active:cursor-grabbing">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-[#60a5fa]">
+          <CheckSquare className="w-3.5 h-3.5" />
+          <span>Checklist</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-300 font-mono">
+            {completedCount}/{items.length}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 nodrag">
+          <button
+            onClick={addItem}
+            className="p-1 text-[#8493a8] hover:text-white rounded transition-colors"
+            title="Add task"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => data.onDelete?.(id)}
+            className="p-1 text-[#8493a8] hover:text-red-400 rounded transition-colors"
+            title="Delete checklist"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => {
+          const val = e.target.value
+          setTitle(val)
+          data.onUpdate?.(id, { title: val, items })
+        }}
+        placeholder="Milestone title..."
+        className="w-full bg-transparent font-bold text-xs text-white placeholder-[#64748b] focus:outline-none mb-2 pb-1 border-b border-white/5"
+      />
+
+      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+        {items.map((it) => (
+          <div key={it.id} className="flex items-center gap-2 group">
+            <button
+              onClick={() => toggleItem(it.id)}
+              className={`w-4 h-4 rounded border flex items-center justify-center transition-colors flex-shrink-0 ${it.done ? 'bg-emerald-500 border-emerald-400 text-white' : 'border-[#475569] hover:border-blue-400'}`}
+            >
+              {it.done && <Check className="w-3 h-3 stroke-[3]" />}
+            </button>
+            <input
+              type="text"
+              value={it.text}
+              onChange={(e) => updateItemText(it.id, e.target.value)}
+              className={`w-full bg-transparent text-xs focus:outline-none ${it.done ? 'line-through text-[#64748b]' : 'text-[#cbd5e1]'}`}
+            />
+            <button
+              onClick={() => deleteItem(it.id)}
+              className="opacity-0 group-hover:opacity-100 text-[#64748b] hover:text-red-400 transition-opacity p-0.5"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const canvasNodeTypes = {
+  welcome: WelcomeNode,
+  thread: ThreadNode,
+  tool: ToolNode,
+  sticky: StickyNoteNode,
+  pin: PinNode,
+  checklist: ChecklistNode,
+}
+
 export default function Learningplayground() {
   const { user, session, signOut } = useAuth()
+  const location = useLocation()
 
   const [messages, setMessages] = useState([])
   const [suggestions, setSuggestions] = useState(defaultSuggestions)
@@ -133,7 +696,8 @@ export default function Learningplayground() {
   const [tierStatus, setTierStatus] = useState(null)
   const toolsQuota = (tierStatus?.quotas || []).find((quota) => quota.actionType === 'learning_tool_generate')
 
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isSidebarHovered, setIsSidebarHovered] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeNavSection, setActiveNavSection] = useState('chats') // 'chats' | 'saved-tools' | 'community'
   const [savedTools, setSavedTools] = useState([])
@@ -300,7 +864,8 @@ export default function Learningplayground() {
   }
 
   const [generatedTool, setGeneratedTool] = useState(null)
-  const [rightPanelOpen, setRightPanelOpen] = useState(true)
+  const [isChatPanelOpen, setIsChatPanelOpen] = useState(true)
+  const [rightPanelOpen, setRightPanelOpen] = useState(false)
   const [mobileTab, setMobileTab] = useState('chat') // 'chat' | 'tool'
   const [isToolMaximized, setIsToolMaximized] = useState(false)
   const [generationStage, setGenerationStage] = useState(null)
@@ -309,6 +874,218 @@ export default function Learningplayground() {
   const [isLoading, setIsLoading] = useState(false)
   const [isChatListening, setIsChatListening] = useState(false)
   const chatRecognitionRef = useRef(null)
+  const [canvasNodes, setCanvasNodes, onCanvasNodesChange] = useNodesState([])
+  const [canvasUserNotes, setCanvasUserNotes] = useState([])
+  const saveTimeoutRef = useRef({})
+
+  // Fetch canvas notes from backend API on mount or when active session changes
+  const fetchCanvasNotes = async () => {
+    if (!session?.access_token) {
+      // Load from localStorage for guest / offline mode
+      try {
+        const localKey = `canvas_notes_${user?.id || 'guest'}_${activeChatId || 'global'}`
+        const localData = localStorage.getItem(localKey)
+        if (localData) {
+          setCanvasUserNotes(JSON.parse(localData))
+        } else {
+          setCanvasUserNotes([])
+        }
+      } catch (err) {
+        console.error('Failed to load local canvas notes:', err)
+      }
+      return
+    }
+
+    try {
+      const url = activeChatId
+        ? `${API_BASE}/api/canvas/notes?sessionId=${activeChatId}`
+        : `${API_BASE}/api/canvas/notes`
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: 'include',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data.data)) {
+          const mapped = data.data.map((n) => ({
+            id: String(n.id),
+            type: n.type || 'sticky',
+            title: n.title || '',
+            content: n.content || '',
+            items: Array.isArray(n.items) ? n.items : [],
+            color: n.color || 'yellow',
+            position: { x: Number(n.position_x) || 100, y: Number(n.position_y) || 100 },
+            width: Number(n.width) || 260,
+            height: Number(n.height) || 220,
+            isPinned: Boolean(n.is_pinned),
+            sessionId: n.session_id,
+          }))
+          setCanvasUserNotes(mapped)
+          const localKey = `canvas_notes_${user?.id || 'guest'}_${activeChatId || 'global'}`
+          localStorage.setItem(localKey, JSON.stringify(mapped))
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch canvas notes from backend:', err)
+    }
+  }
+
+  useEffect(() => {
+    fetchCanvasNotes()
+  }, [session?.access_token, activeChatId])
+
+  // Debounced sync for a single note to DB and localStorage
+  const debouncedSyncNote = (note) => {
+    const localKey = `canvas_notes_${user?.id || 'guest'}_${activeChatId || 'global'}`
+    setCanvasUserNotes((prev) => {
+      const exists = prev.some((n) => n.id === note.id)
+      const updated = exists ? prev.map((n) => (n.id === note.id ? { ...n, ...note } : n)) : [...prev, note]
+      try {
+        localStorage.setItem(localKey, JSON.stringify(updated))
+      } catch { }
+      return updated
+    })
+
+    if (!session?.access_token) return
+
+    if (saveTimeoutRef.current[note.id]) {
+      clearTimeout(saveTimeoutRef.current[note.id])
+    }
+
+    saveTimeoutRef.current[note.id] = setTimeout(async () => {
+      try {
+        await fetch(`${API_BASE}/api/canvas/notes`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            id: note.id,
+            sessionId: activeChatId || null,
+            type: note.type || 'sticky',
+            title: note.title || '',
+            content: note.content || '',
+            items: note.items || [],
+            color: note.color || 'yellow',
+            positionX: note.position?.x ?? 100,
+            positionY: note.position?.y ?? 100,
+            width: note.width ?? 260,
+            height: note.height ?? 220,
+            isPinned: Boolean(note.isPinned),
+          }),
+        })
+      } catch (err) {
+        console.error('Failed to sync canvas note to DB:', err)
+      }
+    }, 500)
+  }
+
+  const handleAddStickyNote = (x = 350, y = 140) => {
+    const newNote = {
+      id: `sticky_${Date.now()}`,
+      type: 'sticky',
+      title: '',
+      content: '',
+      color: 'yellow',
+      position: { x, y },
+      width: 260,
+      height: 220,
+      isPinned: false,
+      sessionId: activeChatId || null,
+    }
+    setCanvasUserNotes((prev) => [...prev, newNote])
+    debouncedSyncNote(newNote)
+  }
+
+  const handleAddPinNode = (x = 380, y = 160) => {
+    const newPin = {
+      id: `pin_${Date.now()}`,
+      type: 'pin',
+      title: 'Key Formula / Concept',
+      content: '',
+      position: { x, y },
+      isPinned: true,
+      sessionId: activeChatId || null,
+    }
+    setCanvasUserNotes((prev) => [...prev, newPin])
+    debouncedSyncNote(newPin)
+  }
+
+  const handleAddChecklistNode = (x = 400, y = 180) => {
+    const newChecklist = {
+      id: `check_${Date.now()}`,
+      type: 'checklist',
+      title: 'Study Milestones',
+      items: [
+        { id: '1', text: 'Revise core concepts', done: false },
+        { id: '2', text: 'Practice 10 flashcards', done: false },
+      ],
+      position: { x, y },
+      sessionId: activeChatId || null,
+    }
+    setCanvasUserNotes((prev) => [...prev, newChecklist])
+    debouncedSyncNote(newChecklist)
+  }
+
+  const handleUpdateUserNote = (noteId, updates) => {
+    setCanvasUserNotes((prev) => {
+      const note = prev.find((n) => n.id === noteId)
+      if (!note) return prev
+      const updatedNote = { ...note, ...updates }
+      debouncedSyncNote(updatedNote)
+      return prev.map((n) => (n.id === noteId ? updatedNote : n))
+    })
+  }
+
+  const handleDeleteUserNote = async (noteId) => {
+    setCanvasUserNotes((prev) => {
+      const remaining = prev.filter((n) => n.id !== noteId)
+      const localKey = `canvas_notes_${user?.id || 'guest'}_${activeChatId || 'global'}`
+      try {
+        localStorage.setItem(localKey, JSON.stringify(remaining))
+      } catch { }
+      return remaining
+    })
+
+    if (session?.access_token) {
+      try {
+        await fetch(`${API_BASE}/api/canvas/notes/${noteId}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          credentials: 'include',
+        })
+      } catch (err) {
+        console.error('Failed to delete canvas note from DB:', err)
+      }
+    }
+  }
+
+  const onCustomCanvasNodesChange = (changes) => {
+    onCanvasNodesChange(changes)
+  }
+
+  const handleNodeDragStop = (event, node) => {
+    if (!node || !node.id || !node.position) return
+    if (node.id.startsWith('sticky_') || node.id.startsWith('pin_') || node.id.startsWith('check_') || node.id.length === 36) {
+      handleUpdateUserNote(node.id, { position: node.position })
+    }
+  }
+
+  const handleCanvasDoubleClick = (e) => {
+    if (e.target.closest('.nodrag') || e.target.closest('.canvas-node') || e.target.closest('.canvas-sticky-note') || e.target.closest('.canvas-pin-node') || e.target.closest('.canvas-checklist-node') || e.target.closest('button')) {
+      return
+    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = Math.max(40, e.clientX - rect.left - 130)
+    const y = Math.max(40, e.clientY - rect.top - 100)
+    handleAddStickyNote(x, y)
+  }
 
   const toggleChatVoiceInput = () => {
     if (isChatListening) {
@@ -547,10 +1324,74 @@ export default function Learningplayground() {
   const textareaRef = useRef(null)
   const toolContainerRef = useRef(null)
   const fileInputRef = useRef(null)
+  const activeHtml = extractToolHtml(generatedTool)
+  const activeMeta = extractToolMetadata(generatedTool)
+  const isSidebarExpanded = sidebarOpen || isSidebarHovered
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
   }, [messages, isLoading])
+
+  useEffect(() => {
+    setCanvasNodes((prevNodes) => {
+      const previousPositions = new Map(prevNodes.map((node) => [node.id, node.position]))
+      const getPosition = (id, fallback) => previousPositions.get(id) || fallback
+      const nextNodes = []
+
+      // Welcome card on clean canvas when empty
+      if (!generatedTool && !isLoading && !rightPanelOpen && messages.length === 0) {
+        nextNodes.push({
+          id: 'welcome-card',
+          type: 'welcome',
+          position: getPosition('welcome-card', { x: 100, y: 100 }),
+          dragHandle: '.canvas-node-drag-handle',
+          data: {
+            quickActions: suggestions,
+            onSelectSuggestion: (prompt) => handleSendMessage(prompt),
+          },
+        })
+      }
+
+      if (rightPanelOpen || generatedTool || isLoading) {
+        nextNodes.push({
+          id: 'workspace-tool',
+          type: 'tool',
+          position: getPosition('workspace-tool', { x: 80, y: 100 }),
+          dragHandle: '.canvas-node-drag-handle',
+          data: {
+            title: generatedTool ? activeMeta.title : (isLoading ? 'Building your tool' : 'Canvas workspace'),
+            toolType: generatedTool ? activeMeta.toolType : '',
+            html: activeHtml,
+            hasTool: Boolean(generatedTool),
+            loading: isLoading,
+            stage: generationStage,
+            phase: buildPhase,
+            onExpand: generatedTool ? () => setIsToolMaximized(true) : null,
+            onClose: generatedTool ? handleUnloadTool : null,
+          },
+        })
+      }
+
+      // Add all personal sticky notes, pins, and checklists to canvas
+      canvasUserNotes.forEach((note) => {
+        nextNodes.push({
+          id: note.id,
+          type: note.type || 'sticky',
+          position: getPosition(note.id, note.position || { x: 300, y: 150 }),
+          dragHandle: '.canvas-node-drag-handle',
+          data: {
+            ...note,
+            onUpdate: handleUpdateUserNote,
+            onDelete: handleDeleteUserNote,
+          },
+        })
+      })
+
+      return nextNodes
+    })
+  }, [generatedTool, rightPanelOpen, isLoading, generationStage, buildPhase, activeHtml, activeMeta.title, activeMeta.toolType, suggestions, messages.length, canvasUserNotes])
 
   // Automatically fetch database tools on mount / auth state change
   useEffect(() => {
@@ -1801,6 +2642,7 @@ export default function Learningplayground() {
     setMessages(chatSession.messages || [])
     setGeneratedTool(chatSession.generatedTool || null)
     setAttachedDocument(chatSession.attachedDocument || null)
+    setIsChatPanelOpen(true)
     if (chatSession.generatedTool) {
       setRightPanelOpen(true)
     }
@@ -1826,9 +2668,6 @@ export default function Learningplayground() {
     setGeneratedTool(null)
   }
 
-  const activeHtml = extractToolHtml(generatedTool)
-  const activeMeta = extractToolMetadata(generatedTool)
-
   const filteredChats = chatHistory.filter((c) =>
     (c.title || 'Previous Chat').toLowerCase().includes(searchQuery.toLowerCase())
   )
@@ -1843,35 +2682,35 @@ export default function Learningplayground() {
     return meta.title.toLowerCase().includes(searchQuery.toLowerCase())
   })
   return (
-    <div className="flex-1 h-0 w-full relative bg-[#080c14] text-[#f1f5f9] flex overflow-hidden font-sans">
-      <DotGrid />
+    <div className="flex-1 h-0 w-full relative bg-slate-900 text-slate-100 flex overflow-hidden font-sans">
 
-      {/* Left ChatGPT-Style Sidebar */}
+      {/* Left Sidebar */}
       <aside
-        className={`relative z-30 bg-[#080c14] border-r border-[#162032] flex flex-col transition-all duration-300 ${sidebarOpen ? 'w-64 sm:w-68' : 'w-0 border-r-0 overflow-hidden'
-          }`}
+        onMouseEnter={() => setIsSidebarHovered(true)}
+        onMouseLeave={() => setIsSidebarHovered(false)}
+        className={`group/sidebar relative z-30 bg-slate-900 border-r border-slate-800 flex flex-col overflow-hidden transition-[width,transform] duration-300 ${sidebarOpen ? 'w-[17rem] translate-x-0' : 'w-0 -translate-x-full border-r-0'
+          } lg:w-[4.75rem] lg:translate-x-0 lg:border-r lg:border-slate-800 lg:hover:w-[17rem]`}
       >
         {/* Top Header in Sidebar */}
-        {/* Top Header in Sidebar */}
-        <div className="p-3.5 flex items-center justify-between gap-2 border-b border-[#162032]">
+        <div className="p-3.5 flex items-center justify-between gap-2 border-b border-slate-800">
           <div className="flex items-center gap-2.5 min-w-0">
             <Vela size={22} className="flex-shrink-0" />
-            <span className="font-bold text-xs sm:text-sm text-white tracking-tight truncate">
+            <span className={`font-bold text-xs sm:text-sm text-white tracking-tight truncate transition-all duration-200 ${isSidebarExpanded ? 'opacity-100 max-w-[180px]' : 'lg:max-w-0 lg:opacity-0'}`}>
               Learning Playground
             </span>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className={`flex items-center gap-1 transition-all duration-200 ${isSidebarExpanded ? 'opacity-100' : 'lg:pointer-events-none lg:opacity-0'}`}>
             <button
               onClick={() => setShowSidebarSearch(!showSidebarSearch)}
-              className="p-1.5 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#131c2e] transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
               title="Search"
             >
               <Search className="w-4 h-4" />
             </button>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="p-1.5 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#131c2e] transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors lg:hidden"
               title="Close Sidebar"
             >
               <PanelLeftClose className="w-4 h-4" />
@@ -1879,329 +2718,211 @@ export default function Learningplayground() {
           </div>
         </div>
 
-        {/* Primary Action Buttons */}
-        <div className="p-3 space-y-1.5 border-b border-[#162032]">
+        {/* 1. [+] New Chat Button (Prominent Action Button) */}
+        <div className="p-3 border-b border-slate-800 flex-shrink-0">
           <button
             onClick={handleStartNewSession}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[#131c2e] hover:bg-[#19243b] border border-[#1e2d45] text-xs font-semibold text-white transition-all group shadow-sm"
+            className={`w-full flex items-center rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs py-2.5 transition-colors shadow-sm ${isSidebarExpanded ? 'px-3 justify-center gap-2' : 'justify-center px-2'}`}
+            title="Start a new study chat"
           >
-            <Plus className="w-4 h-4 text-[#38bdf8] group-hover:scale-110 transition-transform" />
-            <span>New chat</span>
-          </button>
-        </div>
-
-        {/* Core Navigation Items */}
-        <div className="px-2 pt-2 space-y-0.5 text-xs text-[#94a3b8] border-b border-[#162032] pb-2">
-          <button
-            onClick={() => setActiveNavSection('chats')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'chats'
-              ? 'bg-[#131c2e] text-white font-semibold'
-              : 'hover:bg-[#131c2e]/70 hover:text-white'
-              }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <MessageSquare className="w-4 h-4 text-[#38bdf8]" />
-              <span>Chats</span>
-            </div>
-            {chatHistory.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#3b82f6]/20 text-[#38bdf8] font-mono">
-                {chatHistory.length}
-              </span>
-            )}
-          </button>
-
-          <Link
-            to="/tools"
-            className="w-full px-3 py-2 rounded-lg text-xs font-medium text-[#94a3b8] hover:bg-[#131c2e]/70 hover:text-white flex items-center gap-2.5 transition-all"
-          >
-            <Wrench className="w-4 h-4 text-[#38bdf8]" />
-            <span>Tools Studio</span>
-          </Link>
-
-          <button
-            onClick={() => setShowMarketplaceExplorer(true)}
-            className="w-full px-3 py-2 rounded-lg text-xs font-medium text-[#94a3b8] hover:bg-[#131c2e]/70 hover:text-white flex items-center justify-between transition-all"
-            title="Browse Community Marketplace Tools"
-          >
-            <div className="flex items-center gap-2.5">
-              <Globe className="w-4 h-4 text-[#38bdf8]" />
-              <span>Marketplace</span>
-            </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#3b82f6]/20 text-[#38bdf8] font-mono">
-              {marketplaceTools.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveNavSection('saved-tools')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'saved-tools'
-              ? 'bg-[#131c2e] text-white font-semibold'
-              : 'hover:bg-[#131c2e]/70 hover:text-white'
-              }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <Bookmark className="w-4 h-4 text-[#38bdf8]" />
-              <span>Saved Tools</span>
-            </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1e293b] text-[#8493a8] font-mono">
-              {savedTools.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveNavSection('shared-with-me')
-              fetchSharedTools()
-            }}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'shared-with-me'
-              ? 'bg-[#131c2e] text-white font-semibold'
-              : 'hover:bg-[#131c2e]/70 hover:text-white'
-              }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <Share2 className="w-4 h-4 text-[#38bdf8]" />
-              <span>Shared with me</span>
-            </div>
-            {sharedTools.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono">
-                {sharedTools.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveNavSection('community')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-all ${activeNavSection === 'community'
-              ? 'bg-[#131c2e] text-white font-semibold'
-              : 'hover:bg-[#131c2e]/70 hover:text-white'
-              }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <Sparkles className="w-4 h-4 text-[#38bdf8]" />
-              <span>Community Library</span>
-            </div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1e293b] text-[#8493a8] font-mono">
-              {marketplaceTools.length}
+            <Plus className="w-4 h-4 flex-shrink-0" />
+            <span className={`transition-all duration-200 whitespace-nowrap ${isSidebarExpanded ? 'opacity-100 max-w-[140px]' : 'lg:max-w-0 lg:overflow-hidden lg:opacity-0'}`}>
+              New Chat
             </span>
           </button>
         </div>
-
 
         {/* Search Bar (Collapsible) */}
-        {showSidebarSearch && (
-          <div className="px-3 pt-2 pb-1">
+        {showSidebarSearch && isSidebarExpanded && (
+          <div className="px-3 pt-2 pb-1 border-b border-slate-800">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-[#64748b]" />
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={
-                  activeNavSection === 'chats'
-                    ? 'Search chats...'
-                    : activeNavSection === 'saved-tools'
-                      ? 'Search saved tools...'
-                      : 'Search community...'
-                }
-                className="w-full bg-[#131c2e] border border-[#1e2b45] rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-[#64748b] focus:outline-none focus:border-[#38bdf8]"
+                placeholder="Search chats & tools..."
+                className="w-full bg-slate-800/80 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 autoFocus
               />
             </div>
           </div>
         )}
 
-        {/* Scrollable Recents / Conversations & Tools List */}
-        <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1 scrollbar-thin">
-          {activeNavSection === 'chats' && (
-            <div>
-              <div className="px-2 pt-1 pb-1.5 flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#8493a8] uppercase tracking-wider">
-                  Recents
-                </span>
-                <Clock className="w-3 h-3 text-[#64748b]" />
+        {/* Scrollable Sidebar Content */}
+        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-4 scrollbar-thin">
+          {!isSidebarExpanded ? (
+            <div className="hidden h-full items-center justify-center lg:flex">
+              <div className="rounded-xl border border-dashed border-slate-700 bg-slate-800/40 px-2 py-5 text-[10px] uppercase tracking-[0.22em] text-slate-400 [writing-mode:vertical-rl] rotate-180">
+                Menu
               </div>
-
-              {filteredChats.length === 0 ? (
-                <p className="px-3 py-3 text-xs text-[#64748b]">No previous chats found.</p>
-              ) : (
-                filteredChats.map((chat) => {
-                  const isActive = activeChatId === chat.id
-                  return (
-                    <div
-                      key={chat.id}
-                      onClick={() => loadChatSession(chat)}
-                      className={`group px-3 py-2 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
-                        ? 'bg-[#131c2e] text-white font-medium border border-[#1e2b45]'
-                        : 'text-[#94a3b8] hover:bg-[#131c2e]/60 hover:text-white'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                        <MessageSquare className="w-3.5 h-3.5 text-[#38bdf8] flex-shrink-0" />
-                        <span className="truncate">{chat.title || 'Previous Chat'}</span>
-                      </div>
-
-                      <button
-                        onClick={(e) => deleteChatSession(chat.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-[#64748b] transition-opacity rounded-md"
-                        title="Delete chat thread"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )
-                })
-              )}
             </div>
-          )}
-
-          {activeNavSection === 'saved-tools' && (
-            <div>
-              <div className="px-2 pt-1 pb-1.5">
-                <span className="text-[11px] font-semibold text-[#8493a8] uppercase tracking-wider">
-                  Saved Tools
-                </span>
-              </div>
-              {isLoadingSavedTools ? (
-                <p className="px-3 py-2 text-xs text-[#64748b]">Loading saved tools...</p>
-              ) : filteredSavedTools.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-[#64748b]">No saved tools found.</p>
-              ) : (
-                filteredSavedTools.map((tool) => {
-                  const meta = extractToolMetadata(tool)
-                  const isActive = generatedTool?.id === tool.id
-                  return (
-                    <div
-                      key={tool.id}
-                      onClick={() => selectTool(tool)}
-                      className={`group px-3 py-2 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
-                        ? 'bg-[#131c2e] text-white font-medium border border-[#1e2b45]'
-                        : 'text-[#94a3b8] hover:bg-[#131c2e]/60 hover:text-white'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                        <Wrench className="w-3.5 h-3.5 text-[#38bdf8] flex-shrink-0" />
-                        <span className="truncate">{meta.title}</span>
-                      </div>
-
-                      <button
-                        onClick={(e) => handleDeleteTool(tool.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-[#64748b] transition-opacity rounded-md"
-                        title="Delete tool"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          )}
-
-          {activeNavSection === 'shared-with-me' && (
-            <div>
-              <div className="px-2 pt-1 pb-1.5 flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-[#8493a8] uppercase tracking-wider">
-                  Shared With Me
-                </span>
-                <Share2 className="w-3 h-3 text-[#64748b]" />
-              </div>
-              {isLoadingSharedTools ? (
-                <p className="px-3 py-2 text-xs text-[#64748b]">Loading shared tools...</p>
-              ) : sharedTools.length === 0 ? (
-                <div className="px-3 py-4 text-center">
-                  <p className="text-xs text-[#64748b] mb-1">No tools shared with you yet.</p>
-                  <p className="text-[10px] text-[#475569]">When classmates share a tool with your email, it appears here!</p>
+          ) : (
+            <>
+              {/* ── 1. YOUR WORKSPACE ── */}
+              <div>
+                <div className="px-2 pb-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    Your Workspace
+                  </span>
                 </div>
-              ) : (
-                sharedTools.map((sTool) => {
-                  const meta = extractToolMetadata(sTool.generated_tool || sTool)
-                  const isActive = generatedTool?.id === sTool.id
-                  return (
-                    <div
-                      key={sTool.id || sTool.share_id}
-                      onClick={() => selectTool(sTool.generated_tool || sTool)}
-                      className={`group px-3 py-2 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
-                        ? 'bg-[#131c2e] text-white font-medium border border-[#1e2b45]'
-                        : 'text-[#94a3b8] hover:bg-[#131c2e]/60 hover:text-white'
-                        }`}
-                    >
-                      <div className="flex flex-col min-w-0 pr-2">
-                        <span className="truncate font-semibold text-white">{sTool.title || meta.title}</span>
-                        {sTool.sender_email && (
-                          <span className="text-[10px] text-[#38bdf8]/80 truncate">From: {sTool.sender_email}</span>
-                        )}
-                      </div>
 
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleSaveActiveToolToLibrary(sTool.generated_tool || sTool)
-                        }}
-                        className="p-1 px-2 text-[10px] rounded-md bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-white transition-all font-semibold shadow-sm flex-shrink-0"
-                        title="Save to My Library"
-                      >
-                        Save
-                      </button>
+                <div className="space-y-0.5">
+                  <Link
+                    to="/tools?tab=my-tools"
+                    className={`w-full px-2.5 py-2 rounded-md text-xs flex items-center justify-between transition-colors ${
+                      location.pathname === '/tools' && location.search.includes('tab=my-tools')
+                        ? 'bg-slate-800 text-white font-semibold border border-slate-700'
+                        : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Bookmark className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                      <span className="truncate">📁 My Tools</span>
                     </div>
-                  )
-                })
-              )}
-            </div>
-          )}
+                    {savedTools.length > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">
+                        {savedTools.length}
+                      </span>
+                    )}
+                  </Link>
 
-          {activeNavSection === 'community' && (
-
-            <div>
-              <div className="px-2 pt-1 pb-1.5">
-                <span className="text-[11px] font-semibold text-[#8493a8] uppercase tracking-wider">
-                  Community Library
-                </span>
+                  <Link
+                    to="/tools?tab=shared"
+                    className={`w-full px-2.5 py-2 rounded-md text-xs flex items-center justify-between transition-colors ${
+                      location.pathname === '/tools' && location.search.includes('tab=shared')
+                        ? 'bg-slate-800 text-white font-semibold border border-slate-700'
+                        : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Share2 className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                      <span className="truncate">Shared with Me</span>
+                    </div>
+                    {sharedTools.length > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">
+                        {sharedTools.length}
+                      </span>
+                    )}
+                  </Link>
+                </div>
               </div>
-              {isLoadingMarketplaceTools ? (
-                <p className="px-3 py-2 text-xs text-[#64748b]">Loading community tools...</p>
-              ) : filteredMarketplaceTools.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-[#64748b]">No community tools available.</p>
-              ) : (
-                filteredMarketplaceTools.map((mTool) => {
-                  const meta = extractToolMetadata(mTool)
-                  const isActive = generatedTool?.id === mTool.id
-                  return (
-                    <div
-                      key={mTool.id}
-                      onClick={() => selectTool(mTool)}
-                      className={`group px-3 py-2 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${isActive
-                        ? 'bg-[#131c2e] text-white font-medium border border-[#1e2b45]'
-                        : 'text-[#94a3b8] hover:bg-[#131c2e]/60 hover:text-white'
-                        }`}
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                        <Sparkles className="w-3.5 h-3.5 text-[#38bdf8] flex-shrink-0" />
-                        <span className="truncate">{meta.title}</span>
-                      </div>
 
-                      <button className="opacity-0 group-hover:opacity-100 px-2 py-0.5 text-[10px] font-semibold rounded-md bg-[#3b82f6]/20 text-[#38bdf8] transition-opacity">
-                        Load
+              {/* ── 2. LIBRARY ── */}
+              <div>
+                <div className="px-2 pb-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    Library
+                  </span>
+                </div>
+
+                <div className="space-y-0.5">
+                  <Link
+                    to="/tools?tab=marketplace"
+                    className={`w-full px-2.5 py-2 rounded-md text-xs flex items-center justify-between transition-colors ${
+                      location.pathname === '/tools' && location.search.includes('tab=marketplace')
+                        ? 'bg-slate-800 text-white font-semibold border border-slate-700'
+                        : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Globe className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                      <span className="truncate">Marketplace</span>
+                    </div>
+                    {marketplaceTools.length > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">
+                        {marketplaceTools.length}
+                      </span>
+                    )}
+                  </Link>
+
+                  <button
+                    onClick={() => setShowUploadModal(true)}
+                    className="w-full px-2.5 py-2 rounded-md text-xs text-left text-slate-300 hover:bg-slate-800/60 hover:text-white flex items-center gap-2 transition-colors"
+                    title="Import notes, lecture slides, or documents"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                    <span className="truncate">Import from Drive</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-slate-800 my-2" />
+
+              {/* ── 3. HISTORY ── */}
+              <div>
+                <div className="px-2 pb-1.5 flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    History
+                  </span>
+                  <Clock className="w-3 h-3 text-slate-500" />
+                </div>
+
+                <div className="space-y-0.5">
+                  {filteredChats.length === 0 ? (
+                    <div className="space-y-0.5">
+                      <button
+                        onClick={() => handleSendMessage('Organic Chemistry reaction mechanisms')}
+                        className="w-full px-2.5 py-1.5 rounded-md text-xs text-left text-slate-400 hover:text-white hover:bg-slate-800/60 truncate transition-colors flex items-center gap-2"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                        <span className="truncate">Organic Chemistry</span>
+                      </button>
+                      <button
+                        onClick={() => handleSendMessage('Calculus II integration techniques and practice')}
+                        className="w-full px-2.5 py-1.5 rounded-md text-xs text-left text-slate-400 hover:text-white hover:bg-slate-800/60 truncate transition-colors flex items-center gap-2"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                        <span className="truncate">Calculus II</span>
                       </button>
                     </div>
-                  )
-                })
-              )}
-            </div>
+                  ) : (
+                    filteredChats.slice(0, 5).map((chat) => {
+                      const isActive = activeChatId === chat.id
+                      return (
+                        <div
+                          key={chat.id}
+                          onClick={() => loadChatSession(chat)}
+                          className={`group px-2.5 py-1.5 rounded-md text-xs flex items-center justify-between cursor-pointer transition-all ${
+                            isActive
+                              ? 'bg-slate-800 text-white font-medium border border-slate-700'
+                              : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0 pr-1">
+                            <MessageSquare className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                            <span className="truncate">{chat.title || 'Previous Chat'}</span>
+                          </div>
+                          <button
+                            onClick={(e) => deleteChatSession(chat.id, e)}
+                            className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-400 text-slate-500 transition-opacity rounded"
+                            title="Delete chat"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            </>
           )}
         </div>
 
         {/* User Profile Footer */}
-        <div className="p-3 border-t border-[#162032] bg-[#080c14] flex items-center justify-between">
+        <div className="p-3 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-full bg-[#1e293b] border border-[#334155] flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm">
+            <div className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm">
               {user?.email ? user.email.charAt(0).toUpperCase() : 'G'}
             </div>
-            <div className="min-w-0">
+            <div className={`min-w-0 transition-all duration-200 ${isSidebarExpanded ? 'opacity-100 max-w-[120px]' : 'lg:max-w-0 lg:overflow-hidden lg:opacity-0'}`}>
               <p className="font-semibold text-xs text-white truncate max-w-[110px]">
                 {user?.email ? user.email.split('@')[0] : 'Guest User'}
               </p>
-              <p className="text-[10px] text-[#64748b] truncate">
-                {user ? 'Unlimited Plan' : 'Free Plan'}
+              <p className="text-[10px] text-slate-500 truncate">
+                {user ? 'Free Plan' : 'Not signed in'}
               </p>
             </div>
           </div>
@@ -2215,447 +2936,420 @@ export default function Learningplayground() {
               setAttachedDocument(null)
               if (signOut) await signOut()
             }}
-            className="p-1.5 rounded-lg hover:bg-[#131c2e] text-[#64748b] hover:text-red-400 transition-colors"
-            title="Sign Out"
+            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-red-400 transition-colors"
+            title="Sign out"
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
       </aside>
 
-      {/* Main Center & Canvas Workspace */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative z-10 bg-[#080c14]">
+      {/* Floating Left Chat Panel (Collapsible) */}
+      <div
+        className={`relative z-20 flex flex-col bg-[#10151f]/95 backdrop-blur-xl transition-[width,transform,margin,opacity] duration-300 flex-shrink-0 overflow-hidden ${
+          isChatPanelOpen
+            ? 'w-[calc(100%-1rem)] sm:w-[380px] lg:w-[420px] translate-x-0 m-2 sm:my-3 sm:ml-3 sm:mr-1.5 h-[calc(100%-1rem)] sm:h-[calc(100%-1.5rem)] rounded-2xl border border-[#223247] shadow-2xl shadow-black/40'
+            : 'w-0 m-0 -translate-x-full h-full border-0 pointer-events-none'
+        }`}
+      >
+        {/* Chat Panel Header */}
+        <div className="p-3 sm:p-3.5 flex items-center justify-between gap-2 border-b border-[#223247] bg-[#0c1017]">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-[#16263d] border border-[#223247] flex items-center justify-center flex-shrink-0">
+              <Vela size={16} />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-xs sm:text-sm font-semibold text-white truncate">
+                {chatHistory.find((c) => c.id === activeChatId)?.title || 'Study Assistant'}
+              </h2>
+              <p className="text-[10px] text-[#7f93ad] truncate">
+                {messages.length > 0 ? `${messages.length} message${messages.length === 1 ? '' : 's'}` : 'Interactive session'}
+              </p>
+            </div>
+          </div>
 
-        {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#141c2e]/60 bg-[#080c14] flex-shrink-0 z-20">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleStartNewSession}
+              className="p-1.5 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#21262E] transition-colors"
+              title="New Chat"
+            >
+              <SquarePen className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setIsChatPanelOpen(false)}
+              className="p-1.5 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#21262E] transition-colors"
+              title="Hide Chat"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable Messages Thread */}
+        <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-4">
+          {messages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center px-2 py-6">
+              <div className="w-12 h-12 rounded-2xl bg-[#16263d]/80 border border-[#223247] flex items-center justify-center text-white mb-3 shadow-lg">
+                <Vela size={28} />
+              </div>
+              <h3 className="text-sm sm:text-base font-semibold text-white">How can I help you study?</h3>
+              <p className="text-xs text-[#8493a8] mt-1 max-w-xs leading-relaxed">
+                Prompt to build custom revision tools, quizzes, flashcards, diagrams, or ask any concept question.
+              </p>
+
+              <div className="w-full mt-6 space-y-2">
+                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 text-left px-1 mb-1.5">
+                  Suggested Prompts
+                </div>
+                {suggestions.slice(0, 3).map((action) => (
+                  <button
+                    key={action.id}
+                    onClick={() => handleSendMessage(action.prompt)}
+                    className="w-full text-left p-3 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700/80 hover:border-slate-600 transition-all group"
+                  >
+                    <div className="flex items-center gap-2 text-xs font-semibold text-white group-hover:text-blue-300">
+                      <Lightbulb className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                      <span>{action.title}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">{action.prompt}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            messages.map((m, idx) => {
+              const isUser = m.role === 'user'
+              return (
+                <div key={m.id || idx} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+                  {isUser ? (
+                    <div className="max-w-[88%] bg-[#21262E] border border-[#282E38] text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed shadow-sm">
+                      <p className="whitespace-pre-wrap">{m.content}</p>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2.5 max-w-[95%]">
+                      <div className="w-6 h-6 rounded-full bg-[#16263d] border border-[#223247] flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                        <Vela size={14} />
+                      </div>
+                      <div className="flex-1 min-w-0 bg-[#0e1626]/90 border border-[#1b2b40] rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs sm:text-sm text-[#e2e8f0] leading-relaxed shadow-sm space-y-2">
+                        <p className="whitespace-pre-wrap">{m.content}</p>
+                        {m.attachedTool && (
+                          <div className="mt-2.5 pt-2.5 border-t border-[#1e2e45] flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 text-[11px] text-[#93c5fd] font-semibold truncate">
+                              <Wrench className="w-3.5 h-3.5 text-[#3b82f6] flex-shrink-0" />
+                              <span className="truncate">{extractToolMetadata(m.attachedTool).title || 'Interactive Tool'}</span>
+                            </div>
+                            <button
+                              onClick={() => selectTool(m.attachedTool)}
+                              className="px-2.5 py-1 text-[11px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-lg transition-colors flex-shrink-0 shadow-sm"
+                            >
+                              View Tool
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          )}
+
+          {isLoading && (
+            <div className="flex items-start gap-2.5 max-w-[95%]">
+              <div className="w-6 h-6 rounded-full bg-[#16263d] border border-[#223247] flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm animate-pulse">
+                <Vela size={14} />
+              </div>
+              <div className="bg-[#0e1626]/90 border border-[#1b2b40] rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs text-[#9fb0c5] shadow-sm flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#5A7D99] animate-ping" />
+                <span>{generationStage || 'Thinking and generating tool...'}</span>
+              </div>
+            </div>
+          )}
+
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Docked Composer at Bottom of Chat Panel */}
+        <div className="p-3 sm:p-3.5 border-t border-[#223247] bg-[#0c1017]">
+          {attachedDocument && (
+            <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-[#3b82f6]/40 bg-[#5A7D99]/20 px-2.5 py-1 text-xs text-[#93c5fd]">
+              <span className="flex items-center gap-1.5 truncate">
+                <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                <span className="truncate">{attachedDocument.title}</span>
+              </span>
+              <button
+                onClick={() => setAttachedDocument(null)}
+                className="text-[#bfdbfe] hover:text-white flex-shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-[#223247] bg-[#141b29] p-2 focus-within:border-[#385677] transition-colors">
+            <textarea
+              ref={textareaRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSendMessage()
+                }
+              }}
+              placeholder="Ask a question or build a study tool..."
+              className="w-full resize-none border-none bg-transparent py-1 text-xs sm:text-sm text-white placeholder-[#7f93ad] focus:outline-none min-h-[36px] max-h-28"
+              rows={1}
+            />
+
+            <div className="mt-1.5 flex items-center justify-between gap-1.5 border-t border-[#1d293d] pt-1.5">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(true)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#8493a8] hover:bg-[#1f2e45] hover:text-white transition-colors"
+                  title="Attach file, PDF, audio, or YouTube"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleChatVoiceInput}
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                    isChatListening ? 'bg-red-500 text-white animate-pulse' : 'text-[#8493a8] hover:bg-[#1f2e45] hover:text-white'
+                  }`}
+                  title="Voice Input (Whisper)"
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <button
+                onClick={() => handleSendMessage()}
+                disabled={isLoading || !inputValue.trim()}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#5A7D99] hover:bg-[#3D5E7A] text-white transition-all disabled:opacity-40 disabled:hover:bg-[#5A7D99]"
+                title="Send prompt"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Center & Canvas Workspace */}
+      <div className="flex-1 min-w-0 h-full overflow-hidden relative z-10" ref={toolContainerRef}>
+        <div className="absolute left-3 right-3 top-3 z-20 flex items-start justify-between gap-3 pointer-events-none">
+          <div className="flex items-center gap-2 pointer-events-auto">
             {!sidebarOpen && (
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="p-1.5 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#131c2e] transition-colors"
+                className="rounded-lg border border-slate-700 bg-slate-800/95 p-2 text-slate-300 shadow-md transition-colors hover:bg-slate-700 hover:text-white lg:hidden"
                 title="Open Sidebar"
               >
                 <PanelLeft className="w-4 h-4" />
               </button>
             )}
+          </div>
+
+          <div className="flex items-center gap-2 pointer-events-auto">
+            {/* Canvas Notes & Pins Toolbar */}
+            <div className="flex items-center gap-1 bg-slate-800/95 border border-slate-700 rounded-lg p-1 shadow-md">
+              <button
+                onClick={() => handleAddStickyNote(380, 140)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
+                title="Add a Sticky Note (or double-click canvas)"
+              >
+                <Plus className="w-3.5 h-3.5 text-amber-400" />
+                <span>Sticky Note</span>
+              </button>
+              <button
+                onClick={() => handleAddPinNode(420, 160)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
+                title="Pin a key formula or concept"
+              >
+                <Pin className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Formula Pin</span>
+              </button>
+              <button
+                onClick={() => handleAddChecklistNode(450, 180)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
+                title="Add a study checklist"
+              >
+                <CheckSquare className="w-3.5 h-3.5 text-blue-400" />
+                <span className="hidden sm:inline">Checklist</span>
+              </button>
+            </div>
 
             <button
               onClick={handleStartNewSession}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-[#cbd5e1] hover:text-white hover:bg-[#131c2e] transition-colors"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/95 px-3.5 py-2 text-xs font-semibold text-slate-200 shadow-md transition-colors hover:bg-slate-700 hover:text-white"
             >
               <SquarePen className="w-3.5 h-3.5" />
               <span>New chat</span>
             </button>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <button className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#0e1726] border border-[#1e2d45] text-xs font-semibold text-white hover:bg-[#182338] transition-all shadow-sm">
-              <Sparkles className="w-3.5 h-3.5 text-[#38bdf8]" />
-              <span>Upgrade</span>
-            </button>
-
+            
             <button
               onClick={() => setRightPanelOpen(!rightPanelOpen)}
-              className={`p-1.5 rounded-lg transition-colors ${rightPanelOpen ? 'text-[#38bdf8] bg-[#131c2e]' : 'text-[#8493a8] hover:text-white'}`}
+              className={`rounded-lg border px-3 py-2 text-xs font-semibold shadow-md transition-colors ${rightPanelOpen || generatedTool ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-700 bg-slate-800/95 text-slate-300 hover:bg-slate-700 hover:text-white'}`}
               title={rightPanelOpen ? 'Hide Tool Canvas' : 'Show Tool Canvas'}
             >
-              <PanelRight className="w-4 h-4" />
+              <span className="inline-flex items-center gap-1.5">
+                {rightPanelOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRight className="w-3.5 h-3.5" />}
+                <span>{rightPanelOpen ? 'Hide tool' : 'Show tool'}</span>
+              </span>
             </button>
           </div>
         </div>
 
-        {/* Center Workspace (Chat Stream + Interactive Canvas) */}
-        <div className="flex-1 flex overflow-hidden min-h-0 relative">
-
-          {/* Center Chat Stream Column */}
-          <div
-            className={`flex-1 flex flex-col h-full min-h-0 overflow-hidden min-w-0 bg-[#080c14] relative z-10 transition-all ${mobileTab === 'tool' ? 'hidden lg:flex' : 'flex'
-              }`}
-          >
-            {/* Conversation Stream */}
-            <div className="flex-1 overflow-y-auto min-h-0 px-4 py-6 space-y-4 max-w-3xl mx-auto w-full flex flex-col">
-              {messages.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center py-6 px-2">
-                  {/* ChatGPT Hero Title */}
-                  <h1 className="text-3xl font-semibold text-white mb-8 tracking-tight">
-                    Where should we begin?
-                  </h1>
-
-                  {/* Centered Large ChatGPT Input Pill Capsule */}
-                  <div className="w-full max-w-2xl bg-[#131c2e] border border-[#1f2d45] rounded-3xl p-3 shadow-2xl focus-within:border-[#38bdf8]/70 focus-within:shadow-[0_0_30px_rgba(56,189,248,0.15)] transition-all">
-                    {/* Top Input Row */}
-                    <div className="flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowUploadModal(true)}
-                        className="w-8 h-8 rounded-full bg-[#1b2740] hover:bg-[#243555] text-white flex items-center justify-center font-bold text-base transition-colors flex-shrink-0"
-                        title="Attach files, PDF, audio, or YouTube"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-
-                      <textarea
-                        ref={textareaRef}
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            handleSendMessage()
-                          }
-                        }}
-                        placeholder="Ask anything"
-                        className="flex-1 bg-transparent border-none focus:outline-none text-sm text-white placeholder-[#8493a8] resize-none py-1 max-h-32 min-h-[36px]"
-                        rows={1}
-                      />
-                    </div>
-
-                    {/* Bottom Action Controls Row inside Pill */}
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#1a263c]">
-                      <div className="flex items-center gap-2">
-                        {attachedDocument && (
-                          <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#3b82f6]/20 border border-[#3b82f6]/40 text-xs text-[#38bdf8]">
-                            <FileText className="w-3 h-3" />
-                            <span className="truncate max-w-[140px]">{attachedDocument.title}</span>
-                            <button onClick={() => setAttachedDocument(null)} className="hover:text-white ml-1">✕</button>
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {/* Voice Mic Button */}
-                        <button
-                          type="button"
-                          onClick={toggleChatVoiceInput}
-                          className={`p-1.5 rounded-full transition-colors ${isChatListening ? 'bg-red-500 text-white animate-pulse' : 'text-[#8493a8] hover:text-white hover:bg-[#1b2740]'}`}
-                          title="Voice Input (Whisper)"
-                        >
-                          <Mic className="w-4 h-4" />
-                        </button>
-
-                        {/* Send Button */}
-                        <button
-                          onClick={() => handleSendMessage()}
-                          disabled={isLoading || !inputValue.trim()}
-                          className="w-8 h-8 rounded-full bg-[#3b82f6] hover:bg-[#2563eb] text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105 disabled:opacity-40"
-                          title="Send prompt"
-                        >
-                          <Send className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Quick Action Prompt Items under Capsule */}
-                  <div className="flex flex-col items-start gap-2.5 mt-6 w-full max-w-2xl px-2">
-                    <button
-                      onClick={() => handleSendMessage('Create interactive revision flashcards and a timed quiz on key concepts')}
-                      className="flex items-center gap-3 text-xs text-[#94a3b8] hover:text-white transition-colors"
-                    >
-                      <Sparkles className="w-4 h-4 text-[#38bdf8]" />
-                      <span>Create interactive revision tools or flashcards</span>
-                    </button>
-
-                    <button
-                      onClick={() => setShowUploadModal(true)}
-                      className="flex items-center gap-3 text-xs text-[#94a3b8] hover:text-white transition-colors"
-                    >
-                      <FileText className="w-4 h-4 text-[#38bdf8]" />
-                      <span>Ground study session in lecture notes (PDF / Slides)</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleSendMessage('Perform deep research and generate a comprehensive study guide')}
-                      className="flex items-center gap-3 text-xs text-[#94a3b8] hover:text-white transition-colors"
-                    >
-                      <Globe className="w-4 h-4 text-[#38bdf8]" />
-                      <span>Deep academic research and study summary</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    {m.role === 'assistant' && <Vela size={26} className="mt-1 flex-shrink-0" />}
-                    <div
-                      className={`max-w-xl px-4 py-3 rounded-2xl text-xs leading-relaxed ${m.role === 'user'
-                        ? 'bg-[#1e293b] border border-[#334155] text-white shadow-md'
-                        : 'bg-[#131c2e] border border-[#1e2d45] text-[#f1f5f9]'
-                        }`}
-                    >
-                      <div className="whitespace-pre-wrap">{m.content}</div>
-                      {m.attachedTool && (
-                        <div className="mt-2.5 flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              selectTool(m.attachedTool)
-                              setRightPanelOpen(true)
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#3b82f6] hover:bg-[#2563eb] text-white font-semibold text-[11px] transition-all shadow-sm"
-                          >
-                            <Sparkles className="w-3.5 h-3.5 text-white" />
-                            <span>Open in Canvas</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-
-              {isLoading && (
-                <div className="flex gap-3 justify-start items-center animate-fade-in py-1">
-                  <Vela size={26} loading={true} className="flex-shrink-0" />
-                  <div className="px-4 py-2.5 rounded-2xl bg-[#131c2e] border border-[#1e2d45] text-xs text-white flex items-center gap-2 shadow-sm">
-                    <span className="w-2 h-2 rounded-full bg-[#38bdf8] animate-ping" />
-                    <span>{generationStage || 'Vela is crafting your interactive tool on the canvas...'}</span>
-                  </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Docked Bottom Input Bar (when conversation has messages) */}
-            {messages.length > 0 && (
-              <div className="p-4 bg-[#080c14] border-t border-[#141c2e]/60 flex-shrink-0">
-                <div className="max-w-3xl mx-auto w-full">
-                  <div className="bg-[#131c2e] border border-[#1f2d45] rounded-3xl p-2.5 shadow-2xl focus-within:border-[#38bdf8]/70 transition-all">
-                    <div className="flex items-center gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => setShowUploadModal(true)}
-                        className="w-7 h-7 rounded-full bg-[#1b2740] hover:bg-[#243555] text-white flex items-center justify-center font-bold text-sm transition-colors flex-shrink-0"
-                        title="Attach files or notes"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-
-                      <textarea
-                        ref={textareaRef}
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            handleSendMessage()
-                          }
-                        }}
-                        placeholder="Ask anything"
-                        className="flex-1 bg-transparent border-none focus:outline-none text-xs text-white placeholder-[#8493a8] resize-none px-1 py-1 max-h-24 min-h-[32px]"
-                        rows={1}
-                      />
-
-                      <button
-                        type="button"
-                        onClick={toggleChatVoiceInput}
-                        className={`p-1.5 rounded-full transition-colors ${isChatListening ? 'bg-red-500 text-white animate-pulse' : 'text-[#8493a8] hover:text-white hover:bg-[#1b2740]'}`}
-                        title="Voice Input (Whisper)"
-                      >
-                        <Mic className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        onClick={() => handleSendMessage()}
-                        disabled={isLoading || !inputValue.trim()}
-                        className="w-7 h-7 rounded-full bg-[#3b82f6] hover:bg-[#2563eb] text-white flex items-center justify-center shadow-lg transition-transform hover:scale-105 disabled:opacity-40 flex-shrink-0"
-                        title="Send message"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-          </div>
-
-          {/* Right Interactive Tool Viewer Canvas Panel */}
-          <div
-            ref={toolContainerRef}
-            className={`bg-[#0b101b] flex flex-col overflow-hidden transition-all duration-300 relative ${isToolMaximized
-              ? 'fixed inset-0 z-50 bg-[#080c14]'
-              : rightPanelOpen
-                ? 'flex-1 border-l border-[#162032] min-w-0 shadow-2xl'
-                : 'w-0 border-l-0 overflow-hidden hidden'
-              } ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex'}`}
-          >
-            {/* Always-visible Floating Minimize Badge when Maximized */}
-            {isToolMaximized && (
+        {generatedTool && (
+          <div className="absolute left-3 right-3 top-[5.75rem] z-20 flex justify-end pointer-events-none">
+            <div className="flex max-w-full flex-wrap items-center gap-2 rounded-[22px] border border-[#1b2b40] bg-[#09111d]/92 px-3 py-2 shadow-xl shadow-black/20 backdrop-blur-md pointer-events-auto">
               <button
-                onClick={() => setIsToolMaximized(false)}
-                className="fixed top-3 right-4 z-50 px-3 py-1.5 rounded-lg bg-[#3b82f6] hover:bg-[#2563eb] text-white text-xs font-bold shadow-2xl border border-white/20 flex items-center gap-1.5 transition-all"
-                title="Exit Fullscreen (Escape)"
+                onClick={openInlineEditor}
+                className="rounded-full border border-[#223247] bg-[#101b2d] px-3 py-1.5 text-[11px] font-semibold text-[#e2e8f0] transition-colors hover:bg-[#16263d] hover:text-white"
+                title="Edit questions, cards, and content in canvas"
               >
-                <Minimize2 className="w-3.5 h-3.5" />
-                <span>Minimize (Esc)</span>
-              </button>
-            )}
-
-            {/* Unified Single Canvas Header Bar */}
-            <div className="px-4 py-2.5 border-b border-[#162032] bg-[#0e1424] flex items-center justify-between flex-shrink-0 z-30 relative gap-3">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <Sparkles className="w-4 h-4 text-[#38bdf8] flex-shrink-0" />
-                <span className="text-xs sm:text-sm font-bold text-white truncate">
-                  {activeMeta.title || 'Interactive Workspace'}
+                <span className="inline-flex items-center gap-1.5">
+                  <Edit3 className="w-3.5 h-3.5 text-[#5A7D99]" />
+                  <span>Edit</span>
                 </span>
-                {generatedTool && (
-                  <span className="capitalize text-[10px] px-2 py-0.5 rounded-full bg-[#3b82f6]/15 border border-[#3b82f6]/30 text-[#38bdf8] font-mono font-semibold flex-shrink-0">
-                    {activeMeta.toolType}
+              </button>
+              <button
+                onClick={() => handleSaveActiveToolToLibrary(generatedTool)}
+                className="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1.5 text-[11px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500 hover:text-white"
+                title="Save this tool to your personal Saved Tools library"
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <Bookmark className="w-3.5 h-3.5" />
+                  <span>Save</span>
+                </span>
+              </button>
+              <button
+                onClick={() => handleOpenShareModal(generatedTool)}
+                className="rounded-full border border-[#223247] bg-[#101b2d] px-3 py-1.5 text-[11px] font-semibold text-[#e2e8f0] transition-colors hover:bg-[#16263d] hover:text-white"
+                title="Share with another student or copy direct link"
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <Share2 className="w-3.5 h-3.5 text-[#5A7D99]" />
+                  <span>Share</span>
+                </span>
+              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  className="rounded-full border border-[#223247] bg-[#101b2d] px-3 py-1.5 text-[11px] font-semibold text-[#e2e8f0] transition-colors hover:bg-[#16263d] hover:text-white"
+                  title="Export or print study materials"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <Download className="w-3.5 h-3.5 text-[#5A7D99]" />
+                    <span>Export</span>
                   </span>
+                </button>
+
+                {showExportMenu && (
+                  <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-[#1e2d45] bg-[#21262E] p-1.5 shadow-2xl">
+                    <button
+                      onClick={handleExportMarkdown}
+                      className="w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-white transition-colors hover:bg-[#1a253c]"
+                    >
+                      <span className="flex items-center gap-2">
+                        <FileText className="w-3.5 h-3.5 text-[#5A7D99]" />
+                        Download Markdown
+                      </span>
+                    </button>
+                    <button
+                      onClick={handlePrintStudySheet}
+                      className="mt-1 w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-white transition-colors hover:bg-[#1a253c]"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Printer className="w-3.5 h-3.5 text-[#5A7D99]" />
+                        Print / PDF Cheat Sheet
+                      </span>
+                    </button>
+                  </div>
                 )}
               </div>
-
-              {generatedTool && (
-                <div className="flex items-center gap-1.5 text-xs text-[#cbd5e1] flex-shrink-0">
-                  <button
-                    onClick={openInlineEditor}
-                    className="p-1 px-2.5 rounded-lg bg-[#131c2e] hover:bg-[#1a253c] text-[#cbd5e1] hover:text-white transition-colors flex items-center gap-1 text-[11px] border border-[#1e2d45]"
-                    title="Edit questions, cards, and content in canvas"
-                  >
-                    <Edit3 className="w-3.5 h-3.5 text-[#38bdf8]" />
-                    <span className="hidden md:inline">Edit</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleSaveActiveToolToLibrary(generatedTool)}
-                    className="p-1 px-2.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-white transition-all flex items-center gap-1.5 text-[11px] border border-emerald-500/30 hover:border-emerald-500 font-medium"
-                    title="Save this tool to your personal Saved Tools library"
-                  >
-                    <Bookmark className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Save to Library</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleOpenShareModal(generatedTool)}
-                    className="p-1 px-2.5 rounded-lg bg-[#131c2e] hover:bg-[#1a253c] text-[#cbd5e1] hover:text-white transition-all flex items-center gap-1 text-[11px] border border-[#1e2d45]"
-                    title="Share with another student or copy direct link"
-                  >
-                    <Share2 className="w-3.5 h-3.5 text-[#38bdf8]" />
-                    <span className="hidden md:inline">Share</span>
-                  </button>
-
-
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowExportMenu(!showExportMenu)}
-                      className="p-1 px-2 rounded-lg bg-[#131c2e] hover:bg-[#1a253c] text-[#cbd5e1] hover:text-white transition-all flex items-center gap-1 text-[11px] border border-[#1e2d45]"
-                      title="Export or print study materials"
-                    >
-                      <Download className="w-3.5 h-3.5 text-[#38bdf8]" />
-                      <span className="hidden md:inline">Export</span>
-                    </button>
-
-                    {showExportMenu && (
-                      <div className="absolute right-0 mt-1.5 w-56 rounded-xl bg-[#131c2e] border border-[#1e2d45] shadow-2xl p-1.5 z-50 animate-fade-in space-y-1">
-                        <button
-                          onClick={handleExportMarkdown}
-                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#1a253c] text-xs font-semibold text-white flex items-center gap-2 transition-colors"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-[#38bdf8]" />
-                          <div>
-                            <p className="text-xs">Download Markdown</p>
-                            <p className="text-[10px] text-[#8493a8]">Clean Obsidian/Notion format</p>
-                          </div>
-                        </button>
-
-                        <button
-                          onClick={handlePrintStudySheet}
-                          className="w-full text-left px-3 py-2 rounded-lg hover:bg-[#1a253c] text-xs font-semibold text-white flex items-center gap-2 transition-colors"
-                        >
-                          <Printer className="w-3.5 h-3.5 text-[#38bdf8]" />
-                          <div>
-                            <p className="text-xs">Print / PDF Cheat Sheet</p>
-                            <p className="text-[10px] text-[#8493a8]">Clean 2-column print layout</p>
-                          </div>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => openPublishModal(generatedTool)}
-                    className="p-1 px-2.5 rounded-lg bg-[#3b82f6]/20 hover:bg-[#3b82f6] text-[#38bdf8] hover:text-white transition-all flex items-center gap-1.5 text-[11px] border border-[#3b82f6]/40 hover:border-[#3b82f6] font-medium shadow-sm group"
-                    title="Publish this tool to the Community Marketplace"
-                  >
-                    <Globe className="w-3.5 h-3.5 text-[#38bdf8] group-hover:text-white" />
-                    <span className="hidden sm:inline">Publish</span>
-                  </button>
-
-                  <button
-                    onClick={() => setIsToolMaximized(!isToolMaximized)}
-                    className={`p-1 px-2.5 rounded-lg transition-all flex items-center gap-1 text-[11px] font-medium border ${isToolMaximized
-                      ? 'bg-[#3b82f6] hover:bg-[#2563eb] text-white border-[#3b82f6] shadow-md'
-                      : 'bg-[#131c2e] hover:bg-[#1a253c] text-[#cbd5e1] hover:text-white border-[#1e2d45]'
-                      }`}
-                    title={isToolMaximized ? 'Minimize Workspace (Esc)' : 'Expand Fullscreen'}
-                  >
-                    {isToolMaximized ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                    <span className="hidden md:inline">{isToolMaximized ? 'Minimize' : 'Expand'}</span>
-                  </button>
-
-                  <button
-                    onClick={handleUnloadTool}
-                    className="p-1 px-1.5 rounded-lg hover:bg-red-500/20 text-[#8493a8] hover:text-red-400 transition-colors flex items-center gap-1 text-[11px]"
-                    title="Close tool and return to canvas idle"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Sandbox Canvas Body */}
-            <div className="flex-1 p-2 sm:p-4 overflow-y-auto bg-[#080c14] flex flex-col min-h-0">
-              {isLoading ? (
-                <div className="flex-1 flex flex-col items-center justify-center my-auto w-full max-w-xl mx-auto p-2 sm:p-4">
-                  <PlaygroundLoader stage={generationStage} phase={buildPhase} />
-                </div>
-              ) : generatedTool ? (
-                activeHtml ? (
-                  <iframe
-                    srcDoc={activeHtml}
-                    title="Interactive Tool Sandbox"
-                    className="w-full h-full min-h-[450px] border-none rounded-[8px] bg-white flex-1 shadow-2xl"
-                    allow="microphone"
-                    sandbox="allow-scripts allow-modals allow-forms"
-                  />
-                ) : (
-                  <div className="space-y-4 p-4">
-                    <h4 className="text-base font-semibold text-white">{activeMeta.title}</h4>
-                    <p className="text-xs text-[#ECECF1]">{activeMeta.description}</p>
-                    {Array.isArray(activeMeta.items) && activeMeta.items.length > 0 && (
-                      <div className="grid gap-3 grid-cols-1">
-                        {activeMeta.items.map((item, idx) => (
-                          <div key={idx} className="p-3.5 rounded-[6px] bg-[#212121] border border-[#2F2F2F]">
-                            <p className="font-medium text-xs text-white mb-1">
-                              {item.question || item.title || item.concept || item.front}
-                            </p>
-                            <p className="text-xs text-[#8E8E93]">
-                              {item.answer || item.explanation || item.detail || item.back || item.content}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 my-auto">
-                  <Vela size={56} className="mb-3 opacity-40 hover:opacity-100 transition-opacity" />
-                  <h4 className="text-sm font-semibold text-white mb-1">Interactive Canvas</h4>
-                  <p className="text-xs text-[#8E8E93] max-w-xs">
-                    Select a tool from your left sidebar or ask Vela in the chat to generate an interactive revision tool.
-                  </p>
-                </div>
-              )}
+              <button
+                onClick={() => openPublishModal(generatedTool)}
+                className="rounded-full border border-[#3b82f6]/40 bg-[#3b82f6]/15 px-3 py-1.5 text-[11px] font-semibold text-[#93c5fd] transition-colors hover:bg-[#3b82f6] hover:text-white"
+                title="Publish this tool to the Community Marketplace"
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>Publish</span>
+                </span>
+              </button>
             </div>
           </div>
+        )}
 
+        <div className="absolute inset-0 z-0 learning-canvas" onDoubleClick={handleCanvasDoubleClick}>
+          <ReactFlow
+            nodes={canvasNodes}
+            edges={[]}
+            nodeTypes={canvasNodeTypes}
+            onNodesChange={onCustomCanvasNodesChange}
+            onNodeDragStop={handleNodeDragStop}
+            fitView
+            fitViewOptions={{ padding: 0.18, minZoom: 0.7 }}
+            minZoom={0.35}
+            maxZoom={1.8}
+            defaultViewport={{ x: 0, y: 0, zoom: 0.88 }}
+            panOnScroll
+            selectionOnDrag={false}
+            nodesDraggable
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background variant="dots" gap={26} size={1.5} color="rgba(148, 163, 184, 0.45)" />
+            <MiniMap
+              pannable
+              zoomable
+              nodeColor={(node) => {
+                if (node.type === 'tool') return '#60a5fa'
+                if (node.type === 'welcome') return '#34d399'
+                return '#94a3b8'
+              }}
+              maskColor="rgba(26, 32, 44, 0.75)"
+              className="!bg-[#242d3d]/95 !border !border-[#3e4d66] !rounded-2xl !shadow-xl"
+            />
+            <Controls className="!rounded-2xl !overflow-hidden !border !border-[#3e4d66] !bg-[#242d3d]/95 !backdrop-blur-md !shadow-xl" />
+          </ReactFlow>
         </div>
+
+
+        {isToolMaximized && generatedTool && (
+          <div className="fixed inset-0 z-50 bg-[#04070d]/92 backdrop-blur-sm p-3 sm:p-5">
+            <div className="flex h-full flex-col rounded-[28px] border border-[#1f3046] bg-[#09111d] shadow-2xl">
+              <div className="flex items-center justify-between gap-3 border-b border-[#18283e] px-4 py-3">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8fb7ff]">Expanded workspace</div>
+                  <h3 className="mt-1 truncate text-sm font-semibold text-white">{activeMeta.title}</h3>
+                </div>
+                <button
+                  onClick={() => setIsToolMaximized(false)}
+                  className="rounded-full border border-[#223247] bg-[#101b2d] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#16263d]"
+                  title="Exit Fullscreen (Escape)"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <Minimize2 className="w-3.5 h-3.5" />
+                    <span>Minimize</span>
+                  </span>
+                </button>
+              </div>
+              <div className="flex-1 p-3 sm:p-4">
+                <iframe
+                  srcDoc={activeHtml}
+                  title="Expanded Interactive Tool Sandbox"
+                  className="h-full min-h-[420px] w-full rounded-[22px] border-none bg-white shadow-[0_24px_60px_rgba(15,23,42,0.24)]"
+                  allow="microphone"
+                  sandbox="allow-scripts allow-modals allow-forms"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* In-Canvas Direct Inline Editor Modal */}
@@ -3369,8 +4063,8 @@ export default function Learningplayground() {
 
       {/* FLOATING ACTION NOTIFICATION TOAST */}
       {shareToastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-[#0f172a] text-white px-4 py-3 rounded-xl border border-[#38bdf8]/40 shadow-2xl animate-fade-in text-xs font-semibold">
-          <CheckCircle2 className="w-4 h-4 text-[#38bdf8]" />
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-[#1A1E24] text-white px-4 py-3 rounded-xl border border-[#5A7D99]/40 shadow-2xl animate-fade-in text-xs font-semibold">
+          <CheckCircle2 className="w-4 h-4 text-[#5A7D99]" />
           <span>{shareToastMessage}</span>
         </div>
       )}
@@ -3378,11 +4072,11 @@ export default function Learningplayground() {
       {/* INLINE TOOL EDITOR MODAL */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in">
+          <div className="bg-[#1A1E24] border border-[#282E38] rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in">
             {/* Modal Header */}
-            <div className="p-4 px-6 border-b border-[#1e293b] flex items-center justify-between bg-[#0b1120]">
+            <div className="p-4 px-6 border-b border-[#282E38] flex items-center justify-between bg-[#131519]">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#38bdf8]/15 border border-[#38bdf8]/30 flex items-center justify-center text-[#38bdf8]">
+                <div className="w-8 h-8 rounded-lg bg-[#5A7D99]/15 border border-[#5A7D99]/30 flex items-center justify-center text-[#5A7D99]">
                   <Edit3 className="w-4 h-4" />
                 </div>
                 <div>
@@ -3392,7 +4086,7 @@ export default function Learningplayground() {
               </div>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="p-1 rounded-lg text-[#94a3b8] hover:text-white hover:bg-[#1e293b] transition-colors"
+                className="p-1 rounded-lg text-[#94a3b8] hover:text-white hover:bg-[#282E38] transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -3406,7 +4100,7 @@ export default function Learningplayground() {
                   type="text"
                   value={editingTitle}
                   onChange={(e) => setEditingTitle(e.target.value)}
-                  className="w-full bg-[#1e293b] border border-[#334155] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#38bdf8] transition-colors"
+                  className="w-full bg-[#282E38] border border-[#282E38] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5A7D99] transition-colors"
                   placeholder="e.g., Photosynthesis Flashcards"
                 />
               </div>
@@ -3417,17 +4111,17 @@ export default function Learningplayground() {
                   type="text"
                   value={editingDesc}
                   onChange={(e) => setEditingDesc(e.target.value)}
-                  className="w-full bg-[#1e293b] border border-[#334155] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#38bdf8] transition-colors"
+                  className="w-full bg-[#282E38] border border-[#282E38] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5A7D99] transition-colors"
                   placeholder="e.g., Core light-dependent and light-independent mechanisms"
                 />
               </div>
 
-              <div className="pt-2 border-t border-[#1e293b]">
+              <div className="pt-2 border-t border-[#282E38]">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-xs font-bold text-[#cbd5e1]">Study Items & Cards ({editingItems.length})</h4>
                   <button
                     onClick={handleAddEditorItem}
-                    className="px-2.5 py-1 rounded-lg bg-[#38bdf8]/15 hover:bg-[#38bdf8]/25 text-[#38bdf8] text-xs font-semibold flex items-center gap-1 border border-[#38bdf8]/30 transition-colors"
+                    className="px-2.5 py-1 rounded-lg bg-[#5A7D99]/15 hover:bg-[#5A7D99]/25 text-[#5A7D99] text-xs font-semibold flex items-center gap-1 border border-[#5A7D99]/30 transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add Card / Item</span>
@@ -3436,9 +4130,9 @@ export default function Learningplayground() {
 
                 <div className="space-y-3">
                   {editingItems.map((item, idx) => (
-                    <div key={idx} className="p-3.5 rounded-xl bg-[#1e293b]/70 border border-[#334155] space-y-2 relative group">
+                    <div key={idx} className="p-3.5 rounded-xl bg-[#282E38]/70 border border-[#282E38] space-y-2 relative group">
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-[#38bdf8]">Card {idx + 1}</span>
+                        <span className="text-[11px] font-bold text-[#5A7D99]">Card {idx + 1}</span>
                         <button
                           onClick={() => handleDeleteEditorItem(idx)}
                           className="p-1 text-[#ef4444] hover:bg-[#ef4444]/15 rounded-md transition-colors"
@@ -3454,7 +4148,7 @@ export default function Learningplayground() {
                           value={item.front || item.question || item.concept || item.word || item.left || ''}
                           onChange={(e) => handleUpdateEditorItem(idx, 'front', e.target.value)}
                           placeholder="Front / Term / Question"
-                          className="w-full bg-[#0f172a] border border-[#334155] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#38bdf8]"
+                          className="w-full bg-[#1A1E24] border border-[#282E38] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#5A7D99]"
                         />
                       </div>
 
@@ -3464,7 +4158,7 @@ export default function Learningplayground() {
                           value={item.back || item.answer || item.definition || item.explanation || item.detail || item.right || ''}
                           onChange={(e) => handleUpdateEditorItem(idx, 'back', e.target.value)}
                           placeholder="Back / Definition / Detailed Explanation"
-                          className="w-full bg-[#0f172a] border border-[#334155] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#38bdf8] resize-none"
+                          className="w-full bg-[#1A1E24] border border-[#282E38] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#5A7D99] resize-none"
                         />
                       </div>
                     </div>
@@ -3474,16 +4168,16 @@ export default function Learningplayground() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 px-6 border-t border-[#1e293b] flex items-center justify-end gap-2.5 bg-[#0b1120]">
+            <div className="p-4 px-6 border-t border-[#282E38] flex items-center justify-end gap-2.5 bg-[#131519]">
               <button
                 onClick={() => setShowEditModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#94a3b8] hover:text-white hover:bg-[#1e293b] transition-colors"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#94a3b8] hover:text-white hover:bg-[#282E38] transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveInlineEdit}
-                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#38bdf8] to-[#2563eb] hover:opacity-90 shadow-lg shadow-sky-500/20 transition-all flex items-center gap-1.5"
+                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-[#5A7D99] hover:bg-[#3D5E7A] shadow-md transition-colors flex items-center gap-1.5"
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>Save Changes</span>
@@ -3496,11 +4190,11 @@ export default function Learningplayground() {
       {/* SHARE & COLLABORATE MODAL */}
       {showShareModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-fade-in">
+          <div className="bg-[#1A1E24] border border-[#282E38] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-fade-in">
             {/* Header */}
-            <div className="p-4 px-6 border-b border-[#1e293b] flex items-center justify-between bg-[#0b1120]">
+            <div className="p-4 px-6 border-b border-[#282E38] flex items-center justify-between bg-[#131519]">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#38bdf8]/15 border border-[#38bdf8]/30 flex items-center justify-center text-[#38bdf8]">
+                <div className="w-8 h-8 rounded-lg bg-[#5A7D99]/15 border border-[#5A7D99]/30 flex items-center justify-center text-[#5A7D99]">
                   <Share2 className="w-4 h-4" />
                 </div>
                 <div>
@@ -3510,7 +4204,7 @@ export default function Learningplayground() {
               </div>
               <button
                 onClick={() => setShowShareModal(false)}
-                className="p-1 rounded-lg text-[#94a3b8] hover:text-white hover:bg-[#1e293b] transition-colors"
+                className="p-1 rounded-lg text-[#94a3b8] hover:text-white hover:bg-[#282E38] transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -3527,11 +4221,11 @@ export default function Learningplayground() {
                     type="text"
                     readOnly
                     value={`${window.location.origin}/?toolId=${shareModalTargetTool?.id || ''}`}
-                    className="flex-1 bg-[#1e293b] border border-[#334155] rounded-xl px-3 py-2 text-xs text-white select-all font-mono"
+                    className="flex-1 bg-[#282E38] border border-[#282E38] rounded-xl px-3 py-2 text-xs text-white select-all font-mono"
                   />
                   <button
                     onClick={() => handleCopyShareLink(shareModalTargetTool)}
-                    className="px-3.5 py-2 rounded-xl bg-[#38bdf8] hover:bg-[#0284c7] text-white text-xs font-bold transition-all flex items-center gap-1 shadow-md flex-shrink-0"
+                    className="px-3.5 py-2 rounded-xl bg-[#5A7D99] hover:bg-[#3D5E7A] text-white text-xs font-bold transition-all flex items-center gap-1 shadow-md flex-shrink-0"
                   >
                     <Copy className="w-3.5 h-3.5" />
                     <span>Copy</span>
@@ -3540,9 +4234,9 @@ export default function Learningplayground() {
               </div>
 
               <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-[#1e293b]" />
+                <div className="flex-1 h-px bg-[#282E38]" />
                 <span className="text-[10px] text-[#64748b] uppercase font-bold tracking-wider">OR</span>
-                <div className="flex-1 h-px bg-[#1e293b]" />
+                <div className="flex-1 h-px bg-[#282E38]" />
               </div>
 
               {/* Option 2: Send Directly to User Email */}
@@ -3558,7 +4252,7 @@ export default function Learningplayground() {
                       if (e.key === 'Enter') handleShareToolToEmail()
                     }}
                     placeholder="classmate@university.edu"
-                    className="w-full bg-[#1e293b] border border-[#334155] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#38bdf8] transition-colors"
+                    className="w-full bg-[#282E38] border border-[#282E38] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#5A7D99] transition-colors"
                   />
                   {shareError && (
                     <p className="text-[11px] text-[#ef4444] font-medium">{shareError}</p>
@@ -3566,7 +4260,7 @@ export default function Learningplayground() {
                   <button
                     onClick={handleShareToolToEmail}
                     disabled={isSharingEmail || !shareEmailRecipient.trim()}
-                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#38bdf8] to-[#2563eb] hover:opacity-90 disabled:opacity-40 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-sky-500/20"
+                    className="w-full py-2.5 rounded-xl bg-[#5A7D99] hover:bg-[#3D5E7A] disabled:opacity-40 text-white text-xs font-bold transition-colors flex items-center justify-center gap-2"
                   >
                     {isSharingEmail ? (
                       <span>Sharing Tool...</span>
@@ -3599,4 +4293,5 @@ export default function Learningplayground() {
     </div>
   )
 }
+
 

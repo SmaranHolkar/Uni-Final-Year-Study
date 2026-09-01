@@ -14,6 +14,7 @@ import topicRouter from './features/topics/topic.routes.js';
 import marketplaceRouter from './features/marketplace/marketplace.routes.js';
 import groundedRouter from './features/ai/grounded.routes.js';
 import multimodalRouter from './features/ai/multimodal.routes.js';
+import canvasRouter from './features/canvas/canvas.routes.js';
 
 // Shared middleware
 import requireAuth from './shared/middleware/requireAuth.js';
@@ -50,8 +51,27 @@ async function runAutoMigrations() {
                 ALTER TABLE public.w_embeddings ADD COLUMN page_number INT DEFAULT 1;
             END IF;
         END $$;
+
+        CREATE TABLE IF NOT EXISTS public.canvas_notes (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL,
+            session_id TEXT,
+            type VARCHAR(32) DEFAULT 'sticky',
+            title VARCHAR(255),
+            content TEXT,
+            items JSONB DEFAULT '[]'::jsonb,
+            color VARCHAR(32) DEFAULT 'yellow',
+            position_x FLOAT DEFAULT 100,
+            position_y FLOAT DEFAULT 100,
+            width FLOAT DEFAULT 260,
+            height FLOAT DEFAULT 220,
+            is_pinned BOOLEAN DEFAULT false,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_canvas_notes_user_session ON public.canvas_notes (user_id, session_id);
       `);
-      console.log('[DB MIGRATIONS] w_embeddings paragraph & page metadata verified');
+      console.log('[DB MIGRATIONS] w_embeddings & canvas_notes tables verified');
     } finally {
       client.release();
     }
@@ -128,6 +148,7 @@ app.use('/api', quizRouter);
 app.use('/api', topicRouter);
 app.use('/api', groundedRouter);
 app.use('/api', multimodalRouter);
+app.use('/api', canvasRouter);
 
 // Health check endpoint for Render
 app.get('/api/health', (req, res) => {

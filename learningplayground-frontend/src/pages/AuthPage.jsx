@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { signIn, signUp } from '../auth'
-import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react'
+import { Mail, Lock, ArrowRight, WarningCircle as AlertCircle } from 'iconoir-react'
 
 export default function AuthPage() {
   const [isSignUp, setIsSignUp] = useState(false)
@@ -114,7 +114,7 @@ export default function AuthPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-[#5A7D99] to-[#3D6660] hover:from-[#3D5E7A] hover:to-[#4A6B52] focus:outline-none transition-all shadow-md shadow-[#5A7D99]/20 disabled:opacity-50"
+              className="w-full flex justify-center items-center gap-2 py-2.5 px-4 border border-transparent rounded-xl text-sm font-semibold text-white bg-[#5A7D99] hover:bg-[#3D5E7A] focus:outline-none transition-colors shadow-sm disabled:opacity-50"
             >
               {loading ? (
                 'Processing...'

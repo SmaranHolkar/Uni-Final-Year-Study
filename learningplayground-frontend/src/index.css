@@ -3,23 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --bg: #080c14;
-  --surface: #0e1422;
-  --surface-hover: #141c30;
-  --card: #131c2e;
-  --card-hover: #19243b;
-  --border: #1d2b45;
-  --border-subtle: rgba(56, 189, 248, 0.12);
-  
+  --bg: #1a202c;
+  --surface: #242d3d;
+  --surface-hover: #2d384c;
+  --card: #2d3748;
+  --card-hover: #37445a;
+  --border: #3e4d66;
+  --border-subtle: rgba(148, 163, 184, 0.2);
+
   --primary: #3b82f6;
   --primary-hover: #2563eb;
-  --primary-glow: rgba(59, 130, 246, 0.25);
+  --primary-glow: rgba(59, 130, 246, 0.3);
   --cyan: #38bdf8;
-  --cyan-glow: rgba(56, 189, 248, 0.2);
-  
-  --white: #f1f5f9;
-  --muted: #8493a8;
-  --dim: #475569;
+  --cyan-glow: rgba(56, 189, 248, 0.25);
+
+  --white: #f8fafc;
+  --muted: #94a3b8;
+  --dim: #64748b;
 
   --background: var(--bg);
   --foreground: var(--white);
@@ -39,6 +39,8 @@
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
+
+
 
 body {
   margin: 0;
@@ -89,6 +91,7 @@ body {
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(100%);
   }
@@ -100,10 +103,13 @@ body {
 
 /* Pulse Glow */
 @keyframes pulseGlow {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.3;
     filter: blur(16px);
   }
+
   50% {
     opacity: 0.6;
     filter: blur(24px);

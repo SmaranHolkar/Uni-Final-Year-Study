@@ -8,6 +8,7 @@ import { getBlueprintForPrompt } from './blueprintLoader.js';
 import { generateChemistrySimulatorHtml, generate3DSimulationHtml } from './simulationGenerators.js';
 
 const GROQ_KEY = process.env.GROQ_API;
+export const DEFAULT_AI_MODEL = process.env.GROQ_MODEL || 'qwen/qwen3.6-27b';
 
 let embedder;
 // Handles getEmbedding logic.
@@ -313,11 +314,10 @@ ${trimmedContext}
           Authorization: `Bearer ${GROQ_KEY}`,
         },
         body: JSON.stringify({
-          model: 'openai/gpt-oss-safeguard-20b',
+          model: DEFAULT_AI_MODEL,
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.7,
-          max_tokens: 2000,
-          response_format: { type: 'json_object' },
+          max_tokens: 2500,
         }),
       }
     );
@@ -352,43 +352,60 @@ export async function getChatCompletion(
   maxTokens = 2000,
   options = {}
 ) {
-  if (!GROQ_KEY) {
+  const keys = [
+    process.env.GROQ_API,
+    process.env.LearningPlayground_API_KEY,
+    process.env.GROQ_API_KEY,
+  ].filter(Boolean);
+
+  if (keys.length === 0) {
     throw new Error('GROQ_API is not set in the server environment');
   }
 
   const targetModel = model || DEFAULT_AI_MODEL;
   const { forceJson = false } = options;
 
-  return retryWithBackoff(async () => {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${GROQ_KEY}`,
-      },
-      signal: AbortSignal.timeout(25000),
-      body: JSON.stringify({
-        model: targetModel,
-        messages: [
-          { role: 'system', content: 'You are Vela, an advanced academic study assistant with deep pedagogical intelligence. Deliver sharp, clear, accurate, and deeply helpful explanations and tools.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature,
-        max_tokens: Math.min(maxTokens || 2200, 3000),
-        ...(forceJson ? { response_format: { type: 'json_object' } } : {}),
-      }),
-    });
+  let lastError = null;
+  for (let kIdx = 0; kIdx < keys.length; kIdx++) {
+    const activeKey = keys[kIdx];
+    try {
+      return await retryWithBackoff(async () => {
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${activeKey}`,
+          },
+          signal: AbortSignal.timeout(25000),
+          body: JSON.stringify({
+            model: targetModel,
+            messages: [
+              { role: 'system', content: 'You are Vela, an advanced academic study assistant with deep pedagogical intelligence. Deliver sharp, clear, accurate, and deeply helpful explanations and tools.' },
+              { role: 'user', content: prompt }
+            ],
+            temperature,
+            max_tokens: Math.min(maxTokens || 2200, 3000),
+            ...(forceJson ? { response_format: { type: 'json_object' } } : {}),
+          }),
+        });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Groq API error (${res.status}): ${errText}`);
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Groq API error (${res.status}): ${errText}`);
+        }
+
+        const data = await res.json();
+        const rawContent = data.choices[0]?.message?.content || '';
+        const cleaned = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+        return cleaned || rawContent;
+      }, 2, 1000);
+    } catch (err) {
+      lastError = err;
+      console.warn(`[ML ENGINE] Groq key ${kIdx + 1}/${keys.length} error: ${err.message}. Trying next key if available...`);
     }
+  }
 
-    const data = await res.json();
-    const rawContent = data.choices[0]?.message?.content || '';
-    const cleaned = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-    return cleaned || rawContent;
-  }, 2, 1000);
+  throw lastError || new Error('All AI API keys failed');
 }
 
 // toolGenAI: routes all AI calls to Groq via getChatCompletion using high-intelligence model.
@@ -1712,7 +1729,7 @@ ITEM SCHEMA (for interactive tool types):
     else if (lowerP.includes('diagram') || lowerP.includes('svg') || lowerP.includes('visual')) detectedType = 'svg_diagram';
     else if (lowerP.includes('kit') || lowerP.includes('revision')) detectedType = 'revision-kit';
 
-    const cleanTopic = promptText.replace(/create|generate|make|build|flashcards|quiz|notes|tool|for|on|about|the/gi, '').trim() || 'Study Revision';
+    const cleanTopic = promptText.replace(/\b(create|generate|make|build|flashcards|quiz|notes|tool|for|on|about|the|a|an)\b/gi, '').replace(/\s+/g, ' ').trim() || 'Study Revision';
 
     if (detectedType !== 'chat') {
       plan = {

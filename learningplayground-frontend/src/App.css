@@ -1,33 +1,226 @@
-/* App custom animations and overrides */
+/* =========================================================
+   Quality Product Design System
+   Disciplined Radii, Clean Elevation, High Contrast Typography
+   ========================================================= */
+
 .app-container {
   height: 100vh;
   width: 100vw;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  background-color: #1e293b;
+  color: #f8fafc;
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #CDD1D6 0%, #5A7D99 50%, #3D6660 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #f8fafc;
 }
 
-.glow-border {
+/* Canvas Area */
+.learning-canvas {
+  background-color: #1e293b;
+}
+
+.learning-canvas .react-flow__pane {
+  cursor: grab;
+}
+
+.learning-canvas .react-flow__pane:active {
+  cursor: grabbing;
+}
+
+.learning-canvas .react-flow__controls-button {
+  background: #334155;
+  border-bottom: 1px solid #475569;
+  color: #f1f5f9;
+}
+
+.learning-canvas .react-flow__controls-button:hover {
+  background: #475569;
+}
+
+/* Nodes: Disciplined 12px radius, clean 1px border, subtle elevation */
+.canvas-node {
+  border: 1px solid #475569;
+  border-radius: 12px;
+  background: #1e293b;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  padding: 1.25rem;
+}
+
+.canvas-node-welcome {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+.canvas-node-thread-user {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.canvas-node-thread-assistant {
+  background: #334155;
+  color: #f8fafc;
+}
+
+.canvas-tool-node {
+  overflow: hidden;
+  border: 1px solid #475569;
+  border-radius: 12px;
+  background: #1e293b;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+}
+
+.canvas-tool-surface {
+  position: relative;
+  background: #0f172a;
+}
+
+.canvas-tool-placeholder {
   position: relative;
 }
 
-.glow-border::after {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  background: linear-gradient(135deg, rgba(90,125,153,0.3), rgba(61,102,96,0.3));
-  border-radius: inherit;
-  z-index: -1;
-  opacity: 0;
-  transition: opacity 0.3s ease;
+/* Canvas Sticky Notes - Matte, high contrast, clean 10px corners */
+.canvas-sticky-note {
+  position: relative;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  overflow: hidden;
 }
 
-.glow-border:hover::after {
-  opacity: 1;
+.canvas-sticky-note:hover {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.canvas-sticky-yellow {
+  background: #292314;
+  border: 1px solid #ca8a04;
+  color: #fef08a;
+}
+.canvas-sticky-yellow .canvas-sticky-header {
+  background: rgba(202, 138, 4, 0.2);
+  border-bottom: 1px solid rgba(202, 138, 4, 0.35);
+}
+
+.canvas-sticky-cyan {
+  background: #0c2d48;
+  border: 1px solid #0284c7;
+  color: #bae6fd;
+}
+.canvas-sticky-cyan .canvas-sticky-header {
+  background: rgba(2, 132, 199, 0.2);
+  border-bottom: 1px solid rgba(2, 132, 199, 0.35);
+}
+
+.canvas-sticky-green {
+  background: #113824;
+  border: 1px solid #16a34a;
+  color: #bbf7d0;
+}
+.canvas-sticky-green .canvas-sticky-header {
+  background: rgba(22, 163, 74, 0.2);
+  border-bottom: 1px solid rgba(22, 163, 74, 0.35);
+}
+
+.canvas-sticky-purple {
+  background: #2b1744;
+  border: 1px solid #9333ea;
+  color: #e9d5ff;
+}
+.canvas-sticky-purple .canvas-sticky-header {
+  background: rgba(147, 51, 234, 0.2);
+  border-bottom: 1px solid rgba(147, 51, 234, 0.35);
+}
+
+.canvas-sticky-rose {
+  background: #3b1422;
+  border: 1px solid #e11d48;
+  color: #fecdd3;
+}
+.canvas-sticky-rose .canvas-sticky-header {
+  background: rgba(225, 29, 72, 0.2);
+  border-bottom: 1px solid rgba(225, 29, 72, 0.35);
+}
+
+/* Formula Pin Node */
+.canvas-pin-node {
+  border-radius: 10px;
+  background: #1e293b;
+  border: 1px solid #475569;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* Checklist Node */
+.canvas-checklist-node {
+  border-radius: 10px;
+  background: #1e293b;
+  border: 1px solid #475569;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* Base Surfaces & Utility Overrides */
+.bg-\[\#131519\],
+.bg-\[\#080c14\] {
+  background-color: #1e293b !important;
+}
+
+.bg-\[\#1A1E24\],
+.bg-\[\#1A1E24\]\/90,
+.bg-\[\#1A1E24\]\/94,
+.bg-\[\#1A1E24\]\/95,
+.bg-\[\#10151f\],
+.bg-\[\#10151f\]\/95,
+.bg-\[\#0c1017\],
+.bg-\[\#09111d\] {
+  background-color: #1e293b !important;
+}
+
+.bg-\[\#21262E\],
+.bg-\[\#141b29\],
+.bg-\[\#16263d\],
+.bg-\[\#0e1626\],
+.bg-\[\#0e1626\]\/90,
+.bg-\[\#0f1828\],
+.bg-\[\#1f2e45\],
+.bg-\[\#1a2436\] {
+  background-color: #334155 !important;
+}
+
+.hover\:bg-\[\#282E38\]:hover,
+.hover\:bg-\[\#21262E\]:hover,
+.hover\:bg-\[\#1a2436\]:hover,
+.hover\:bg-\[\#1f2e45\]:hover,
+.hover\:bg-\[\#101b2d\]:hover {
+  background-color: #475569 !important;
+}
+
+.border-\[\#282E38\],
+.border-\[\#223247\],
+.border-\[\#1e2d45\],
+.border-\[\#1b2b40\],
+.border-\[\#18283e\],
+.border-\[\#1f3046\],
+.border-\[\#20304a\],
+.border-\[\#21324c\],
+.border-\[\#1d293d\] {
+  border-color: #475569 !important;
+}
+
+/* Clear, high-contrast typography hierarchy */
+.text-\[\#8493a8\],
+.text-\[\#94a3b8\],
+.text-\[\#7f93ad\],
+.text-\[\#9fb0c5\],
+.text-\[\#64748b\],
+.text-\[\#6E7580\],
+.text-\[\#475569\],
+.text-\[\#5d7696\] {
+  color: #94a3b8 !important;
+}
+
+.text-\[\#5A7D99\],
+.text-\[\#CDD1D6\] {
+  color: #cbd5e1 !important;
 }
