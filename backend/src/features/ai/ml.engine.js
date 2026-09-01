@@ -8,7 +8,7 @@ import { getBlueprintForPrompt } from './blueprintLoader.js';
 import { generateChemistrySimulatorHtml, generate3DSimulationHtml } from './simulationGenerators.js';
 
 const GROQ_KEY = process.env.GROQ_API;
-export const DEFAULT_AI_MODEL = process.env.GROQ_MODEL || 'qwen/qwen3.6-27b';
+export const DEFAULT_AI_MODEL = process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
 
 let embedder;
 // Handles getEmbedding logic.
