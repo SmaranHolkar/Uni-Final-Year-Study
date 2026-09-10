@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { ReactFlow, Background, Controls, MiniMap, useNodesState } from '@xyflow/react'
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
+import { ReactFlow, Background, Controls, MiniMap, useNodesState, ReactFlowProvider, useReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Link, useLocation } from 'react-router-dom'
 import {
@@ -66,10 +66,14 @@ import {
   MoreHoriz as MoreHorizontal,
   Activity,
   PositionAlign as Target,
+  Minus,
+  Filter,
+  Refresh as RefreshCw,
 } from 'iconoir-react'
 import { useAuth } from '../AuthContext'
 import Vela from '../components/Vela'
 import PlaygroundLoader from '../components/PlaygroundLoader'
+import CitationSplitViewer from '../components/CitationSplitViewer'
 import { morphToolToHtml } from '../utils/toolMorpher'
 
 const defaultSuggestions = [
@@ -78,21 +82,21 @@ const defaultSuggestions = [
     icon: Lightbulb,
     title: 'Create a study plan',
     prompt: 'Help me create a structured study plan for my upcoming exams.',
-    color: 'hsl(142, 70%, 50%)',
+    tag: 'Planning',
   },
   {
     id: 2,
     icon: TrendingUp,
     title: 'Practice flashcards',
     prompt: 'Generate practice flashcards on concepts I recently studied.',
-    color: 'hsl(195, 85%, 55%)',
+    tag: 'Active Recall',
   },
   {
     id: 3,
     icon: AlertCircle,
     title: 'Explain a concept',
     prompt: 'Explain a complex academic concept in simple intuitive terms.',
-    color: 'hsl(280, 70%, 60%)',
+    tag: 'Deep Dive',
   },
 ]
 
@@ -108,19 +112,158 @@ function extractToolHtml(toolObj) {
   return ''
 }
 
+// Canonical archetype resolver that inspects explicit toolType, title, descriptions, items, and HTML structures
+function resolveCanonicalToolType(rawType, toolObj = null) {
+  const clean = String(rawType || '').toLowerCase().trim()
+  if (/quiz|mcq|assessment|test|multiple-choice|multiple choice|questions/i.test(clean)) return 'quiz'
+  if (/true-false|true\/false|boolean/i.test(clean)) return 'true-false'
+  if (/match/i.test(clean)) return 'matching'
+  if (/timeline|order|chronol|sequence/i.test(clean)) return 'timeline'
+  if (/crossword/i.test(clean)) return 'crossword'
+  if (/wordsearch|word-search|word search|search/i.test(clean)) return 'wordsearch'
+  if (/cloze|blurt|fill/i.test(clean)) return 'cloze'
+  if (/feynman|grader/i.test(clean)) return 'feynman'
+  if (/flashcard|cards|deck/i.test(clean)) return 'flashcards'
+
+  if (toolObj) {
+    const rawObj = toolObj.generated_tool || toolObj
+    const checkStrings = [
+      rawObj.toolType,
+      rawObj.tool_type,
+      rawObj.type,
+      rawObj.category,
+      rawObj.ui,
+      rawObj.render,
+      rawObj.data?.toolType,
+      rawObj.data?.tool_type,
+      rawObj.data?.type,
+      rawObj.title,
+      rawObj.description,
+      toolObj.title,
+      toolObj.description,
+      toolObj.toolType,
+      toolObj.tool_type,
+    ].filter(Boolean).map(s => String(s).toLowerCase())
+
+    for (const str of checkStrings) {
+      if (/quiz|mcq|assessment|test|multiple-choice|multiple choice/i.test(str)) return 'quiz'
+      if (/true-false|true\/false|boolean/i.test(str)) return 'true-false'
+      if (/match/i.test(str)) return 'matching'
+      if (/timeline|order|chronol|sequence/i.test(str)) return 'timeline'
+      if (/crossword/i.test(str)) return 'crossword'
+      if (/wordsearch|word-search|word search/i.test(str)) return 'wordsearch'
+      if (/cloze|blurt|fill/i.test(str)) return 'cloze'
+      if (/feynman|grader/i.test(str)) return 'feynman'
+    }
+
+    // Inspect items structure
+    const rawItems = Array.isArray(rawObj.items) && rawObj.items.length > 0
+      ? rawObj.items
+      : (Array.isArray(rawObj?.data?.items) ? rawObj.data.items : [])
+    if (rawItems.length > 0) {
+      const first = rawItems[0] || {}
+      if (first.choices || first.options || (first.answer && ['A', 'B', 'C', 'D'].includes(String(first.answer).toUpperCase()))) return 'quiz'
+      if (first.left || first.right) return 'matching'
+      if (first.position || (first.text && (first.detail || first.explanation))) return 'timeline'
+      if (first.clue && first.word) return 'crossword'
+      if (first.sentence && (first.answer || first.target)) return 'cloze'
+      if (first.isTrue !== undefined) return 'true-false'
+    }
+
+    // Inspect HTML signatures
+    const html = extractToolHtml(toolObj)
+    if (html) {
+      if (html.includes('choice-btn') || html.includes('q-card') || html.includes('Timed Assessment') || html.includes('q-counter') || html.includes('choices-box') || html.includes('id="q-text"')) return 'quiz'
+      if (html.includes('match-card') || html.includes('matching-grid') || html.includes('Interactive Matching') || html.includes('match-container') || html.includes('left-col')) return 'matching'
+      if (html.includes('timeline-track') || html.includes('timeline-slot') || html.includes('Chronological Sequence') || html.includes('timeline-card')) return 'timeline'
+      if (html.includes('cw-grid') || html.includes('cw-cell') || html.includes('Academic Crossword') || html.includes('crossword-box')) return 'crossword'
+      if (html.includes('ws-grid') || html.includes('ws-cell') || html.includes('Academic Word Search') || html.includes('wordsearch-grid')) return 'wordsearch'
+      if (html.includes('cloze-card') || html.includes('occlusion-mask') || html.includes('Cloze Blurting') || html.includes('cloze-input')) return 'cloze'
+      if (html.includes('feynman-box') || html.includes('Feynman Rubric')) return 'feynman'
+    }
+  }
+
+  return 'flashcards'
+}
+
+// User-friendly display names for tool archetypes
+function formatToolTypeName(rawType, toolObj = null) {
+  const canonical = resolveCanonicalToolType(rawType, toolObj)
+  switch (canonical) {
+    case 'quiz': return 'Quiz'
+    case 'matching': return 'Matching'
+    case 'timeline': return 'Timeline'
+    case 'crossword': return 'Crossword'
+    case 'wordsearch': return 'Word Search'
+    case 'true-false': return 'True/False'
+    case 'cloze': return 'Cloze'
+    case 'feynman': return 'Rubric'
+    case 'flashcards': return 'Flashcards'
+    default: return 'Tool'
+  }
+}
+
 // Helper to safely extract tool metadata (title, description, items, toolType)
 function extractToolMetadata(toolObj) {
   if (!toolObj) return { title: 'Interactive Learning Tool', description: '', items: [], toolType: 'tool' }
   const target = toolObj.generated_tool || toolObj
-  const items = Array.isArray(target.items)
+  
+  let items = Array.isArray(target.items) && target.items.length > 0
     ? target.items
-    : (Array.isArray(target?.data?.items) ? target.data.items : [])
+    : (Array.isArray(target?.data?.items) && target.data.items.length > 0
+      ? target.data.items
+      : (Array.isArray(toolObj.items) && toolObj.items.length > 0 ? toolObj.items : []))
+
+  // If items is empty or items lack rich fields, parse from the embedded HTML DATA script
+  const html = extractToolHtml(toolObj)
+  if (html) {
+    try {
+      const dataMatch = html.match(/(?:const|let|var)\s+DATA\s*=\s*(\[[\s\S]*?\]);/) ||
+                        html.match(/(?:const|let|var)\s+ORIGINAL\s*=\s*(\[[\s\S]*?\]);/) ||
+                        html.match(/(?:const|let|var)\s+PAIRS\s*=\s*(\[[\s\S]*?\]);/) ||
+                        html.match(/(?:const|let|var)\s+RAW\s*=\s*(\[[\s\S]*?\]);/)
+      if (dataMatch && dataMatch[1]) {
+        const parsed = JSON.parse(dataMatch[1])
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const first = parsed[0] || {}
+          const itemFirst = items[0] || {}
+          const hasRicherData = 
+            (first.choices && !itemFirst.choices) ||
+            (first.left && !itemFirst.left) ||
+            (first.position && !itemFirst.position) ||
+            (first.word && !itemFirst.word) ||
+            (first.sentence && !itemFirst.sentence) ||
+            (first.isTrue !== undefined && itemFirst.isTrue === undefined)
+
+          if (items.length === 0 || hasRicherData) {
+            items = parsed
+          }
+        }
+      }
+      if (html.includes('cw-grid') || html.includes('ws-grid')) {
+        const layoutMatch = html.match(/(?:const|let|var)\s+LAYOUT\s*=\s*(\{[\s\S]*?\});/)
+        if (layoutMatch && layoutMatch[1]) {
+          const parsedLayout = JSON.parse(layoutMatch[1])
+          if (Array.isArray(parsedLayout?.words) && parsedLayout.words.length > 0) {
+            if (items.length === 0 || !items[0]?.word) {
+              items = parsedLayout.words
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  const rawToolType = target.toolType || target.tool_type || target.type || toolObj.toolType || toolObj.tool_type || toolObj.type || 'tool'
+  const canonicalType = resolveCanonicalToolType(rawToolType, toolObj)
 
   return {
     title: target.title || toolObj.title || 'Interactive Learning Tool',
     description: target.description || toolObj.description || '',
     items,
-    toolType: target.toolType || target.tool_type || toolObj.tool_type || 'tool',
+    toolType: canonicalType,
   }
 }
 
@@ -184,7 +327,21 @@ function ToolNode({ data }) {
   const [nodeWidth, setNodeWidth] = useState(820)
   const [nodeHeight, setNodeHeight] = useState(580)
   const [isResizing, setIsResizing] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
   const resizeRef = useRef({ startX: 0, startY: 0, startW: 820, startH: 580 })
+  const exportMenuRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
+        setShowExportMenu(false)
+      }
+    }
+    if (showExportMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showExportMenu])
 
   const handleResizeStart = (e) => {
     e.stopPropagation()
@@ -227,24 +384,129 @@ function ToolNode({ data }) {
       style={{ width: `${nodeWidth}px` }}
     >
       {/* Node Header */}
-      <div className="canvas-node-drag-handle flex items-center justify-between gap-3 border-b border-[#18283e] px-4 py-2.5 bg-[#0e1626]">
-        <div className="min-w-0 flex items-center gap-2.5">
+      <div className="canvas-node-drag-handle flex flex-wrap items-center justify-between gap-2.5 border-b border-[#18283e] px-3.5 py-2.5 bg-[#0e1626]">
+        <div className="min-w-0 flex items-center gap-2">
           <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-[#7dd3fc]">
             <Layers className="w-3.5 h-3.5 text-[#5A7D99]" />
             <span className="hidden sm:inline">Workspace</span>
           </div>
           <div className="h-3 w-px bg-[#282E38]" />
-          <h3 className="truncate text-xs sm:text-sm font-semibold text-white max-w-[180px] sm:max-w-[280px]">
+          <h3 className="truncate text-xs sm:text-sm font-semibold text-white max-w-[150px] sm:max-w-[240px]">
             {data.title}
           </h3>
           {data.toolType && (
-            <span className="rounded-full border border-[#282E38] bg-[#131519] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fb7ff]">
+            <span className="rounded-[4px] border border-[#282E38] bg-[#131519] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fb7ff]">
               {data.toolType}
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 nodrag">
+          {/* Action buttons attached to the interactive tool box */}
+          {data.hasTool && (
+            <div className="flex items-center gap-1.5 rounded-[6px] border border-[#1b2b40] bg-[#09111d]/92 px-2 py-1 shadow-md">
+              {data.onEdit && (
+                <button
+                  onClick={data.onEdit}
+                  className="nodrag rounded-[4px] border border-[#223247] bg-[#101b2d] px-2.5 py-1 text-[11px] font-semibold text-[#e2e8f0] transition-colors hover:bg-[#16263d] hover:text-white flex items-center gap-1.5"
+                  title={`Edit ${formatToolTypeName(data.toolType)} questions, items, and content in canvas`}
+                >
+                  <Edit3 className="w-3.5 h-3.5 text-[#5A7D99]" />
+                  <span>Edit {formatToolTypeName(data.toolType)}</span>
+                </button>
+              )}
+              {data.onViewCitation && (
+                <button
+                  onClick={data.onViewCitation}
+                  className="nodrag rounded-[4px] border border-blue-500/30 bg-blue-500/15 px-2.5 py-1 text-[11px] font-semibold text-blue-300 transition-colors hover:bg-blue-500 hover:text-white flex items-center gap-1.5 shadow-sm"
+                  title="Open Grounded Document Split-Viewer & Source Citations"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Citations</span>
+                </button>
+              )}
+              {data.onSave && (
+                <button
+                  onClick={data.onSave}
+                  className="nodrag rounded-[4px] border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500 hover:text-white"
+                  title="Save this tool to your personal Saved Tools library"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <Bookmark className="w-3.5 h-3.5" />
+                    <span>Save</span>
+                  </span>
+                </button>
+              )}
+              {data.onShare && (
+                <button
+                  onClick={data.onShare}
+                  className="nodrag rounded-[4px] border border-[#223247] bg-[#101b2d] px-2.5 py-1 text-[11px] font-semibold text-[#e2e8f0] transition-colors hover:bg-[#16263d] hover:text-white"
+                  title="Share with another student or copy direct link"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <Share2 className="w-3.5 h-3.5 text-[#5A7D99]" />
+                    <span>Share</span>
+                  </span>
+                </button>
+              )}
+              {(data.onExportMarkdown || data.onPrintSheet) && (
+                <div className="relative nodrag" ref={exportMenuRef}>
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="nodrag rounded-[4px] border border-[#223247] bg-[#101b2d] px-2.5 py-1 text-[11px] font-semibold text-[#e2e8f0] transition-colors hover:bg-[#16263d] hover:text-white"
+                    title="Export or print study materials"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <Download className="w-3.5 h-3.5 text-[#5A7D99]" />
+                      <span>Export</span>
+                    </span>
+                  </button>
+
+                  {showExportMenu && (
+                    <div className="absolute right-0 top-full mt-1.5 z-50 w-52 rounded-[6px] border border-[#1e2d45] bg-[#21262E] p-1.5 shadow-2xl nodrag">
+                      {data.onExportMarkdown && (
+                        <button
+                          onClick={() => {
+                            setShowExportMenu(false)
+                            data.onExportMarkdown()
+                          }}
+                          className="w-full rounded-[4px] px-3 py-2 text-left text-xs font-semibold text-white transition-colors hover:bg-[#1a253c] flex items-center gap-2"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-[#5A7D99]" />
+                          <span>Download Markdown</span>
+                        </button>
+                      )}
+                      {data.onPrintSheet && (
+                        <button
+                          onClick={() => {
+                            setShowExportMenu(false)
+                            data.onPrintSheet()
+                          }}
+                          className="mt-1 w-full rounded-[4px] px-3 py-2 text-left text-xs font-semibold text-white transition-colors hover:bg-[#1a253c] flex items-center gap-2"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-[#5A7D99]" />
+                          <span>Print / PDF Cheat Sheet</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              {data.onPublish && (
+                <button
+                  onClick={data.onPublish}
+                  className="nodrag rounded-[4px] border border-[#3b82f6]/40 bg-[#3b82f6]/15 px-2.5 py-1 text-[11px] font-semibold text-[#93c5fd] transition-colors hover:bg-[#3b82f6] hover:text-white"
+                  title="Publish this tool to the Community Marketplace"
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>Publish</span>
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Quick Size Presets */}
           <div className="hidden sm:flex items-center gap-1 bg-[#131519] border border-[#282E38] rounded-lg p-0.5 nodrag">
             <button
@@ -327,21 +589,24 @@ function ToolNode({ data }) {
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
                   onClick={() => data.onSelectSuggestion?.('Create interactive flashcards on my topics')}
-                  className="nodrag px-2.5 py-1 text-[11px] rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                  className="nodrag px-3 py-1.5 text-[11px] font-medium rounded-lg bg-[#141b29] hover:bg-[#1f2a3f] text-[#cbd5e1] hover:text-white border border-[#282E38] transition-colors flex items-center gap-1.5 shadow-sm"
                 >
-                  ⚡ Flashcards
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Flashcards</span>
                 </button>
                 <button
                   onClick={() => data.onSelectSuggestion?.('Build a 10-question practice quiz with active recall')}
-                  className="nodrag px-2.5 py-1 text-[11px] rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                  className="nodrag px-3 py-1.5 text-[11px] font-medium rounded-lg bg-[#141b29] hover:bg-[#1f2a3f] text-[#cbd5e1] hover:text-white border border-[#282E38] transition-colors flex items-center gap-1.5 shadow-sm"
                 >
-                  📝 Practice Quiz
+                  <CheckSquare className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Practice Quiz</span>
                 </button>
                 <button
                   onClick={() => data.onSelectSuggestion?.('Generate a concept breakdown diagram')}
-                  className="nodrag px-2.5 py-1 text-[11px] rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors"
+                  className="nodrag px-3 py-1.5 text-[11px] font-medium rounded-lg bg-[#141b29] hover:bg-[#1f2a3f] text-[#cbd5e1] hover:text-white border border-[#282E38] transition-colors flex items-center gap-1.5 shadow-sm"
                 >
-                  🧠 Mind Map
+                  <Brain className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Mind Map</span>
                 </button>
               </div>
             </div>
@@ -677,6 +942,1363 @@ function ChecklistNode({ data, id }) {
   )
 }
 
+function PdfViewerNode({ data, id }) {
+  const [nodeWidth, setNodeWidth] = useState(data.width || 880)
+  const [nodeHeight, setNodeHeight] = useState(data.height || 640)
+  const [isResizing, setIsResizing] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [paragraphs, setParagraphs] = useState(Array.isArray(data.paragraphs) ? data.paragraphs : [])
+  const [selectedText, setSelectedText] = useState('')
+  const [selectedParaId, setSelectedParaId] = useState(null)
+  const [tooltipPos, setTooltipPos] = useState(null)
+  const [copiedId, setCopiedId] = useState(null)
+  const [viewerTab, setViewerTab] = useState(data.fileUrl ? 'pdf' : 'pages')
+  const [localFileUrl, setLocalFileUrl] = useState(data.fileUrl || null)
+  const [activePage, setActivePage] = useState(1)
+  const [zoomLevel, setZoomLevel] = useState(100)
+  const [pageTheme, setPageTheme] = useState('paper') // 'paper' | 'sepia' | 'dark'
+  const [isLoadingDoc, setIsLoadingDoc] = useState(false)
+  const [showOutline, setShowOutline] = useState(false)
+  const [activeRecallMode, setActiveRecallMode] = useState(false)
+  const [revealedClozeIds, setRevealedClozeIds] = useState({})
+  const [userHighlights, setUserHighlights] = useState(Array.isArray(data.highlights) ? data.highlights : [])
+  const [userMarginNotes, setUserMarginNotes] = useState(Array.isArray(data.marginNotes) ? data.marginNotes : [])
+  const [activeHighlightColor, setActiveHighlightColor] = useState('yellow') // 'yellow' | 'green' | 'blue' | 'purple' | 'coral'
+  const [activeMarginInputParaId, setActiveMarginInputParaId] = useState(null)
+  const [marginInputText, setMarginInputText] = useState('')
+  const [speechStatus, setSpeechStatus] = useState('stopped') // 'stopped' | 'playing' | 'paused'
+  const [speechRate, setSpeechRate] = useState(1.0)
+  const [readingParagraphId, setReadingParagraphId] = useState(null)
+
+  const resizeRef = useRef({ startX: 0, startY: 0, startW: 880, startH: 640 })
+  const containerRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const speechUtteranceRef = useRef(null)
+
+  useEffect(() => {
+    if (data.fileUrl) {
+      setLocalFileUrl(data.fileUrl)
+      setViewerTab('pdf')
+    }
+  }, [data.fileUrl])
+
+  useEffect(() => {
+    if (Array.isArray(data.paragraphs) && data.paragraphs.length > 0) {
+      setParagraphs(data.paragraphs)
+      return
+    }
+
+    const docTitle = data.title || 'Study Document'
+    let isMounted = true
+
+    const fetchDoc = async () => {
+      setIsLoadingDoc(true)
+      try {
+        const token = data.authToken || localStorage.getItem('token') || (() => {
+          try {
+            const key = Object.keys(localStorage).find((k) => k.includes('auth-token'))
+            return key ? JSON.parse(localStorage.getItem(key))?.access_token : null
+          } catch {
+            return null
+          }
+        })()
+
+        if (token) {
+          const res = await fetch(`${data.apiBase || 'http://localhost:5000'}/api/document-paragraphs?title=${encodeURIComponent(docTitle)}`, {
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: 'include',
+          })
+          if (res.ok) {
+            const resData = await res.json()
+            if (isMounted && resData.paragraphs && resData.paragraphs.length > 0) {
+              setParagraphs(resData.paragraphs)
+              if (resData.fileUrl && !localFileUrl) {
+                setLocalFileUrl(resData.fileUrl)
+                data.onUpdate?.(id, { fileUrl: resData.fileUrl })
+              }
+              setIsLoadingDoc(false)
+              return
+            }
+          }
+        }
+      } catch {}
+
+      if (isMounted) {
+        setIsLoadingDoc(false)
+        const cleanTitle = (docTitle || 'Course Document').replace(/\+/g, ' ')
+        setParagraphs([
+          {
+            id: 1,
+            paragraphIndex: 1,
+            pageNumber: 1,
+            heading: '1. Executive Overview & Core Mechanisms',
+            text: `Document Source: "${cleanTitle}". This document provides syllabus-aligned theoretical frameworks, core pathways, mathematical models, and critical exam definitions. Review the active recall prompts and highlighted terminology across all subsequent sections.`,
+          },
+          {
+            id: 2,
+            paragraphIndex: 2,
+            pageNumber: 1,
+            heading: '2. Foundational Principles & Thresholds',
+            text: `Core mechanisms operate under specific regulatory thresholds and rate-limiting steps. Ensure clarity on input constraints, intermediary states, and observable outputs during exam evaluations.`,
+          },
+          {
+            id: 3,
+            paragraphIndex: 3,
+            pageNumber: 2,
+            heading: '3. Applied Case Studies & Methodologies',
+            text: `Real-world applications require sequential analysis: initial state validation, constraint checking, iterative transformation, and boundary verification. Compare and contrast alternative operational models.`,
+          },
+          {
+            id: 4,
+            paragraphIndex: 4,
+            pageNumber: 2,
+            heading: '4. Exam Takeaways & Active Recall Summary',
+            text: `Critical review checklist: Memorize primary definitions, master the standard sequence of operations, identify common distractor traps, and verify all formula derivations before tackling practice quizzes.`,
+          },
+        ])
+      }
+    }
+    fetchDoc()
+    return () => {
+      isMounted = false
+      if (window.speechSynthesis) window.speechSynthesis.cancel()
+    }
+  }, [data.title, data.authToken, data.apiBase, data.paragraphs])
+
+  const handleResizeStart = (e) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setIsResizing(true)
+    resizeRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: nodeWidth,
+      startH: nodeHeight,
+    }
+
+    const handleMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - resizeRef.current.startX
+      const deltaY = moveEvent.clientY - resizeRef.current.startY
+      const nextW = Math.max(540, Math.min(1400, resizeRef.current.startW + deltaX))
+      const nextH = Math.max(440, Math.min(1000, resizeRef.current.startH + deltaY))
+      setNodeWidth(nextW)
+      setNodeHeight(nextH)
+      data.onUpdate?.(id, { width: nextW, height: nextH })
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
+  const handleTextSelection = (paraId = null) => {
+    const selection = window.getSelection()
+    const text = selection ? selection.toString().trim() : ''
+    if (text && text.length > 2) {
+      setSelectedText(text)
+      setSelectedParaId(paraId)
+      try {
+        const rect = selection.getRangeAt(0).getBoundingClientRect()
+        if (containerRef.current) {
+          const containerRect = containerRef.current.getBoundingClientRect()
+          setTooltipPos({
+            top: Math.max(10, rect.top - containerRect.top - 54),
+            left: Math.max(10, Math.min(nodeWidth - 360, rect.left - containerRect.left + rect.width / 2 - 160)),
+          })
+        }
+      } catch {}
+    } else {
+      setSelectedText('')
+      setSelectedParaId(null)
+      setTooltipPos(null)
+    }
+  }
+
+  const handleApplyHighlight = (colorToUse = activeHighlightColor) => {
+    if (!selectedText) return
+    const newHighlight = {
+      id: `hl_${Date.now()}`,
+      paragraphId: selectedParaId,
+      text: selectedText,
+      color: colorToUse,
+      pageNumber: activePage,
+      createdAt: Date.now(),
+    }
+    const updated = [...userHighlights, newHighlight]
+    setUserHighlights(updated)
+    data.onUpdate?.(id, { highlights: updated })
+    setSelectedText('')
+    setTooltipPos(null)
+  }
+
+  const handleRemoveHighlight = (hlId) => {
+    const updated = userHighlights.filter((h) => h.id !== hlId)
+    setUserHighlights(updated)
+    data.onUpdate?.(id, { highlights: updated })
+  }
+
+  const handleAddMarginNote = (paraId) => {
+    if (!marginInputText.trim()) return
+    const newNote = {
+      id: `mn_${Date.now()}`,
+      paragraphId: paraId,
+      text: marginInputText.trim(),
+      createdAt: Date.now(),
+    }
+    const updated = [...userMarginNotes, newNote]
+    setUserMarginNotes(updated)
+    data.onUpdate?.(id, { marginNotes: updated })
+    setMarginInputText('')
+    setActiveMarginInputParaId(null)
+  }
+
+  const handleDeleteMarginNote = (noteId) => {
+    const updated = userMarginNotes.filter((n) => n.id !== noteId)
+    setUserMarginNotes(updated)
+    data.onUpdate?.(id, { marginNotes: updated })
+  }
+
+  // Text-To-Speech controls
+  const handleStartReadAloud = (startPara = null) => {
+    if (!('speechSynthesis' in window)) {
+      alert('Text-to-speech is not supported in this browser.')
+      return
+    }
+    window.speechSynthesis.cancel()
+
+    const activeItems = (pages.find((p) => p.pageNumber === activePage)?.items || paragraphs)
+    const textToSpeak = startPara ? startPara.text : activeItems.map((p) => `${p.heading || ''}. ${p.text}`).join(' ')
+
+    if (!textToSpeak.trim()) return
+
+    const utter = new SpeechSynthesisUtterance(textToSpeak)
+    utter.rate = speechRate
+    utter.pitch = 1.0
+
+    if (startPara) {
+      setReadingParagraphId(startPara.id)
+    }
+
+    utter.onend = () => {
+      setSpeechStatus('stopped')
+      setReadingParagraphId(null)
+    }
+
+    utter.onerror = () => {
+      setSpeechStatus('stopped')
+      setReadingParagraphId(null)
+    }
+
+    speechUtteranceRef.current = utter
+    window.speechSynthesis.speak(utter)
+    setSpeechStatus('playing')
+  }
+
+  const handlePauseResumeReadAloud = () => {
+    if (!('speechSynthesis' in window)) return
+    if (speechStatus === 'playing') {
+      window.speechSynthesis.pause()
+      setSpeechStatus('paused')
+    } else if (speechStatus === 'paused') {
+      window.speechSynthesis.resume()
+      setSpeechStatus('playing')
+    }
+  }
+
+  const handleStopReadAloud = () => {
+    if (!('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    setSpeechStatus('stopped')
+    setReadingParagraphId(null)
+  }
+
+  const handleLocalPdfChoose = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const blobUrl = URL.createObjectURL(file)
+      setLocalFileUrl(blobUrl)
+      setViewerTab('pdf')
+      data.onUpdate?.(id, { fileUrl: blobUrl, title: file.name.replace(/\.[^/.]+$/, '') })
+    }
+  }
+
+  // Group paragraphs into virtual A4 pages
+  const pages = useMemo(() => {
+    const grouped = {}
+    paragraphs.forEach((p, idx) => {
+      const pageNum = p.pageNumber || Math.floor(idx / 3) + 1
+      if (!grouped[pageNum]) grouped[pageNum] = []
+      grouped[pageNum].push(p)
+    })
+    const pageKeys = Object.keys(grouped).map(Number).sort((a, b) => a - b)
+    if (pageKeys.length === 0) {
+      return [{ pageNumber: 1, items: [] }]
+    }
+    return pageKeys.map((k) => ({ pageNumber: k, items: grouped[k] }))
+  }, [paragraphs])
+
+  const totalPages = Math.max(1, pages.length)
+  const displayDocTitle = (data.title || 'PDF Document').replace(/\+/g, ' ')
+
+  const matchesSearch = (text) => {
+    if (!searchQuery.trim()) return true
+    return (text || '').toLowerCase().includes(searchQuery.toLowerCase())
+  }
+
+  // Color mapping helper
+  const getHighlightColorStyle = (color) => {
+    switch (color) {
+      case 'green':
+        return 'bg-emerald-400/30 text-emerald-900 dark:text-emerald-200 border-b-2 border-emerald-500'
+      case 'blue':
+        return 'bg-blue-400/30 text-blue-900 dark:text-blue-200 border-b-2 border-blue-500'
+      case 'purple':
+        return 'bg-purple-400/30 text-purple-900 dark:text-purple-200 border-b-2 border-purple-500'
+      case 'coral':
+        return 'bg-rose-400/30 text-rose-900 dark:text-rose-200 border-b-2 border-rose-500'
+      case 'yellow':
+      default:
+        return 'bg-amber-300/40 text-amber-950 dark:text-amber-200 border-b-2 border-amber-400'
+    }
+  }
+
+  // Theme styling for paper sheets
+  const getPageThemeClasses = () => {
+    if (pageTheme === 'sepia') {
+      return {
+        bg: 'bg-[#fbf0d9]',
+        text: 'text-[#2b1f14]',
+        subtext: 'text-[#705843]',
+        border: 'border-[#ebd7b2]',
+        heading: 'text-[#3c2a1a]',
+        rule: 'border-[#ebd7b2]',
+        badge: 'bg-[#ebd7b2]/70 text-[#4a3520]',
+        cardBg: 'bg-[#f4e6c9]/90 border-[#ebd7b2]',
+      }
+    }
+    if (pageTheme === 'dark') {
+      return {
+        bg: 'bg-[#121824]',
+        text: 'text-slate-200',
+        subtext: 'text-slate-400',
+        border: 'border-[#243042]',
+        heading: 'text-white',
+        rule: 'border-[#243042]',
+        badge: 'bg-blue-500/15 text-blue-300 border border-blue-500/30',
+        cardBg: 'bg-[#1a2333]/90 border-[#243042]',
+      }
+    }
+    // Default crisp white paper
+    return {
+      bg: 'bg-white',
+      text: 'text-slate-800',
+      subtext: 'text-slate-500',
+      border: 'border-slate-200',
+      heading: 'text-slate-900',
+      rule: 'border-slate-200',
+      badge: 'bg-slate-100 text-slate-700 border border-slate-300',
+      cardBg: 'bg-slate-50/90 border-slate-200',
+    }
+  }
+
+  const themeStyle = getPageThemeClasses()
+
+  // Render text with interactive highlights and cloze occlusion
+  const renderInteractiveText = (item) => {
+    const rawText = item.text || ''
+    const itemHighlights = userHighlights.filter((h) => h.paragraphId === item.id || rawText.includes(h.text))
+
+    if (!activeRecallMode && itemHighlights.length === 0) {
+      return (
+        <span onMouseUp={() => handleTextSelection(item.id)}>
+          {rawText}
+        </span>
+      )
+    }
+
+    // Build regex / segments for highlights or cloze terms
+    const termsToOccludeOrHighlight = []
+
+    itemHighlights.forEach((hl) => {
+      if (hl.text && rawText.includes(hl.text)) {
+        termsToOccludeOrHighlight.push({
+          text: hl.text,
+          type: 'highlight',
+          color: hl.color || 'yellow',
+          id: hl.id,
+        })
+      }
+    })
+
+    if (activeRecallMode) {
+      // Find key academic patterns (capitalized multi-word concepts, bracketed items, numbers)
+      const regexPatterns = [/\b[A-Z][a-zA-Z0-9_\-]{3,}(?:\s+[A-Z][a-zA-Z0-9_\-]+)?\b/g, /\([A-Za-z0-9_\s\.,\-%+=><]{2,}\)/g]
+      regexPatterns.forEach((rx) => {
+        let match
+        while ((match = rx.exec(rawText)) !== null) {
+          const matchStr = match[0]
+          if (matchStr.length > 3 && !termsToOccludeOrHighlight.some((t) => t.text.includes(matchStr))) {
+            termsToOccludeOrHighlight.push({
+              text: matchStr,
+              type: 'cloze',
+              id: `cloze_${item.id}_${match.index}`,
+            })
+          }
+        }
+      })
+    }
+
+    if (termsToOccludeOrHighlight.length === 0) {
+      return (
+        <span onMouseUp={() => handleTextSelection(item.id)}>
+          {rawText}
+        </span>
+      )
+    }
+
+    // Escape regex characters
+    const escaped = termsToOccludeOrHighlight
+      .map((t) => t.text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'))
+      .filter(Boolean)
+      .join('|')
+
+    if (!escaped) {
+      return (
+        <span onMouseUp={() => handleTextSelection(item.id)}>
+          {rawText}
+        </span>
+      )
+    }
+
+    const splitRegex = new RegExp(`(${escaped})`, 'gi')
+    const parts = rawText.split(splitRegex)
+
+    return (
+      <span onMouseUp={() => handleTextSelection(item.id)}>
+        {parts.map((part, idx) => {
+          const matchedItem = termsToOccludeOrHighlight.find((t) => t.text.toLowerCase() === part.toLowerCase())
+
+          if (!matchedItem) {
+            return <span key={idx}>{part}</span>
+          }
+
+          // Active Recall Cloze mode rendering
+          if (activeRecallMode) {
+            const clozeKey = `${item.id}_${idx}`
+            const isRevealed = Boolean(revealedClozeIds[clozeKey])
+
+            return (
+              <span
+                key={idx}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setRevealedClozeIds((prev) => ({ ...prev, [clozeKey]: !prev[clozeKey] }))
+                }}
+                className={`inline-block px-1.5 py-0.2 mx-0.5 rounded cursor-pointer transition-all ${
+                  isRevealed
+                    ? 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border border-emerald-400/40 shadow-sm'
+                    : 'bg-blue-600/30 hover:bg-blue-600/40 text-transparent filter blur-[4.5px] select-none hover:blur-[2px] border border-blue-400/30'
+                }`}
+                title={isRevealed ? 'Click to hide term' : 'Click to reveal & test recall'}
+              >
+                {part}
+              </span>
+            )
+          }
+
+          // Normal Highlight mode rendering
+          return (
+            <span
+              key={idx}
+              className={`px-1 py-0.2 mx-0.5 rounded font-medium cursor-pointer transition-all hover:ring-2 hover:ring-blue-400/60 ${getHighlightColorStyle(matchedItem.color)}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (window.confirm(`Remove highlight: "${part}"?`)) {
+                  handleRemoveHighlight(matchedItem.id)
+                }
+              }}
+              title="Click to remove or edit highlight"
+            >
+              {part}
+            </span>
+          )
+        })}
+      </span>
+    )
+  }
+
+  return (
+    <div
+      className="canvas-pdf-viewer-node relative select-none rounded-2xl border border-[#223247] bg-[#090d15] shadow-2xl backdrop-blur-2xl flex flex-col overflow-hidden"
+      style={{ width: `${nodeWidth}px` }}
+      ref={containerRef}
+    >
+      {/* Top Application Bar & Drag Handle */}
+      <div className="canvas-node-drag-handle flex flex-wrap items-center justify-between gap-2.5 border-b border-[#1b2636] px-3.5 py-2.5 bg-[#0d1422]">
+        <div className="min-w-0 flex items-center gap-2">
+          <button
+            onClick={() => setShowOutline((prev) => !prev)}
+            className={`p-1.5 rounded-lg border transition-colors ${showOutline ? 'bg-blue-600 text-white border-blue-500' : 'bg-[#131b28] text-slate-300 border-[#243042] hover:text-white'}`}
+            title="Toggle Table of Contents & Outline Sidebar"
+          >
+            <Layers className="w-3.5 h-3.5" />
+          </button>
+          <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-[#60a5fa] font-bold">
+            <BookOpen className="w-3.5 h-3.5 text-blue-400" />
+            <span>PDF Study Reader</span>
+          </div>
+          <div className="h-3.5 w-px bg-[#283548]" />
+          <h3 className="truncate text-xs sm:text-sm font-semibold text-white max-w-[160px] sm:max-w-[240px]" title={displayDocTitle}>
+            {displayDocTitle}
+          </h3>
+          <span className="rounded-full border border-blue-500/30 bg-blue-500/15 px-2 py-0.5 text-[10px] font-mono text-blue-300">
+            {totalPages} {totalPages === 1 ? 'page' : 'pages'}
+          </span>
+        </div>
+
+        {/* View Switchers & Document Actions */}
+        <div className="flex items-center gap-1.5 nodrag">
+          {/* Active Recall / Cloze Mode Toggle */}
+          <button
+            onClick={() => setActiveRecallMode((prev) => !prev)}
+            className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
+              activeRecallMode
+                ? 'bg-purple-600 text-white border border-purple-400 shadow-purple-500/30 animate-pulse'
+                : 'bg-[#131b28] text-slate-300 border border-[#243042] hover:bg-purple-600/20 hover:text-purple-300 hover:border-purple-500/40'
+            }`}
+            title="Active Recall Cloze Blurring Mode: Blurs key terms so you can test yourself!"
+          >
+            <Brain className="w-3 h-3 text-purple-300" />
+            <span>{activeRecallMode ? 'Active Recall: ON' : 'Cloze Blurting'}</span>
+          </button>
+
+          {/* Switch between Authentic Page Sheets and Native Browser PDF Embed */}
+          <div className="flex items-center bg-[#131b28] border border-[#243042] rounded-lg p-0.5 text-[10px] font-medium">
+            <button
+              onClick={() => setViewerTab('pages')}
+              className={`px-2 py-0.5 rounded transition-all ${viewerTab === 'pages' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+              title="Interactive Document Pages (with highlights, margin notes, active recall)"
+            >
+              Interactive Pages
+            </button>
+            <button
+              onClick={() => {
+                setViewerTab('pdf')
+                if (!localFileUrl) fileInputRef.current?.click()
+              }}
+              className={`px-2 py-0.5 rounded transition-all ${viewerTab === 'pdf' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+              title="Native Browser PDF Viewer"
+            >
+              Native PDF
+            </button>
+          </div>
+
+          {/* Reading Tone / Theme (Paper vs Sepia vs Dark) */}
+          {viewerTab === 'pages' && (
+            <div className="hidden sm:flex items-center gap-0.5 bg-[#131b28] border border-[#243042] rounded-lg p-0.5 text-[10px]">
+              <button
+                onClick={() => setPageTheme('paper')}
+                className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${pageTheme === 'paper' ? 'border-blue-400 bg-white text-slate-900 font-bold' : 'border-transparent text-slate-400 hover:text-white'}`}
+                title="Crisp White Paper"
+              >
+                W
+              </button>
+              <button
+                onClick={() => setPageTheme('sepia')}
+                className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${pageTheme === 'sepia' ? 'border-amber-400 bg-[#fbf0d9] text-[#2b1f14] font-bold' : 'border-transparent text-slate-400 hover:text-white'}`}
+                title="Warm Book Sepia"
+              >
+                S
+              </button>
+              <button
+                onClick={() => setPageTheme('dark')}
+                className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${pageTheme === 'dark' ? 'border-blue-400 bg-slate-800 text-white font-bold' : 'border-transparent text-slate-400 hover:text-white'}`}
+                title="Dark Academic Mode"
+              >
+                D
+              </button>
+            </div>
+          )}
+
+          {/* Search Box */}
+          <div className="relative">
+            <Search className="w-3 h-3 absolute left-2 top-2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search in PDF..."
+              className="bg-[#131b28] border border-[#243042] rounded-lg pl-7 pr-2 py-1 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 w-24 sm:w-32 transition-all"
+            />
+          </div>
+
+          {/* Pick local PDF */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            onChange={handleLocalPdfChoose}
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="rounded-lg border border-[#243042] bg-[#131b28] px-2 py-1 text-[10px] text-slate-300 hover:bg-[#1e293b] hover:text-white transition-colors"
+            title="Upload or replace PDF file"
+          >
+            <Upload className="w-3 h-3 inline mr-1 text-blue-400" />
+            <span className="hidden md:inline">Open PDF</span>
+          </button>
+
+          {/* Close */}
+          {data.onDelete && (
+            <button
+              onClick={() => data.onDelete(id)}
+              className="nodrag rounded-lg border border-red-900/40 bg-red-950/20 p-1.5 text-red-400 transition-colors hover:bg-red-900/40 hover:text-white"
+              title="Close PDF Viewer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Reader Secondary Toolbar (Page Navigation, Highlighters, Read-Aloud TTS & Zoom) */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1b2636] px-4 py-1.5 bg-[#0a0f19] text-xs text-slate-300 select-none">
+        <div className="flex items-center gap-2">
+          {viewerTab === 'pages' && (
+            <>
+              <button
+                disabled={activePage <= 1}
+                onClick={() => setActivePage((p) => Math.max(1, p - 1))}
+                className="rounded p-1 text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors"
+                title="Previous Page"
+              >
+                ◀
+              </button>
+              <span className="text-[11px] font-mono text-slate-400">
+                Page <strong className="text-white">{activePage}</strong> / {totalPages}
+              </span>
+              <button
+                disabled={activePage >= totalPages}
+                onClick={() => setActivePage((p) => Math.min(totalPages, p + 1))}
+                className="rounded p-1 text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 transition-colors"
+                title="Next Page"
+              >
+                ▶
+              </button>
+
+              <div className="h-3.5 w-px bg-[#243042] mx-1" />
+
+              {/* Text-to-Speech Toolbar */}
+              <div className="flex items-center gap-1 bg-[#131b28] border border-[#243042] rounded-md px-1.5 py-0.5 text-[10px]">
+                {speechStatus === 'stopped' ? (
+                  <button
+                    onClick={() => handleStartReadAloud()}
+                    className="flex items-center gap-1 text-blue-300 hover:text-white font-medium"
+                    title="Read Aloud (Text to Speech)"
+                  >
+                    <Volume2 className="w-3 h-3 text-blue-400" />
+                    <span>Read Aloud</span>
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={handlePauseResumeReadAloud}
+                      className="px-1 text-amber-300 hover:text-white font-bold"
+                      title={speechStatus === 'playing' ? 'Pause Speech' : 'Resume Speech'}
+                    >
+                      {speechStatus === 'playing' ? '❚❚' : '▶'}
+                    </button>
+                    <button
+                      onClick={handleStopReadAloud}
+                      className="px-1 text-red-400 hover:text-white font-bold"
+                      title="Stop Speech"
+                    >
+                      ■
+                    </button>
+                  </>
+                )}
+
+                <button
+                  onClick={() => setSpeechRate((r) => (r === 1.0 ? 1.25 : r === 1.25 ? 1.5 : 1.0))}
+                  className="font-mono text-[9px] text-slate-400 hover:text-white ml-1 px-1 rounded bg-[#0c121e]"
+                  title="Speech Speed"
+                >
+                  {speechRate}x
+                </button>
+              </div>
+
+              {/* Highlighter Color Palette Picker */}
+              <div className="hidden md:flex items-center gap-1 bg-[#131b28] border border-[#243042] rounded-md px-1.5 py-0.5 text-[10px]">
+                <span className="text-slate-400 text-[9px] font-mono mr-0.5">Pen:</span>
+                {[
+                  { color: 'yellow', hex: '#fde047', label: 'Yellow (Core Concept)' },
+                  { color: 'green', hex: '#86efac', label: 'Green (Definition)' },
+                  { color: 'blue', hex: '#93c5fd', label: 'Blue (Formula / Logic)' },
+                  { color: 'purple', hex: '#d8b4fe', label: 'Purple (Exam Trap)' },
+                  { color: 'coral', hex: '#fda4af', label: 'Coral (Warning)' },
+                ].map((c) => (
+                  <button
+                    key={c.color}
+                    onClick={() => setActiveHighlightColor(c.color)}
+                    style={{ backgroundColor: c.hex }}
+                    className={`w-3.5 h-3.5 rounded-full transition-transform ${activeHighlightColor === c.color ? 'scale-125 ring-2 ring-white shadow-sm' : 'opacity-70 hover:opacity-100'}`}
+                    title={c.label}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Zoom controls */}
+          <div className="flex items-center gap-1 bg-[#131b28] border border-[#243042] rounded-md px-1.5 py-0.5 text-[10px]">
+            <button
+              onClick={() => setZoomLevel((z) => Math.max(75, z - 15))}
+              className="text-slate-400 hover:text-white px-1"
+              title="Zoom out"
+            >
+              -
+            </button>
+            <span className="font-mono text-slate-300 w-8 text-center">{zoomLevel}%</span>
+            <button
+              onClick={() => setZoomLevel((z) => Math.min(150, z + 15))}
+              className="text-slate-400 hover:text-white px-1"
+              title="Zoom in"
+            >
+              +
+            </button>
+          </div>
+
+          {/* Quick preset sizes */}
+          <div className="hidden sm:flex items-center gap-0.5 bg-[#131b28] border border-[#243042] rounded-md p-0.5 text-[10px]">
+            <button
+              onClick={() => { setNodeWidth(680); setNodeHeight(540); data.onUpdate?.(id, { width: 680, height: 540 }) }}
+              className={`px-1.5 py-0.2 rounded ${nodeWidth <= 720 ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+            >
+              S
+            </button>
+            <button
+              onClick={() => { setNodeWidth(880); setNodeHeight(660); data.onUpdate?.(id, { width: 880, height: 660 }) }}
+              className={`px-1.5 py-0.2 rounded ${nodeWidth > 720 && nodeWidth <= 1000 ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+            >
+              M
+            </button>
+            <button
+              onClick={() => { setNodeWidth(1140); setNodeHeight(780); data.onUpdate?.(id, { width: 1140, height: 780 }) }}
+              className={`px-1.5 py-0.2 rounded ${nodeWidth > 1000 ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+            >
+              L
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Container with Optional Outline Sidebar */}
+      <div className="flex-1 flex overflow-hidden relative" style={{ height: `${nodeHeight}px` }}>
+        {/* Left Table of Contents / Outline Drawer */}
+        {showOutline && viewerTab === 'pages' && (
+          <aside className="w-56 bg-[#0c121e] border-r border-[#1e2a3c] p-3 overflow-y-auto flex flex-col flex-shrink-0 animate-fade-in text-xs">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#1e2a3c]">
+              <span className="font-bold text-white uppercase text-[10px] tracking-wider flex items-center gap-1">
+                <Layers className="w-3 h-3 text-blue-400" />
+                <span>Contents</span>
+              </span>
+              <button
+                onClick={() => setShowOutline(false)}
+                className="text-slate-400 hover:text-white p-0.5"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              {paragraphs.map((p, idx) => {
+                const pageNum = p.pageNumber || Math.floor(idx / 3) + 1
+                return (
+                  <button
+                    key={p.id || idx}
+                    onClick={() => setActivePage(pageNum)}
+                    className={`w-full text-left p-2 rounded-lg text-[11px] transition-all flex flex-col gap-0.5 ${
+                      activePage === pageNum
+                        ? 'bg-blue-600/20 border border-blue-500/40 text-blue-200 font-semibold'
+                        : 'text-slate-400 hover:bg-[#151f30] hover:text-white'
+                    }`}
+                  >
+                    <span className="line-clamp-1">{p.heading || `Section ${idx + 1}`}</span>
+                    <span className="text-[9px] text-slate-500 font-mono">Page {pageNum}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </aside>
+        )}
+
+        {/* Main Document Reading Canvas */}
+        <div
+          className="relative overflow-y-auto p-4 sm:p-6 space-y-8 select-text scrollbar-thin bg-[#080c14] flex-1 flex flex-col items-center"
+        >
+          {/* Floating Highlight Micro-Actions Tooltip */}
+          {selectedText && tooltipPos && (
+            <div
+              className="absolute z-50 flex items-center gap-1.5 rounded-xl border border-blue-500/50 bg-[#0c1424] px-2.5 py-1.5 shadow-2xl backdrop-blur-xl animate-fade-in nodrag"
+              style={{ top: `${tooltipPos.top}px`, left: `${tooltipPos.left}px` }}
+            >
+              {/* Highlight Swatches */}
+              <div className="flex items-center gap-1 border-r border-[#243042] pr-1.5 mr-0.5">
+                {[
+                  { color: 'yellow', hex: '#fde047' },
+                  { color: 'green', hex: '#86efac' },
+                  { color: 'blue', hex: '#93c5fd' },
+                  { color: 'purple', hex: '#d8b4fe' },
+                  { color: 'coral', hex: '#fda4af' },
+                ].map((c) => (
+                  <button
+                    key={c.color}
+                    onClick={() => handleApplyHighlight(c.color)}
+                    style={{ backgroundColor: c.hex }}
+                    className="w-3.5 h-3.5 rounded-full hover:scale-125 transition-transform"
+                    title={`Highlight in ${c.color}`}
+                  />
+                ))}
+              </div>
+
+              <button
+                onClick={() => {
+                  data.onGenerateFromHighlight?.(selectedText, 'flashcard', { title: displayDocTitle, pageNumber: activePage, paragraphIndex: selectedParaId })
+                  setSelectedText('')
+                  setTooltipPos(null)
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-amber-500/20 px-2 py-1 text-[11px] font-semibold text-amber-300 hover:bg-amber-500 hover:text-white transition-colors"
+                title="Create active recall flashcard from selection"
+              >
+                <Zap className="w-3 h-3" />
+                <span>Make Card</span>
+              </button>
+              <button
+                onClick={() => {
+                  data.onGenerateFromHighlight?.(selectedText, 'quiz', { title: displayDocTitle, pageNumber: activePage, paragraphIndex: selectedParaId })
+                  setSelectedText('')
+                  setTooltipPos(null)
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-blue-500/20 px-2 py-1 text-[11px] font-semibold text-blue-300 hover:bg-blue-500 hover:text-white transition-colors"
+                title="Generate practice quiz question testing this concept"
+              >
+                <CheckSquare className="w-3 h-3" />
+                <span>Quiz</span>
+              </button>
+              <button
+                onClick={() => {
+                  data.onGenerateFromHighlight?.(selectedText, 'pin', { title: displayDocTitle, pageNumber: activePage, paragraphIndex: selectedParaId })
+                  setSelectedText('')
+                  setTooltipPos(null)
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-slate-800 px-2 py-1 text-[11px] font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                title="Pin quote / formula to canvas"
+              >
+                <Pin className="w-3 h-3" />
+                <span>Pin</span>
+              </button>
+              <button
+                onClick={() => {
+                  data.onGenerateFromHighlight?.(selectedText, 'explain', { title: displayDocTitle, pageNumber: activePage, paragraphIndex: selectedParaId })
+                  setSelectedText('')
+                  setTooltipPos(null)
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-purple-500/20 px-2 py-1 text-[11px] font-semibold text-purple-300 hover:bg-purple-500 hover:text-white transition-colors"
+                title="Ask AI Study Assistant to explain concept"
+              >
+                <Brain className="w-3 h-3" />
+                <span>Explain</span>
+              </button>
+            </div>
+          )}
+
+          {/* NATIVE PDF EMBED MODE */}
+          {viewerTab === 'pdf' ? (
+            localFileUrl ? (
+              <div className="w-full h-full min-h-[480px] rounded-xl overflow-hidden bg-[#1a2333] border border-slate-800 shadow-2xl flex flex-col">
+                <iframe
+                  src={`${localFileUrl}#view=FitH&toolbar=1&navpanes=1`}
+                  title={displayDocTitle}
+                  className="w-full flex-1 border-none rounded-xl"
+                  style={{ minHeight: `${nodeHeight - 70}px` }}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center p-12 text-center text-slate-400 w-full min-h-[380px] rounded-2xl border-2 border-dashed border-[#243042] bg-[#0c121e]">
+                <div className="w-14 h-14 rounded-2xl bg-blue-500/15 border border-blue-400/30 flex items-center justify-center text-blue-400 mb-3">
+                  <FileText className="w-7 h-7" />
+                </div>
+                <h4 className="text-sm font-bold text-white mb-1">Open PDF Document</h4>
+                <p className="text-xs text-slate-400 max-w-sm mb-4">
+                  Upload your course PDF or lecture slides to view in full fidelity with native annotation controls.
+                </p>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-600/25 transition-all"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Select PDF File</span>
+                </button>
+              </div>
+            )
+          ) : (
+            /* AUTHENTIC INTERACTIVE A4 PAPER SHEETS MODE */
+            <div
+              className="w-full flex flex-col items-center space-y-6 transition-transform duration-200 origin-top"
+              style={{ transform: `scale(${zoomLevel / 100})` }}
+            >
+              {pages
+                .filter((pg) => pg.pageNumber === activePage || searchQuery.trim().length > 0)
+                .map((pg) => {
+                  const visibleItems = pg.items.filter((item) => matchesSearch(item.text || item.heading))
+                  if (searchQuery.trim() && visibleItems.length === 0) return null
+
+                  return (
+                    <div
+                      key={pg.pageNumber}
+                      className={`w-full max-w-[740px] min-h-[580px] rounded-xl shadow-2xl p-6 sm:p-10 border transition-all ${themeStyle.bg} ${themeStyle.border} ${themeStyle.text}`}
+                    >
+                      {/* Header Sheet Banner */}
+                      <div className={`flex items-center justify-between pb-3 mb-5 border-b text-[11px] font-mono tracking-wider ${themeStyle.rule} ${themeStyle.subtext}`}>
+                        <span className="truncate max-w-[280px] uppercase font-semibold">
+                          {displayDocTitle}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          {activeRecallMode && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-700 dark:text-purple-300 font-sans font-bold border border-purple-400/40">
+                              🧠 Cloze Recall Active
+                            </span>
+                          )}
+                          <span className="font-bold">
+                            PAGE {pg.pageNumber} OF {totalPages}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Page Content Body */}
+                      <div className="space-y-6">
+                        {visibleItems.length === 0 ? (
+                          <div className="py-12 text-center text-xs opacity-60">
+                            No text on this page matches "{searchQuery}".
+                          </div>
+                        ) : (
+                          visibleItems.map((item, idx) => {
+                            const isReadingThis = readingParagraphId === item.id
+                            const paraMarginNotes = userMarginNotes.filter((mn) => mn.paragraphId === item.id)
+
+                            return (
+                              <div
+                                key={item.id || idx}
+                                className={`group/item relative rounded-xl p-3 -mx-3 transition-all ${
+                                  isReadingThis ? 'bg-blue-500/10 ring-2 ring-blue-500/40' : 'hover:bg-slate-500/5'
+                                }`}
+                              >
+                                {item.heading && (
+                                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                                    <h4 className={`text-sm sm:text-base font-bold font-serif tracking-tight ${themeStyle.heading}`}>
+                                      {item.heading}
+                                    </h4>
+                                    <button
+                                      onClick={() => handleStartReadAloud(item)}
+                                      className="opacity-0 group-hover/item:opacity-100 text-slate-400 hover:text-blue-500 p-1 text-[10px] transition-opacity"
+                                      title="Read this section aloud"
+                                    >
+                                      <Volume2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+
+                                <div className="flex items-start justify-between gap-3">
+                                  <p className="text-xs sm:text-[13px] leading-relaxed font-sans text-justify selection:bg-blue-200 selection:text-blue-900 flex-1">
+                                    {renderInteractiveText(item)}
+                                  </p>
+
+                                  <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity nodrag flex-shrink-0">
+                                    {/* Add Margin Note Button */}
+                                    <button
+                                      onClick={() => setActiveMarginInputParaId(activeMarginInputParaId === item.id ? null : item.id)}
+                                      className="text-slate-400 hover:text-purple-600 p-1 text-[10px] rounded transition-colors"
+                                      title="Add Margin Annotation / Mnemonic"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    {/* Copy Excerpt Button */}
+                                    <button
+                                      onClick={() => {
+                                        navigator.clipboard?.writeText(item.text)
+                                        setCopiedId(item.id || idx)
+                                        setTimeout(() => setCopiedId(null), 2000)
+                                      }}
+                                      className="text-slate-400 hover:text-blue-600 p-1 text-[10px] rounded transition-colors"
+                                      title="Copy excerpt"
+                                    >
+                                      {copiedId === (item.id || idx) ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Margin Notes Tray for this paragraph */}
+                                {(paraMarginNotes.length > 0 || activeMarginInputParaId === item.id) && (
+                                  <div className="mt-3 pt-2.5 border-t border-dashed border-slate-300/40 space-y-2">
+                                    {paraMarginNotes.map((mn) => (
+                                      <div
+                                        key={mn.id}
+                                        className={`p-2.5 rounded-lg text-xs flex items-start justify-between gap-2 shadow-sm border ${themeStyle.cardBg}`}
+                                      >
+                                        <div className="flex items-start gap-2 flex-1">
+                                          <Pin className="w-3 h-3 text-amber-500 flex-shrink-0 mt-0.5" />
+                                          <p className="text-[11px] leading-relaxed text-slate-700 dark:text-slate-200">
+                                            {mn.text}
+                                          </p>
+                                        </div>
+                                        <button
+                                          onClick={() => handleDeleteMarginNote(mn.id)}
+                                          className="text-slate-400 hover:text-red-400 p-0.5"
+                                          title="Delete note"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ))}
+
+                                    {activeMarginInputParaId === item.id && (
+                                      <div className="flex items-center gap-2 pt-1 animate-fade-in">
+                                        <input
+                                          type="text"
+                                          value={marginInputText}
+                                          onChange={(e) => setMarginInputText(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleAddMarginNote(item.id)
+                                          }}
+                                          placeholder="Write a margin note, synthesis, or mnemonic..."
+                                          className="flex-1 bg-white dark:bg-[#1a2333] border border-slate-300 dark:border-[#283548] rounded-lg px-2.5 py-1 text-xs text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-purple-500"
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={() => handleAddMarginNote(item.id)}
+                                          className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition-colors"
+                                        >
+                                          Save
+                                        </button>
+                                        <button
+                                          onClick={() => { setActiveMarginInputParaId(null); setMarginInputText('') }}
+                                          className="text-xs text-slate-400 hover:text-white px-1"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
+
+                      {/* Running Footer Rule */}
+                      <div className={`mt-8 pt-4 border-t flex items-center justify-between text-[10px] font-mono opacity-60 ${themeStyle.rule}`}>
+                        <span>HydrusLearn Verified Syllabus Chunk</span>
+                        <span>§ Section {pg.pageNumber}.1</span>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Resize Corner Handle */}
+      <div
+        onMouseDown={handleResizeStart}
+        className="nodrag absolute bottom-1 right-1 z-20 flex h-6 w-6 cursor-se-resize items-center justify-center rounded-br-2xl text-[#64748b] hover:text-white transition-colors group"
+        title="Drag corner to resize PDF viewer"
+      >
+        <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" className="opacity-60 group-hover:opacity-100">
+          <path d="M14 2 L2 14" strokeLinecap="round" />
+          <path d="M14 7 L7 14" strokeLinecap="round" />
+          <path d="M14 12 L12 14" strokeLinecap="round" />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+function CanvasPageHeaderNode({ data }) {
+  const categories = data.categories || ['all', 'flashcards', 'quiz', 'feynman', 'cloze', 'scenario', 'notes']
+  const accentColor = data.accent || 'blue'
+
+  const getAccentBadge = () => {
+    if (accentColor === 'purple') return 'text-purple-400 bg-purple-500/15 border-purple-500/30'
+    if (accentColor === 'emerald') return 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30'
+    return 'text-blue-400 bg-blue-500/15 border-blue-500/30'
+  }
+
+  return (
+    <div className="select-none rounded-2xl border border-slate-800/90 bg-[#0d1322]/95 backdrop-blur-xl shadow-2xl p-3.5 min-w-[540px] max-w-[680px]">
+      {/* Top Header / Drag Handle */}
+      <div className="canvas-node-drag-handle flex items-center justify-between gap-3 pb-2.5 mb-2.5 border-b border-slate-800/80 cursor-grab active:cursor-grabbing">
+        <div className="flex items-center gap-2">
+          {data.icon === 'share' ? (
+            <Share2 className="w-4 h-4 text-purple-400" />
+          ) : data.icon === 'marketplace' ? (
+            <Globe className="w-4 h-4 text-emerald-400" />
+          ) : (
+            <Bookmark className="w-4 h-4 text-blue-400" />
+          )}
+          <span className="text-xs font-bold uppercase tracking-[0.16em] text-white">
+            {data.title}
+          </span>
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-mono border ${getAccentBadge()}`}>
+            {data.count} {data.count === 1 ? 'item' : 'items'}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 nodrag">
+          {data.onRefresh && (
+            <button
+              onClick={data.onRefresh}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Refresh items"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${data.loading ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+          {data.onClose && (
+            <button
+              onClick={data.onClose}
+              className="p-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/20 transition-colors"
+              title="Close section from canvas"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Search & Category Pills */}
+      <div className="space-y-2.5 nodrag">
+        <div className="relative">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+          <input
+            type="text"
+            value={data.search || ''}
+            onChange={(e) => data.onSearchChange?.(e.target.value)}
+            placeholder={`Filter ${data.title.toLowerCase()}...`}
+            className="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+          />
+        </div>
+
+        {categories.length > 1 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-thin">
+            <span className="text-[10px] font-bold uppercase text-slate-500 tracking-wider flex-shrink-0 flex items-center gap-1">
+              <Filter className="w-2.5 h-2.5" /> Topic:
+            </span>
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => data.onCategoryChange?.(cat)}
+                className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all capitalize whitespace-nowrap ${
+                  data.category === cat
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SavedToolCardNode({ data }) {
+  const tool = data.tool || {}
+  const meta = extractToolMetadata(tool)
+
+  return (
+    <div className="select-none w-[340px] rounded-2xl border border-slate-800/90 bg-[#0e1626]/95 backdrop-blur-xl hover:border-blue-500/50 shadow-xl transition-all hover:shadow-2xl hover:shadow-blue-500/10 p-4 flex flex-col justify-between group">
+      <div>
+        {/* Card Header / Drag Handle */}
+        <div className="canvas-node-drag-handle flex items-center justify-between gap-2 pb-2 mb-2 border-b border-slate-800/80 cursor-grab active:cursor-grabbing">
+          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-400 border border-blue-500/30">
+            {meta.toolType || 'Study Tool'}
+          </span>
+          <div className="flex items-center gap-1 nodrag opacity-0 group-hover:opacity-100 transition-opacity">
+            {data.onShare && (
+              <button
+                onClick={data.onShare}
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Share Tool"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {data.onExportAnki && (
+              <button
+                onClick={data.onExportAnki}
+                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Export Anki CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {data.onDelete && (
+              <button
+                onClick={data.onDelete}
+                className="p-1 rounded text-slate-400 hover:text-red-400 hover:bg-red-500/20 transition-colors"
+                title="Delete from Library"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Card Content */}
+        <h4 className="text-sm font-bold text-white group-hover:text-blue-300 transition-colors line-clamp-1 mb-1">
+          {meta.title || 'Interactive Tool'}
+        </h4>
+        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-3">
+          {meta.description || 'Interactive revision kit with practice concepts and recall testing.'}
+        </p>
+      </div>
+
+      {/* Card Footer with Launch Button */}
+      <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 nodrag">
+        <span className="text-[10px] text-slate-500 font-mono">
+          {meta.items?.length ? `${meta.items.length} cards` : 'Interactive'}
+        </span>
+        <button
+          onClick={data.onLaunch}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-all shadow-md hover:shadow-blue-500/25 active:scale-95"
+        >
+          <Play className="w-3 h-3 fill-current" />
+          <span>Launch Tool</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function SharedToolCardNode({ data }) {
+  const tool = data.tool || {}
+  const meta = extractToolMetadata(tool)
+
+  return (
+    <div className="select-none w-[340px] rounded-2xl border border-purple-500/30 bg-[#130f24]/95 backdrop-blur-xl hover:border-purple-500/60 shadow-xl transition-all hover:shadow-2xl hover:shadow-purple-500/10 p-4 flex flex-col justify-between group">
+      <div>
+        <div className="canvas-node-drag-handle flex items-center justify-between gap-2 pb-2 mb-2 border-b border-purple-900/40 cursor-grab active:cursor-grabbing">
+          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-400 border border-purple-500/30">
+            {meta.toolType || 'Shared Tool'}
+          </span>
+          {tool.sender_email && (
+            <span className="text-[11px] text-purple-300 font-medium truncate max-w-[140px]" title={`Shared by ${tool.sender_email}`}>
+              From: {tool.sender_email.split('@')[0]}
+            </span>
+          )}
+        </div>
+
+        <h4 className="text-sm font-bold text-white group-hover:text-purple-300 transition-colors line-clamp-1 mb-1">
+          {meta.title || 'Shared Tool'}
+        </h4>
+        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-3">
+          {meta.description || 'Shared study session and revision kit.'}
+        </p>
+      </div>
+
+      <div className="pt-2 border-t border-purple-900/40 flex items-center justify-between gap-2 nodrag">
+        {data.onSave && (
+          <button
+            onClick={data.onSave}
+            className="text-[11px] font-semibold text-slate-300 hover:text-white px-2 py-1 rounded hover:bg-slate-800 flex items-center gap-1 transition-colors"
+          >
+            <Bookmark className="w-3 h-3 text-purple-400" />
+            <span>Save Copy</span>
+          </button>
+        )}
+        <button
+          onClick={data.onLaunch}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs transition-all shadow-md hover:shadow-purple-500/25 ml-auto active:scale-95"
+        >
+          <Play className="w-3 h-3 fill-current" />
+          <span>Launch Tool</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function MarketplaceCardNode({ data }) {
+  const tool = data.tool || {}
+  const meta = extractToolMetadata(tool)
+
+  return (
+    <div className="select-none w-[340px] rounded-2xl border border-emerald-500/30 bg-[#0d1c1c]/95 backdrop-blur-xl hover:border-emerald-500/60 shadow-xl transition-all hover:shadow-2xl hover:shadow-emerald-500/10 p-4 flex flex-col justify-between group">
+      <div>
+        <div className="canvas-node-drag-handle flex items-center justify-between gap-2 pb-2 mb-2 border-b border-emerald-900/40 cursor-grab active:cursor-grabbing">
+          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+            {meta.toolType || 'Community'}
+          </span>
+          {tool.category && (
+            <span className="text-[10px] text-emerald-400/80 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40 font-mono">
+              {tool.category}
+            </span>
+          )}
+        </div>
+
+        <h4 className="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors line-clamp-1 mb-1">
+          {meta.title || 'Community Tool'}
+        </h4>
+        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-2">
+          {meta.description || 'Public study revision tool shared with the community.'}
+        </p>
+
+        {Array.isArray(tool.tags) && tool.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {tool.tags.slice(0, 3).map((tg, idx) => (
+              <span key={idx} className="text-[10px] text-slate-400 bg-slate-800/80 px-1.5 py-0.2 rounded">
+                #{tg}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="pt-2 border-t border-emerald-900/40 flex items-center justify-between gap-2 nodrag">
+        {data.onSave && (
+          <button
+            onClick={data.onSave}
+            className="text-[11px] font-semibold text-slate-300 hover:text-white px-2 py-1 rounded hover:bg-slate-800 flex items-center gap-1 transition-colors"
+          >
+            <Bookmark className="w-3 h-3 text-emerald-400" />
+            <span>Fork / Save</span>
+          </button>
+        )}
+        <button
+          onClick={data.onLaunch}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shadow-md hover:shadow-emerald-500/25 ml-auto active:scale-95"
+        >
+          <Play className="w-3 h-3 fill-current" />
+          <span>Launch Tool</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const canvasNodeTypes = {
   welcome: WelcomeNode,
   thread: ThreadNode,
@@ -684,6 +2306,71 @@ const canvasNodeTypes = {
   sticky: StickyNoteNode,
   pin: PinNode,
   checklist: ChecklistNode,
+  pdfViewer: PdfViewerNode,
+  pageHeader: CanvasPageHeaderNode,
+  toolCard: SavedToolCardNode,
+  sharedCard: SharedToolCardNode,
+  marketplaceCard: MarketplaceCardNode,
+}
+
+function CanvasViewAutoFitter({ activeView, nodeCount, hasTool }) {
+  const { fitView } = useReactFlow()
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fitView({ padding: 0.28, duration: 400, maxZoom: 0.76 })
+    }, 80)
+    return () => clearTimeout(timer)
+  }, [activeView, nodeCount, hasTool, fitView])
+  return null
+}
+
+function CanvasViewportControls() {
+  const { zoomIn, zoomOut, fitView, setViewport, getZoom } = useReactFlow()
+  const [zoomLevel, setZoomLevel] = useState(80)
+
+  useEffect(() => {
+    const updateZoom = () => {
+      try {
+        setZoomLevel(Math.round(getZoom() * 100))
+      } catch {}
+    }
+    const interval = setInterval(updateZoom, 500)
+    return () => clearInterval(interval)
+  }, [getZoom])
+
+  return (
+    <div className="nodrag absolute bottom-4 right-4 z-20 flex items-center gap-1 rounded-xl border border-[#282E38] bg-[#0c1017]/95 px-1.5 py-1 shadow-2xl backdrop-blur-xl select-none">
+      <button
+        onClick={() => zoomOut({ duration: 200 })}
+        className="p-1 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#1a2130] transition-colors"
+        title="Zoom Out (-)"
+      >
+        <Minus className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => setViewport({ x: 60, y: 30, zoom: 0.8 }, { duration: 200 })}
+        className="px-2 py-0.5 rounded-lg text-[11px] font-mono text-[#cbd5e1] hover:text-white hover:bg-[#1a2130] transition-colors"
+        title="Reset Zoom to 80%"
+      >
+        {zoomLevel}%
+      </button>
+      <button
+        onClick={() => zoomIn({ duration: 200 })}
+        className="p-1 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#1a2130] transition-colors"
+        title="Zoom In (+)"
+      >
+        <Plus className="w-3.5 h-3.5" />
+      </button>
+      <div className="h-3.5 w-px bg-[#282E38] mx-0.5" />
+      <button
+        onClick={() => fitView({ padding: 0.25, duration: 300 })}
+        className="p-1 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#1a2130] transition-colors"
+        title="Fit Content to Screen (F)"
+      >
+        <Maximize2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  )
 }
 
 export default function Learningplayground() {
@@ -707,9 +2394,62 @@ export default function Learningplayground() {
   const [isThinkingMode, setIsThinkingMode] = useState(false)
   const [showSidebarSearch, setShowSidebarSearch] = useState(false)
 
+  // Active Canvas Page View ('playground' | 'my-tools' | 'shared' | 'marketplace')
+  const [activeCanvasView, setActiveCanvasView] = useState('playground')
+  const [savedToolsSearch, setSavedToolsSearch] = useState('')
+  const [savedToolsCategory, setSavedToolsCategory] = useState('all')
+  const [sharedToolsSearch, setSharedToolsSearch] = useState('')
+  const [marketplaceSearch, setMarketplaceSearch] = useState('')
+  const [marketplaceCategory, setMarketplaceCategory] = useState('all')
+
+  const switchCanvasView = (viewKey) => {
+    setActiveCanvasView(viewKey)
+    if (viewKey === 'my-tools') fetchSavedTools()
+    if (viewKey === 'shared') fetchSharedTools()
+    if (viewKey === 'marketplace') fetchMarketplaceTools()
+  }
+
   // Persistent Chat History (Recents) State — strictly scoped to logged-in user
   const [chatHistory, setChatHistory] = useState([])
   const [activeChatId, setActiveChatId] = useState(null)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+
+  // Fetch chat sessions from backend database
+  const fetchChatSessions = async () => {
+    if (!user?.id || !session?.access_token) return
+    setIsLoadingHistory(true)
+    try {
+      const res = await fetch(`${API_BASE}/api/learning-playground/sessions`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: 'include',
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data.data)) {
+          const formatted = data.data.map((row) => ({
+            id: String(row.id),
+            title: row.title || 'Study Session',
+            messages: Array.isArray(row.messages) ? row.messages : [],
+            generatedTool: row.generated_tool || null,
+            attachedDocument: row.context?.attachedDocument || row.context || null,
+            latestPrompt: row.latest_prompt || '',
+            updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : Date.now(),
+          }))
+          setChatHistory(formatted)
+          try {
+            const userKey = `learning_playground_chat_history_${user.id}`
+            localStorage.setItem(userKey, JSON.stringify(formatted))
+          } catch {}
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch chat sessions from server:', err)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
 
   // Load chat history ONLY when authenticated with a valid user
   useEffect(() => {
@@ -717,9 +2457,15 @@ export default function Learningplayground() {
       try {
         const userKey = `learning_playground_chat_history_${user.id}`
         const saved = localStorage.getItem(userKey)
-        setChatHistory(saved ? JSON.parse(saved) : [])
+        if (saved) {
+          setChatHistory(JSON.parse(saved))
+        }
       } catch {
         setChatHistory([])
+      }
+      // Also fetch from backend if access token is available
+      if (session?.access_token) {
+        fetchChatSessions()
       }
     } else {
       // User is logged out — clear all in-memory chats and remove any legacy unauthenticated cache
@@ -732,7 +2478,7 @@ export default function Learningplayground() {
         localStorage.removeItem('learning_playground_chat_history')
       } catch { }
     }
-  }, [user?.id])
+  }, [user?.id, session?.access_token])
 
   // Save chat history ONLY when logged in
   useEffect(() => {
@@ -770,6 +2516,7 @@ export default function Learningplayground() {
 
   // In-Canvas Inline Editor State
   const [showEditModal, setShowEditModal] = useState(false)
+  const [editingToolType, setEditingToolType] = useState('flashcards')
   const [editingTitle, setEditingTitle] = useState('')
   const [editingDesc, setEditingDesc] = useState('')
   const [editingItems, setEditingItems] = useState([])
@@ -797,23 +2544,118 @@ export default function Learningplayground() {
   const [showShareModal, setShowShareModal] = useState(false)
   const [shareModalTargetTool, setShareModalTargetTool] = useState(null)
   const [shareEmailRecipient, setShareEmailRecipient] = useState('')
-  const [isSharingEmail, setIsSharingEmail] = useState(false)
+  const [isSharingEmail, setIsSharingEmail] = useState('')
   const [shareError, setShareError] = useState('')
+
+  // Grounded Document Split-Viewer & Interactive Source Citations
+  const [showCitationViewer, setShowCitationViewer] = useState(false)
+  const [activeCitationTarget, setActiveCitationTarget] = useState(null)
+  const [activeCitationDocTitle, setActiveCitationDocTitle] = useState('')
+  const [userDocuments, setUserDocuments] = useState([])
+
+  const handleOpenCitationViewer = (citation = null, docTitle = null) => {
+    const titleToUse = docTitle || citation?.documentTitle || citation?.title || attachedDocument?.title
+    if (!titleToUse) {
+      setShareToastMessage('No document attached to this chat session.')
+      setTimeout(() => setShareToastMessage(''), 3000)
+      return
+    }
+    setActiveCitationDocTitle(titleToUse)
+    setActiveCitationTarget(citation)
+    setShowCitationViewer(true)
+  }
+
+  const handleGenerateFromHighlight = (text, actionType, citationMeta) => {
+    if (!text) return
+    const docName = citationMeta?.title || activeCitationDocTitle || 'Source Document'
+    const pageNum = citationMeta?.pageNumber || 1
+    const paraIdx = citationMeta?.paragraphIndex || 1
+
+    if (actionType === 'flashcard') {
+      const newCard = {
+        id: `card_${Date.now()}`,
+        front: text.length > 90 ? `${text.slice(0, 85)}...` : text,
+        back: `Directly excerpted from "${docName}" (Page ${pageNum}, Paragraph ${paraIdx}).\n\nFull Quote:\n"${text}"`,
+        citation: citationMeta,
+      }
+      if (generatedTool) {
+        const meta = extractToolMetadata(generatedTool)
+        const updatedItems = [newCard, ...(meta.items || [])]
+        const updated = {
+          ...generatedTool,
+          items: updatedItems,
+          html: morphToolToHtml('flashcards', meta.title || docName, meta.description, updatedItems),
+        }
+        setGeneratedTool(updated)
+      } else {
+        const newDeck = {
+          id: `tool_${Date.now()}`,
+          title: `${docName} Review Cards`,
+          description: `Active recall cards annotated directly from ${docName}`,
+          toolType: 'flashcards',
+          items: [newCard],
+          html: morphToolToHtml('flashcards', `${docName} Review Cards`, 'Annotated from document', [newCard]),
+        }
+        setGeneratedTool(newDeck)
+      }
+      setShareToastMessage(`⚡ Created Flashcard from quote! (Page ${pageNum})`)
+      setTimeout(() => setShareToastMessage(''), 3500)
+    } else if (actionType === 'quiz') {
+      const prompt = `Generate an interactive multiple-choice quiz question testing this specific excerpt from "${docName}" (Page ${pageNum}):\n\n"${text}"`
+      handleSendMessage(prompt)
+      setShowCitationViewer(false)
+    } else if (actionType === 'pin') {
+      handleAddPinNode(360, 160)
+      setCanvasUserNotes((prev) => {
+        const last = prev[prev.length - 1]
+        if (!last) return prev
+        const updated = {
+          ...last,
+          title: `Quote • ${docName} (p.${pageNum})`,
+          content: `"${text}"`,
+        }
+        debouncedSyncNote(updated)
+        return prev.map((n) => (n.id === last.id ? updated : n))
+      })
+      setShareToastMessage(`📌 Pinned quote to canvas!`)
+      setTimeout(() => setShareToastMessage(''), 3500)
+    } else if (actionType === 'explain') {
+      const prompt = `Explain this concept in plain English with an active recall question, grounded in "${docName}":\n\n"${text}"`
+      handleSendMessage(prompt)
+      setShowCitationViewer(false)
+    }
+  }
 
 
   const audioInputRef = useRef(null)
   const imageInputRef = useRef(null)
+  const dragCounterRef = useRef(0)
+
+  const handleDragEnter = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current += 1
+    if (e.dataTransfer?.items && e.dataTransfer.items.length > 0) {
+      setIsDraggingOver(true)
+    }
+  }
 
   const handleDragOver = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    setIsDraggingOver(true)
+    e.dataTransfer.dropEffect = 'copy'
+    if (!isDraggingOver) {
+      setIsDraggingOver(true)
+    }
   }
 
   const handleDragLeave = (e) => {
     e.preventDefault()
     e.stopPropagation()
-    setIsDraggingOver(false)
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1)
+    if (dragCounterRef.current === 0) {
+      setIsDraggingOver(false)
+    }
   }
 
   const validateAndSetFile = (f) => {
@@ -842,29 +2684,153 @@ export default function Learningplayground() {
   const handleDropFile = (e) => {
     e.preventDefault()
     e.stopPropagation()
+    dragCounterRef.current = 0
     setIsDraggingOver(false)
 
-    const droppedFile = e.dataTransfer.files?.[0]
-    if (droppedFile) {
-      if (droppedFile.type.startsWith('image/')) {
-        setUploadTab('image-ocr')
-        setOcrImageFile(droppedFile)
-        if (!uploadTitle) setUploadTitle(droppedFile.name.replace(/\.[^/.]+$/, ''))
-      } else if (droppedFile.type.startsWith('audio/')) {
-        setUploadTab('audio')
-        setAudioFile(droppedFile)
-        if (!uploadTitle) setUploadTitle(droppedFile.name.replace(/\.[^/.]+$/, ''))
-      } else {
-        validateAndSetFile(droppedFile)
+    const droppedFile = e.dataTransfer?.files?.[0]
+    if (!droppedFile) return
+
+    const docTitle = droppedFile.name.replace(/\.[^/.]+$/, '')
+
+    // If a PDF is dropped directly onto the canvas:
+    if (droppedFile.type === 'application/pdf' || droppedFile.name.toLowerCase().endsWith('.pdf')) {
+      const fileBlobUrl = URL.createObjectURL(droppedFile)
+      setUploadFile(droppedFile)
+      setUploadTitle(docTitle)
+
+      // Calculate drop coordinates on canvas relative to canvas viewport
+      const rect = toolContainerRef.current?.getBoundingClientRect?.() || e.currentTarget?.getBoundingClientRect?.()
+      const dropX = rect ? Math.max(60, Math.round(e.clientX - rect.left - 200)) : 340
+      const dropY = rect ? Math.max(60, Math.round(e.clientY - rect.top - 120)) : 140
+
+      const newDocNode = {
+        id: `pdf_${Date.now()}`,
+        type: 'pdfViewer',
+        title: docTitle,
+        fileUrl: fileBlobUrl,
+        position: { x: dropX, y: dropY },
+        width: 880,
+        height: 640,
+        sessionId: activeChatId || null,
       }
-      if (!showUploadModal) {
-        setShowUploadModal(true)
+      setCanvasUserNotes((prev) => [...prev, newDocNode])
+      debouncedSyncNote(newDocNode)
+
+      // Attach to active study session
+      const docObj = {
+        id: `doc_${Date.now()}`,
+        title: docTitle,
+        fileUrl: fileBlobUrl,
       }
+      setAttachedDocument(docObj)
+
+      setShareToastMessage(`📄 Dropped "${docTitle}" directly into canvas reader!`)
+      setTimeout(() => setShareToastMessage(''), 3500)
+
+      // Background upload to Supabase Storage & vector embedding extraction
+      if (session?.access_token) {
+        const formData = new FormData()
+        formData.append('document', droppedFile)
+        formData.append('title', docTitle)
+
+        fetch(`${API_BASE}/api/upload-document`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          credentials: 'include',
+          body: formData,
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.document?.fileUrl) {
+              handleUpdateUserNote(newDocNode.id, { fileUrl: data.document.fileUrl })
+            }
+          })
+          .catch((err) => console.warn('Direct drop upload background note:', err))
+      }
+      return
+    }
+
+    // For image / audio / other documents
+    if (droppedFile.type.startsWith('image/')) {
+      setUploadTab('image-ocr')
+      setOcrImageFile(droppedFile)
+      if (!uploadTitle) setUploadTitle(docTitle)
+      setShowUploadModal(true)
+    } else if (droppedFile.type.startsWith('audio/')) {
+      setUploadTab('audio')
+      setAudioFile(droppedFile)
+      if (!uploadTitle) setUploadTitle(docTitle)
+      setShowUploadModal(true)
+    } else {
+      validateAndSetFile(droppedFile)
+      setShowUploadModal(true)
     }
   }
 
   const [generatedTool, setGeneratedTool] = useState(null)
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(true)
+  const [chatPanelWidth, setChatPanelWidth] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lp_chat_panel_width')
+      return saved ? Math.max(300, Math.min(760, Number(saved))) : 400
+    } catch {
+      return 400
+    }
+  })
+  const [isChatPanelResizing, setIsChatPanelResizing] = useState(false)
+  const chatResizeRef = useRef({ startX: 0, startW: 400 })
+
+  const handleChatResizeStart = (e) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setIsChatPanelResizing(true)
+    chatResizeRef.current = {
+      startX: e.clientX,
+      startW: chatPanelWidth,
+    }
+
+    const handleMouseMove = (moveEvent) => {
+      const deltaX = moveEvent.clientX - chatResizeRef.current.startX
+      const nextW = chatResizeRef.current.startW + deltaX
+      if (nextW < 220) {
+        setIsChatPanelOpen(false)
+        setChatPanelWidth(400)
+        try {
+          localStorage.setItem('lp_chat_panel_width', '400')
+        } catch {}
+      } else {
+        const clamped = Math.max(300, Math.min(760, nextW))
+        setIsChatPanelOpen(true)
+        setChatPanelWidth(clamped)
+        try {
+          localStorage.setItem('lp_chat_panel_width', String(clamped))
+        } catch {}
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsChatPanelResizing(false)
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }
+
+  // Global keyboard shortcut to toggle chat assistant (Ctrl+J or Cmd+J)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
+        const targetTag = e.target?.tagName?.toLowerCase()
+        if (targetTag === 'input' || targetTag === 'textarea' || e.target?.isContentEditable) return
+        e.preventDefault()
+        setIsChatPanelOpen((prev) => !prev)
+      }
+    }
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [])
   const [rightPanelOpen, setRightPanelOpen] = useState(false)
   const [mobileTab, setMobileTab] = useState('chat') // 'chat' | 'tool'
   const [isToolMaximized, setIsToolMaximized] = useState(false)
@@ -921,6 +2887,7 @@ export default function Learningplayground() {
             height: Number(n.height) || 220,
             isPinned: Boolean(n.is_pinned),
             sessionId: n.session_id,
+            fileUrl: n.file_url || n.fileUrl || null,
           }))
           setCanvasUserNotes(mapped)
           const localKey = `canvas_notes_${user?.id || 'guest'}_${activeChatId || 'global'}`
@@ -1031,6 +2998,31 @@ export default function Learningplayground() {
     debouncedSyncNote(newChecklist)
   }
 
+  const handleAddPdfReaderNode = (docTitle = null, fileUrl = null) => {
+    const activeDoc = attachedDocument
+    if (!activeDoc && !docTitle && !fileUrl) {
+      setShareToastMessage('No PDF attached to this chat session. Attach a PDF to view it.')
+      setTimeout(() => setShareToastMessage(''), 3000)
+      return
+    }
+    const titleToUse = docTitle || activeDoc?.title || 'PDF Document'
+    const fileUrlToUse = fileUrl || activeDoc?.fileUrl || null
+    const newDocNode = {
+      id: `pdf_${Date.now()}`,
+      type: 'pdfViewer',
+      title: titleToUse,
+      fileUrl: fileUrlToUse,
+      position: { x: 400, y: 120 },
+      width: 760,
+      height: 580,
+      sessionId: activeChatId || null,
+    }
+    setCanvasUserNotes((prev) => [...prev, newDocNode])
+    debouncedSyncNote(newDocNode)
+    setShareToastMessage(`Opened "${titleToUse}" on canvas!`)
+    setTimeout(() => setShareToastMessage(''), 3000)
+  }
+
   const handleUpdateUserNote = (noteId, updates) => {
     setCanvasUserNotes((prev) => {
       const note = prev.find((n) => n.id === noteId)
@@ -1072,13 +3064,13 @@ export default function Learningplayground() {
 
   const handleNodeDragStop = (event, node) => {
     if (!node || !node.id || !node.position) return
-    if (node.id.startsWith('sticky_') || node.id.startsWith('pin_') || node.id.startsWith('check_') || node.id.length === 36) {
+    if (node.id.startsWith('sticky_') || node.id.startsWith('pin_') || node.id.startsWith('check_') || node.id.startsWith('pdf_') || node.id.length === 36) {
       handleUpdateUserNote(node.id, { position: node.position })
     }
   }
 
   const handleCanvasDoubleClick = (e) => {
-    if (e.target.closest('.nodrag') || e.target.closest('.canvas-node') || e.target.closest('.canvas-sticky-note') || e.target.closest('.canvas-pin-node') || e.target.closest('.canvas-checklist-node') || e.target.closest('button')) {
+    if (e.target.closest('.nodrag') || e.target.closest('.canvas-node') || e.target.closest('.canvas-sticky-note') || e.target.closest('.canvas-pin-node') || e.target.closest('.canvas-checklist-node') || e.target.closest('.canvas-pdf-viewer-node') || e.target.closest('button')) {
       return
     }
     const rect = e.currentTarget.getBoundingClientRect()
@@ -1238,6 +3230,8 @@ export default function Learningplayground() {
           try { iframeRecognition.stop() } catch { }
           iframeRecognition = null
         }
+      } else if (data.type === 'OPEN_CITATION' || data.type === 'VIEW_CITATION') {
+        handleOpenCitationViewer(data.citation, data.documentTitle)
       }
     }
 
@@ -1252,6 +3246,7 @@ export default function Learningplayground() {
 
   const selectTool = (tool) => {
     setGeneratedTool(tool)
+    setActiveCanvasView('playground')
     setRightPanelOpen(true)
     setMobileTab('tool')
   }
@@ -1259,33 +3254,231 @@ export default function Learningplayground() {
   const openInlineEditor = () => {
     if (!generatedTool) return
     const meta = extractToolMetadata(generatedTool)
+    const canonical = meta.toolType || resolveCanonicalToolType(generatedTool.toolType || generatedTool.type, generatedTool)
+    setEditingToolType(canonical)
     setEditingTitle(meta.title)
     setEditingDesc(meta.description)
-    setEditingItems(
-      Array.isArray(meta.items) && meta.items.length > 0
-        ? JSON.parse(JSON.stringify(meta.items))
-        : [{ id: '1', front: 'Card 1', back: 'Answer 1' }]
-    )
+
+    const rawItems = Array.isArray(meta.items) && meta.items.length > 0
+      ? JSON.parse(JSON.stringify(meta.items))
+      : []
+
+    const seededItems = rawItems.length > 0 ? rawItems.map((it, idx) => {
+      const id = String(it.id || idx + 1)
+      if (canonical === 'quiz') {
+        let choices = Array.isArray(it.choices)
+          ? it.choices.map((c) => (typeof c === 'string' ? c : c.text || c.choice || c.value || String(c))).filter(Boolean)
+          : []
+        if (choices.length === 0 && it.options && Array.isArray(it.options)) {
+          choices = it.options.map((o) => (typeof o === 'string' ? o : o.text || o.choice || String(o))).filter(Boolean)
+        }
+        if (choices.length < 4) {
+          const fallbackSeed = [it.answerText || it.answer || it.back || 'Correct answer', 'Alternative perspective', 'Secondary mechanism', 'None of the above']
+          for (const s of fallbackSeed) {
+            if (choices.length >= 4) break
+            if (!choices.includes(s)) choices.push(s)
+          }
+        }
+        while (choices.length < 4) choices.push(`Choice ${choices.length + 1}`)
+
+        let answer = 'A'
+        if (it.answer && ['A', 'B', 'C', 'D'].includes(it.answer.toUpperCase())) {
+          answer = it.answer.toUpperCase()
+        } else if (it.answerText) {
+          const fIdx = choices.findIndex((c) => c.toLowerCase() === it.answerText.toLowerCase())
+          if (fIdx !== -1) answer = ['A', 'B', 'C', 'D'][fIdx]
+        }
+
+        const answerIndex = ['A', 'B', 'C', 'D'].indexOf(answer)
+        const answerText = choices[answerIndex] || choices[0]
+
+        return {
+          id,
+          question: it.question || it.front || it.concept || it.title || `Question ${idx + 1}`,
+          choices: choices.slice(0, 4),
+          answer,
+          answerText,
+          explanation: it.explanation || it.back || it.detail || '',
+        }
+      }
+      if (canonical === 'matching') {
+        return {
+          id,
+          left: it.left || it.term || it.front || it.concept || `Term ${idx + 1}`,
+          right: it.right || it.definition || it.back || it.explanation || `Definition ${idx + 1}`,
+        }
+      }
+      if (canonical === 'timeline') {
+        return {
+          id,
+          text: it.text || it.title || it.event || it.front || `Milestone ${idx + 1}`,
+          position: Number(it.position || idx + 1),
+          detail: it.detail || it.explanation || it.back || it.date || '',
+        }
+      }
+      if (canonical === 'crossword' || canonical === 'wordsearch') {
+        const rawWord = String(it.word || it.front || it.term || it.concept || `WORD${idx + 1}`).toUpperCase().replace(/[^A-Z]/g, '')
+        return {
+          id,
+          word: rawWord.length >= 3 ? rawWord : `TERM${idx + 1}`,
+          clue: it.clue || it.back || it.definition || it.explanation || `Definition for term ${idx + 1}`,
+        }
+      }
+      if (canonical === 'true-false') {
+        const isTrue = it.answerText ? /^(true|t|yes|1)$/i.test(it.answerText) : (it.answer === 'A' || it.isTrue !== false)
+        return {
+          id,
+          question: it.question || it.front || it.prompt || `Statement ${idx + 1}`,
+          isTrue,
+          answer: isTrue ? 'A' : 'B',
+          answerText: isTrue ? 'True' : 'False',
+          explanation: it.explanation || it.back || '',
+        }
+      }
+      if (canonical === 'cloze') {
+        return {
+          id,
+          sentence: it.sentence || it.front || it.question || `The [blank] is a fundamental component.`,
+          answer: it.answer || it.target || 'key term',
+          hint: it.hint || it.explanation || '',
+        }
+      }
+      return {
+        id,
+        front: it.front || it.question || it.concept || it.term || `Concept ${idx + 1}`,
+        back: it.back || it.answer || it.definition || it.explanation || `Details for concept ${idx + 1}`,
+      }
+    }) : [
+      canonical === 'quiz'
+        ? { id: '1', question: 'What is the primary concept?', choices: ['Choice A', 'Choice B', 'Choice C', 'Choice D'], answer: 'A', answerText: 'Choice A', explanation: 'Key concept explanation.' }
+        : canonical === 'matching'
+        ? { id: '1', left: 'Term 1', right: 'Definition 1' }
+        : canonical === 'timeline'
+        ? { id: '1', text: 'First Milestone', position: 1, detail: 'Initial milestone details.' }
+        : canonical === 'crossword' || canonical === 'wordsearch'
+        ? { id: '1', word: 'CONCEPT', clue: 'Fundamental idea or principle.' }
+        : canonical === 'true-false'
+        ? { id: '1', question: 'State whether this concept is valid.', isTrue: true, answer: 'A', answerText: 'True', explanation: 'Core scientific principle verified.' }
+        : canonical === 'cloze'
+        ? { id: '1', sentence: 'The [mechanism] is a fundamental component.', answer: 'mechanism', hint: 'Core function' }
+        : { id: '1', front: 'Concept 1', back: 'Answer 1' }
+    ]
+
+    setEditingItems(seededItems)
     setShowEditModal(true)
   }
 
   const handleSaveInlineEdit = () => {
     if (!generatedTool) return
     const meta = extractToolMetadata(generatedTool)
-    const newHtml = morphToolToHtml(meta.toolType || 'flashcards', editingTitle, editingDesc, editingItems)
+    const canonical = editingToolType || meta.toolType || resolveCanonicalToolType(generatedTool.toolType || generatedTool.type, generatedTool)
+
+    const normalizedItems = editingItems.map((item, idx) => {
+      const id = String(item.id || idx + 1)
+      if (canonical === 'quiz') {
+        const rawChoices = Array.isArray(item.choices) ? item.choices : []
+        const choices = [
+          rawChoices[0] || 'Choice A',
+          rawChoices[1] || 'Choice B',
+          rawChoices[2] || 'Choice C',
+          rawChoices[3] || 'Choice D',
+        ]
+        const answer = ['A', 'B', 'C', 'D'].includes(item.answer) ? item.answer : 'A'
+        const answerIndex = ['A', 'B', 'C', 'D'].indexOf(answer)
+        const answerText = choices[answerIndex] || choices[0]
+        return {
+          ...item,
+          id,
+          question: item.question || item.front || `Question ${idx + 1}`,
+          choices,
+          answer,
+          answerText,
+          explanation: item.explanation || item.back || '',
+          front: item.question || item.front || `Question ${idx + 1}`,
+          back: `${answerText}. ${item.explanation || ''}`,
+        }
+      }
+      if (canonical === 'matching') {
+        return {
+          ...item,
+          id,
+          left: item.left || `Term ${idx + 1}`,
+          right: item.right || `Definition ${idx + 1}`,
+          front: item.left || `Term ${idx + 1}`,
+          back: item.right || `Definition ${idx + 1}`,
+        }
+      }
+      if (canonical === 'timeline') {
+        return {
+          ...item,
+          id,
+          text: item.text || `Milestone ${idx + 1}`,
+          position: Number(item.position || idx + 1),
+          detail: item.detail || '',
+          front: item.text || `Milestone ${idx + 1}`,
+          back: item.detail || '',
+        }
+      }
+      if (canonical === 'crossword' || canonical === 'wordsearch') {
+        const cleanWord = String(item.word || `WORD${idx + 1}`).toUpperCase().replace(/[^A-Z]/g, '') || `WORD${idx + 1}`
+        return {
+          ...item,
+          id,
+          word: cleanWord,
+          clue: item.clue || `Definition for ${cleanWord}`,
+          front: cleanWord,
+          back: item.clue || `Definition for ${cleanWord}`,
+        }
+      }
+      if (canonical === 'true-false') {
+        const isTrue = item.isTrue !== false
+        return {
+          ...item,
+          id,
+          question: item.question || `Statement ${idx + 1}`,
+          isTrue,
+          answer: isTrue ? 'A' : 'B',
+          answerText: isTrue ? 'True' : 'False',
+          explanation: item.explanation || '',
+          front: item.question || `Statement ${idx + 1}`,
+          back: `${isTrue ? 'True' : 'False'}. ${item.explanation || ''}`,
+        }
+      }
+      if (canonical === 'cloze') {
+        return {
+          ...item,
+          id,
+          sentence: item.sentence || '',
+          answer: item.answer || '',
+          hint: item.hint || '',
+          front: item.sentence || '',
+          back: item.answer || '',
+        }
+      }
+      return {
+        ...item,
+        id,
+        front: item.front || `Concept ${idx + 1}`,
+        back: item.back || `Definition ${idx + 1}`,
+      }
+    })
+
+    const newHtml = morphToolToHtml(canonical, editingTitle, editingDesc, normalizedItems)
 
     const updated = {
       ...generatedTool,
       title: editingTitle,
       description: editingDesc,
-      items: editingItems,
+      items: normalizedItems,
+      toolType: canonical,
       html: newHtml,
       app: { html: newHtml },
       data: {
         ...(generatedTool.data || {}),
         title: editingTitle,
         description: editingDesc,
-        items: editingItems,
+        items: normalizedItems,
+        toolType: canonical,
         html: newHtml,
       },
     }
@@ -1296,16 +3489,59 @@ export default function Learningplayground() {
     setShowEditModal(false)
   }
 
-
   const handleAddEditorItem = () => {
-    setEditingItems((prev) => [
-      ...prev,
-      {
-        id: String(prev.length + 1),
-        front: 'New Concept / Question',
-        back: 'Detailed answer or explanation',
-      },
-    ])
+    const meta = extractToolMetadata(generatedTool)
+    const canonical = editingToolType || meta.toolType || resolveCanonicalToolType(generatedTool.toolType || generatedTool.type, generatedTool)
+    const nextId = String(editingItems.length + 1)
+
+    let newItem = { id: nextId, front: `New Concept ${nextId}`, back: `Detailed answer or explanation ${nextId}` }
+    if (canonical === 'quiz') {
+      newItem = {
+        id: nextId,
+        question: `New Question ${nextId}`,
+        choices: ['Choice A', 'Choice B', 'Choice C', 'Choice D'],
+        answer: 'A',
+        answerText: 'Choice A',
+        explanation: 'Explanation for correct choice.',
+      }
+    } else if (canonical === 'matching') {
+      newItem = {
+        id: nextId,
+        left: `New Term ${nextId}`,
+        right: `Definition for Term ${nextId}`,
+      }
+    } else if (canonical === 'timeline') {
+      newItem = {
+        id: nextId,
+        text: `New Milestone ${nextId}`,
+        position: editingItems.length + 1,
+        detail: 'Milestone description and significance.',
+      }
+    } else if (canonical === 'crossword' || canonical === 'wordsearch') {
+      newItem = {
+        id: nextId,
+        word: `TERM${nextId}`,
+        clue: 'Clue and definition for term.',
+      }
+    } else if (canonical === 'true-false') {
+      newItem = {
+        id: nextId,
+        question: `New Statement ${nextId}`,
+        isTrue: true,
+        answer: 'A',
+        answerText: 'True',
+        explanation: 'Why this statement is true or false.',
+      }
+    } else if (canonical === 'cloze') {
+      newItem = {
+        id: nextId,
+        sentence: `The [blank] is a fundamental component.`,
+        answer: 'term',
+        hint: 'Key definition',
+      }
+    }
+
+    setEditingItems((prev) => [...prev, newItem])
   }
 
   const handleDeleteEditorItem = (idx) => {
@@ -1316,6 +3552,34 @@ export default function Learningplayground() {
     setEditingItems((prev) => {
       const copy = [...prev]
       copy[idx] = { ...copy[idx], [field]: val }
+      return copy
+    })
+  }
+
+  const handleUpdateChoice = (itemIdx, choiceIdx, val) => {
+    setEditingItems((prev) => {
+      const copy = [...prev]
+      const curChoices = Array.isArray(copy[itemIdx]?.choices) ? [...copy[itemIdx].choices] : ['', '', '', '']
+      curChoices[choiceIdx] = val
+      copy[itemIdx] = {
+        ...copy[itemIdx],
+        choices: curChoices,
+        answerText: curChoices[['A', 'B', 'C', 'D'].indexOf(copy[itemIdx].answer || 'A')] || curChoices[0],
+      }
+      return copy
+    })
+  }
+
+  const handleSelectQuizAnswer = (itemIdx, letter) => {
+    setEditingItems((prev) => {
+      const copy = [...prev]
+      const curChoices = copy[itemIdx]?.choices || []
+      const choiceIdx = ['A', 'B', 'C', 'D'].indexOf(letter)
+      copy[itemIdx] = {
+        ...copy[itemIdx],
+        answer: letter,
+        answerText: curChoices[choiceIdx] || curChoices[0] || '',
+      }
       return copy
     })
   }
@@ -1340,42 +3604,247 @@ export default function Learningplayground() {
       const getPosition = (id, fallback) => previousPositions.get(id) || fallback
       const nextNodes = []
 
-      // Welcome card on clean canvas when empty
-      if (!generatedTool && !isLoading && !rightPanelOpen && messages.length === 0) {
-        nextNodes.push({
-          id: 'welcome-card',
-          type: 'welcome',
-          position: getPosition('welcome-card', { x: 100, y: 100 }),
-          dragHandle: '.canvas-node-drag-handle',
-          data: {
-            quickActions: suggestions,
-            onSelectSuggestion: (prompt) => handleSendMessage(prompt),
-          },
-        })
+      // ── PAGE 1: PLAYGROUND ──
+      if (activeCanvasView === 'playground') {
+        if (generatedTool || isLoading) {
+          nextNodes.push({
+            id: 'workspace-tool',
+            type: 'tool',
+            position: getPosition('workspace-tool', { x: 80, y: 100 }),
+            dragHandle: '.canvas-node-drag-handle',
+            data: {
+              title: generatedTool ? activeMeta.title : 'Building your tool',
+              toolType: generatedTool ? activeMeta.toolType : '',
+              html: activeHtml,
+              hasTool: Boolean(generatedTool),
+              loading: isLoading,
+              stage: generationStage,
+              phase: buildPhase,
+              onExpand: generatedTool ? () => setIsToolMaximized(true) : null,
+              onClose: generatedTool ? handleUnloadTool : null,
+              onEdit: generatedTool ? openInlineEditor : null,
+              onViewCitation: (attachedDocument && attachedDocument.title) ? () => handleOpenCitationViewer(null, attachedDocument.title) : null,
+              onSave: generatedTool ? () => handleSaveActiveToolToLibrary(generatedTool) : null,
+              onShare: generatedTool ? () => handleOpenShareModal(generatedTool) : null,
+              onExportMarkdown: generatedTool ? handleExportMarkdown : null,
+              onPrintSheet: generatedTool ? handlePrintStudySheet : null,
+              onPublish: generatedTool ? () => openPublishModal(generatedTool) : null,
+              onSelectSuggestion: (prompt) => handleSendMessage(prompt),
+            },
+          })
+        }
       }
 
-      if (rightPanelOpen || generatedTool || isLoading) {
+      // ── PAGE 2: SAVED TOOLS ──
+      if (activeCanvasView === 'my-tools') {
+        const filteredSaved = savedTools.filter((t) => {
+          const meta = extractToolMetadata(t)
+          const matchesSearch = !savedToolsSearch.trim() ||
+            meta.title.toLowerCase().includes(savedToolsSearch.toLowerCase()) ||
+            meta.description.toLowerCase().includes(savedToolsSearch.toLowerCase()) ||
+            (meta.toolType || '').toLowerCase().includes(savedToolsSearch.toLowerCase())
+          const matchesCat = savedToolsCategory === 'all' ||
+            (meta.toolType || '').toLowerCase().includes(savedToolsCategory.toLowerCase()) ||
+            (t.category || '').toLowerCase().includes(savedToolsCategory.toLowerCase())
+          return matchesSearch && matchesCat
+        })
+
+        // Floating Header & Filter Bar node
         nextNodes.push({
-          id: 'workspace-tool',
-          type: 'tool',
-          position: getPosition('workspace-tool', { x: 80, y: 100 }),
+          id: 'header-saved-tools',
+          type: 'pageHeader',
+          position: getPosition('header-saved-tools', { x: 60, y: 30 }),
           dragHandle: '.canvas-node-drag-handle',
           data: {
-            title: generatedTool ? activeMeta.title : (isLoading ? 'Building your tool' : 'Canvas workspace'),
-            toolType: generatedTool ? activeMeta.toolType : '',
-            html: activeHtml,
-            hasTool: Boolean(generatedTool),
-            loading: isLoading,
-            stage: generationStage,
-            phase: buildPhase,
-            onExpand: generatedTool ? () => setIsToolMaximized(true) : null,
-            onClose: generatedTool ? handleUnloadTool : null,
+            icon: 'bookmark',
+            accent: 'blue',
+            title: 'Saved Tools Library',
+            count: filteredSaved.length,
+            search: savedToolsSearch,
+            onSearchChange: setSavedToolsSearch,
+            category: savedToolsCategory,
+            onCategoryChange: setSavedToolsCategory,
+            categories: ['all', 'flashcards', 'quiz', 'feynman', 'cloze', 'scenario', 'notes', 'mindmap'],
+            loading: isLoadingSavedTools,
+            onRefresh: fetchSavedTools,
+            onClose: () => switchCanvasView('playground'),
           },
         })
+
+        // Individual Tool Card Nodes
+        if (filteredSaved.length > 0) {
+          filteredSaved.forEach((t, i) => {
+            const col = i % 3
+            const row = Math.floor(i / 3)
+            const nodeId = `saved-tool-${t.id}`
+            nextNodes.push({
+              id: nodeId,
+              type: 'toolCard',
+              position: getPosition(nodeId, { x: 60 + col * 360, y: 160 + row * 220 }),
+              dragHandle: '.canvas-node-drag-handle',
+              data: {
+                tool: t,
+                onLaunch: () => selectTool(t),
+                onDelete: (e) => handleDeleteTool(t.id, e),
+                onShare: () => handleOpenShareModal(t),
+                onExportAnki: () => handleExportAnkiCsv(t),
+              },
+            })
+          })
+        } else if (!isLoadingSavedTools) {
+          nextNodes.push({
+            id: 'empty-saved-tools',
+            type: 'sticky',
+            position: getPosition('empty-saved-tools', { x: 60, y: 160 }),
+            dragHandle: '.canvas-node-drag-handle',
+            data: {
+              title: 'No saved tools found',
+              content: savedToolsSearch || savedToolsCategory !== 'all'
+                ? 'Try adjusting your search query or switching the category filter above.'
+                : 'Generate your first revision tool from the chat dock below or explore the Marketplace!',
+              color: 'blue',
+            },
+          })
+        }
       }
 
-      // Add all personal sticky notes, pins, and checklists to canvas
+      // ── PAGE 3: SHARED WITH ME ──
+      if (activeCanvasView === 'shared') {
+        const filteredShared = sharedTools.filter((t) => {
+          const meta = extractToolMetadata(t)
+          return !sharedToolsSearch.trim() ||
+            meta.title.toLowerCase().includes(sharedToolsSearch.toLowerCase()) ||
+            (t.sender_email || '').toLowerCase().includes(sharedToolsSearch.toLowerCase())
+        })
+
+        nextNodes.push({
+          id: 'header-shared-tools',
+          type: 'pageHeader',
+          position: getPosition('header-shared-tools', { x: 60, y: 30 }),
+          dragHandle: '.canvas-node-drag-handle',
+          data: {
+            icon: 'share',
+            accent: 'purple',
+            title: 'Shared with Me',
+            count: filteredShared.length,
+            search: sharedToolsSearch,
+            onSearchChange: setSharedToolsSearch,
+            category: 'all',
+            categories: ['all'],
+            loading: isLoadingSharedTools,
+            onRefresh: fetchSharedTools,
+            onClose: () => switchCanvasView('playground'),
+          },
+        })
+
+        if (filteredShared.length > 0) {
+          filteredShared.forEach((t, i) => {
+            const col = i % 3
+            const row = Math.floor(i / 3)
+            const nodeId = `shared-tool-${t.id}`
+            nextNodes.push({
+              id: nodeId,
+              type: 'sharedCard',
+              position: getPosition(nodeId, { x: 60 + col * 360, y: 160 + row * 220 }),
+              dragHandle: '.canvas-node-drag-handle',
+              data: {
+                tool: t,
+                onLaunch: () => selectTool(t),
+                onSave: (e) => handleForkTool(t, e),
+              },
+            })
+          })
+        } else if (!isLoadingSharedTools) {
+          nextNodes.push({
+            id: 'empty-shared-tools',
+            type: 'sticky',
+            position: getPosition('empty-shared-tools', { x: 60, y: 160 }),
+            dragHandle: '.canvas-node-drag-handle',
+            data: {
+              title: 'No shared tools yet',
+              content: 'When peers share study decks or quizzes with your email address, they will appear right here as visual canvas nodes.',
+              color: 'purple',
+            },
+          })
+        }
+      }
+
+      // ── PAGE 4: MARKETPLACE ──
+      if (activeCanvasView === 'marketplace') {
+        const filteredMarketplace = marketplaceTools.filter((t) => {
+          const meta = extractToolMetadata(t)
+          const matchesSearch = !marketplaceSearch.trim() ||
+            meta.title.toLowerCase().includes(marketplaceSearch.toLowerCase()) ||
+            meta.description.toLowerCase().includes(marketplaceSearch.toLowerCase()) ||
+            (t.tags || []).some(tg => tg.toLowerCase().includes(marketplaceSearch.toLowerCase()))
+          const matchesCat = marketplaceCategory === 'all' ||
+            (t.category || '').toLowerCase().includes(marketplaceCategory.toLowerCase()) ||
+            (meta.toolType || '').toLowerCase().includes(marketplaceCategory.toLowerCase())
+          return matchesSearch && matchesCat
+        })
+
+        nextNodes.push({
+          id: 'header-marketplace',
+          type: 'pageHeader',
+          position: getPosition('header-marketplace', { x: 60, y: 30 }),
+          dragHandle: '.canvas-node-drag-handle',
+          data: {
+            icon: 'marketplace',
+            accent: 'emerald',
+            title: 'Community Marketplace',
+            count: filteredMarketplace.length,
+            search: marketplaceSearch,
+            onSearchChange: setMarketplaceSearch,
+            category: marketplaceCategory,
+            onCategoryChange: setMarketplaceCategory,
+            categories: ['all', 'STEM & Medicine', 'Humanities', 'flashcards', 'quiz', 'feynman', 'cloze', 'calculator'],
+            loading: isLoadingMarketplaceTools,
+            onRefresh: fetchMarketplaceTools,
+            onClose: () => switchCanvasView('playground'),
+          },
+        })
+
+        if (filteredMarketplace.length > 0) {
+          filteredMarketplace.forEach((t, i) => {
+            const col = i % 3
+            const row = Math.floor(i / 3)
+            const nodeId = `marketplace-tool-${t.id}`
+            nextNodes.push({
+              id: nodeId,
+              type: 'marketplaceCard',
+              position: getPosition(nodeId, { x: 60 + col * 360, y: 160 + row * 240 }),
+              dragHandle: '.canvas-node-drag-handle',
+              data: {
+                tool: t,
+                onLaunch: () => selectTool(t),
+                onSave: (e) => handleForkTool(t, e),
+              },
+            })
+          })
+        } else if (!isLoadingMarketplaceTools) {
+          nextNodes.push({
+            id: 'empty-marketplace',
+            type: 'sticky',
+            position: getPosition('empty-marketplace', { x: 60, y: 160 }),
+            dragHandle: '.canvas-node-drag-handle',
+            data: {
+              title: 'No community tools match',
+              content: 'Try searching for a different keyword or selecting a different subject topic.',
+              color: 'emerald',
+            },
+          })
+        }
+      }
+
+      // Add all personal sticky notes, pins, checklists, and PDF document viewers to canvas
       canvasUserNotes.forEach((note) => {
+        // PDF document viewers must only render in the specific chat session where they were opened
+        if (note.type === 'pdfViewer') {
+          if (note.sessionId && activeChatId && note.sessionId !== activeChatId) {
+            return
+          }
+        }
+
         nextNodes.push({
           id: note.id,
           type: note.type || 'sticky',
@@ -1383,6 +3852,9 @@ export default function Learningplayground() {
           dragHandle: '.canvas-node-drag-handle',
           data: {
             ...note,
+            authToken: session?.access_token,
+            apiBase: API_BASE,
+            onGenerateFromHighlight: handleGenerateFromHighlight,
             onUpdate: handleUpdateUserNote,
             onDelete: handleDeleteUserNote,
           },
@@ -1391,14 +3863,35 @@ export default function Learningplayground() {
 
       return nextNodes
     })
-  }, [generatedTool, rightPanelOpen, isLoading, generationStage, buildPhase, activeHtml, activeMeta.title, activeMeta.toolType, suggestions, messages.length, canvasUserNotes])
+  }, [
+    activeCanvasView, generatedTool, rightPanelOpen, isLoading, generationStage, buildPhase,
+    activeHtml, activeMeta.title, activeMeta.toolType, suggestions, messages.length,
+    canvasUserNotes, savedTools, sharedTools, marketplaceTools,
+    isLoadingSavedTools, isLoadingSharedTools, isLoadingMarketplaceTools,
+    savedToolsSearch, savedToolsCategory, sharedToolsSearch, marketplaceSearch, marketplaceCategory
+  ])
 
-  // Automatically fetch database tools on mount / auth state change
+  // Automatically fetch database tools on mount / auth state change & handle initial view param
   useEffect(() => {
     fetchMarketplaceTools()
     if (session?.access_token) {
       fetchTierStatus()
       fetchSavedTools()
+      fetchSharedTools()
+    }
+
+    // Check if initial URL param wants to show a page on canvas
+    const params = new URLSearchParams(window.location.search)
+    const view = params.get('view') || params.get('tab')
+    if (view === 'my-tools' || view === 'saved') {
+      setActiveCanvasView('my-tools')
+      if (session?.access_token) fetchSavedTools()
+    } else if (view === 'shared') {
+      setActiveCanvasView('shared')
+      if (session?.access_token) fetchSharedTools()
+    } else if (view === 'marketplace') {
+      setActiveCanvasView('marketplace')
+      fetchMarketplaceTools()
     }
   }, [session?.access_token])
 
@@ -2020,6 +4513,11 @@ export default function Learningplayground() {
     setOcrImageFile(null)
     setUploadTitle('')
 
+    // Ensure canvas is on playground and chat is open to interact with the imported material
+    setActiveCanvasView('playground')
+    setIsChatPanelOpen(true)
+    setRightPanelOpen(true)
+
     const instruction = uploadInstruction.trim()
     setUploadInstruction('')
     setSelectedIngestFormat('')
@@ -2029,24 +4527,17 @@ export default function Learningplayground() {
         handleSendMessage(`${instruction} based on "${docObj.title}"`)
       }, 300)
     } else {
-      // Attached cleanly without auto-generation so user can freely prompt
-      setChatHistory(prev => [
-        ...prev,
-        {
-          id: Date.now(),
-          role: 'assistant',
-          content: `**Attached "${docObj.title}" to this session.**\n\nWhat would you like to create from this? You can type any request in the chat bar (e.g. *2D Crossword*, *Feynman Grader*, *Cloze Notes*, *Flashcards*, *Quiz*, or ask specific questions).`
-        }
-      ])
+      // Attached cleanly - post system guidance message in chat
+      const attachMsg = {
+        id: `msg_${Date.now()}`,
+        role: 'assistant',
+        content: `Attached **"${docObj.title}"** to this study session.\n\nWhat would you like to create from this? You can type any prompt (e.g. *Flashcards*, *Practice Quiz*, *Feynman Grader*, *Summary Cheat Sheet*) or ask questions.`,
+      }
+      setMessages((prev) => [...prev, attachMsg])
     }
   }
 
   const handleUploadDocument = async () => {
-    if (!session?.access_token) {
-      setUploadError('Please sign in to upload documents.')
-      return
-    }
-
     if (!uploadFile) {
       setUploadError('Please select a file to upload.')
       return
@@ -2056,6 +4547,23 @@ export default function Learningplayground() {
 
     setIsUploadingDoc(true)
     setUploadError('')
+
+    const fileBlobUrl = uploadFile.type === 'application/pdf' || uploadFile.name.endsWith('.pdf')
+      ? URL.createObjectURL(uploadFile)
+      : null
+
+    // If user is guest / offline, attach document directly to session
+    if (!session?.access_token) {
+      const docObj = {
+        id: `doc_${Date.now()}`,
+        title: docTitle,
+        name: uploadFile.name,
+        fileUrl: fileBlobUrl,
+      }
+      setIsUploadingDoc(false)
+      triggerIngestCompletion(docObj)
+      return
+    }
 
     try {
       const formData = new FormData()
@@ -2079,11 +4587,19 @@ export default function Learningplayground() {
       const docObj = {
         id: data.document?.id || Date.now(),
         title: docTitle,
+        fileUrl: fileBlobUrl,
       }
       triggerIngestCompletion(docObj)
     } catch (err) {
-      console.error('Upload document error:', err)
-      setUploadError(err.message || 'Error processing document RAG embeddings.')
+      console.warn('Upload document API warning, using direct attachment:', err)
+      // Graceful fallback to client-side attachment if RAG backend had an issue
+      const fallbackDoc = {
+        id: `doc_${Date.now()}`,
+        title: docTitle,
+        name: uploadFile.name,
+        fileUrl: fileBlobUrl,
+      }
+      triggerIngestCompletion(fallbackDoc)
     } finally {
       setIsUploadingDoc(false)
     }
@@ -2604,68 +5120,121 @@ export default function Learningplayground() {
   }
 
   const saveOrUpdateChatSession = (updatedMessages, currentTool = generatedTool, doc = attachedDocument) => {
-    if (!updatedMessages || updatedMessages.length === 0 || !user?.id) return
+    if (!updatedMessages || updatedMessages.length === 0) return
 
     const firstUserMsg = updatedMessages.find((m) => m.role === 'user')
     const rawContent = firstUserMsg ? firstUserMsg.content : 'Study Session'
-    const title = rawContent.slice(0, 36) + (rawContent.length > 36 ? '...' : '')
+    const title = rawContent.slice(0, 48) + (rawContent.length > 48 ? '...' : '')
+    const idToUse = activeChatId || `chat_${Date.now()}`
+    if (!activeChatId) {
+      setActiveChatId(idToUse)
+    }
+
+    const updatedSession = {
+      id: idToUse,
+      title,
+      messages: updatedMessages,
+      generatedTool: currentTool,
+      attachedDocument: doc,
+      updatedAt: Date.now(),
+    }
 
     setChatHistory((prev) => {
-      let idToUse = activeChatId
-      if (!idToUse) {
-        idToUse = `chat_${Date.now()}`
-        setActiveChatId(idToUse)
-      }
-
       const existingIdx = prev.findIndex((s) => s.id === idToUse)
-      const updatedSession = {
-        id: idToUse,
-        title,
-        messages: updatedMessages,
-        generatedTool: currentTool,
-        attachedDocument: doc,
-        updatedAt: Date.now(),
-      }
-
+      let newHistory
       if (existingIdx >= 0) {
-        const newHistory = [...prev]
+        newHistory = [...prev]
         newHistory[existingIdx] = updatedSession
-        return newHistory
       } else {
-        return [updatedSession, ...prev]
+        newHistory = [updatedSession, ...prev]
       }
+      if (user?.id) {
+        try {
+          const userKey = `learning_playground_chat_history_${user.id}`
+          localStorage.setItem(userKey, JSON.stringify(newHistory))
+        } catch {}
+      }
+      return newHistory
     })
+
+    // If authenticated, persist to PostgreSQL backend
+    if (user?.id && session?.access_token) {
+      fetch(`${API_BASE}/api/learning-playground/sessions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          sessionId: idToUse,
+          title,
+          latestPrompt: firstUserMsg?.content || '',
+          messages: updatedMessages,
+          generatedTool: currentTool,
+          context: doc ? { attachedDocument: doc } : null,
+        }),
+      }).catch((err) => console.error('Failed to sync session to server:', err))
+    }
   }
 
   const loadChatSession = (chatSession) => {
+    setActiveCanvasView('playground')
     setActiveChatId(chatSession.id)
     setMessages(chatSession.messages || [])
-    setGeneratedTool(chatSession.generatedTool || null)
-    setAttachedDocument(chatSession.attachedDocument || null)
+    const tool = chatSession.generatedTool || chatSession.generated_tool || null
+    setGeneratedTool(tool)
+    const doc = chatSession.attachedDocument || chatSession.context?.attachedDocument || chatSession.context || null
+    setAttachedDocument(doc)
     setIsChatPanelOpen(true)
-    if (chatSession.generatedTool) {
+    if (tool) {
       setRightPanelOpen(true)
     }
     setMobileTab('chat')
   }
 
-  const deleteChatSession = (sessionId, e) => {
+  const deleteChatSession = async (sessionId, e) => {
     if (e) e.stopPropagation()
-    setChatHistory((prev) => prev.filter((s) => s.id !== sessionId))
+    setChatHistory((prev) => {
+      const updated = prev.filter((s) => s.id !== sessionId)
+      if (user?.id) {
+        try {
+          const userKey = `learning_playground_chat_history_${user.id}`
+          localStorage.setItem(userKey, JSON.stringify(updated))
+        } catch {}
+      }
+      return updated
+    })
     if (activeChatId === sessionId) {
       handleStartNewSession()
+    }
+    if (user?.id && session?.access_token) {
+      try {
+        await fetch(`${API_BASE}/api/learning-playground/sessions/${sessionId}`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          credentials: 'include',
+        })
+      } catch (err) {
+        console.error('Failed to delete session from server:', err)
+      }
     }
   }
 
   const handleStartNewSession = () => {
+    setActiveCanvasView('playground')
     setActiveChatId(null)
     setMessages([])
     setGeneratedTool(null)
     setAttachedDocument(null)
+    setRightPanelOpen(false)
   }
 
   const handleUnloadTool = () => {
     setGeneratedTool(null)
+    setRightPanelOpen(false)
   }
 
   const filteredChats = chatHistory.filter((c) =>
@@ -2768,43 +5337,60 @@ export default function Learningplayground() {
                 </div>
 
                 <div className="space-y-0.5">
-                  <Link
-                    to="/tools?tab=my-tools"
+                  <button
+                    type="button"
+                    onClick={() => switchCanvasView('playground')}
                     className={`w-full px-2.5 py-2 rounded-md text-xs flex items-center justify-between transition-colors ${
-                      location.pathname === '/tools' && location.search.includes('tab=my-tools')
-                        ? 'bg-slate-800 text-white font-semibold border border-slate-700'
+                      activeCanvasView === 'playground'
+                        ? 'bg-blue-600/20 text-blue-400 font-semibold border border-blue-500/40 shadow-sm'
+                        : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <MessageSquare className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                      <span className="truncate">Playground</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => switchCanvasView('my-tools')}
+                    className={`w-full px-2.5 py-2 rounded-md text-xs flex items-center justify-between transition-colors ${
+                      activeCanvasView === 'my-tools'
+                        ? 'bg-blue-600/20 text-blue-400 font-semibold border border-blue-500/40 shadow-sm'
                         : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <Bookmark className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                      <span className="truncate">📁 My Tools</span>
+                      <span className="truncate">My Tools</span>
                     </div>
                     {savedTools.length > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${activeCanvasView === 'my-tools' ? 'bg-blue-500/30 text-blue-300' : 'bg-slate-800 text-slate-400'}`}>
                         {savedTools.length}
                       </span>
                     )}
-                  </Link>
+                  </button>
 
-                  <Link
-                    to="/tools?tab=shared"
+                  <button
+                    type="button"
+                    onClick={() => switchCanvasView('shared')}
                     className={`w-full px-2.5 py-2 rounded-md text-xs flex items-center justify-between transition-colors ${
-                      location.pathname === '/tools' && location.search.includes('tab=shared')
-                        ? 'bg-slate-800 text-white font-semibold border border-slate-700'
+                      activeCanvasView === 'shared'
+                        ? 'bg-purple-600/20 text-purple-400 font-semibold border border-purple-500/40 shadow-sm'
                         : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <Share2 className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                      <Share2 className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
                       <span className="truncate">Shared with Me</span>
                     </div>
                     {sharedTools.length > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${activeCanvasView === 'shared' ? 'bg-purple-500/30 text-purple-300' : 'bg-slate-800 text-slate-400'}`}>
                         {sharedTools.length}
                       </span>
                     )}
-                  </Link>
+                  </button>
                 </div>
               </div>
 
@@ -2817,32 +5403,37 @@ export default function Learningplayground() {
                 </div>
 
                 <div className="space-y-0.5">
-                  <Link
-                    to="/tools?tab=marketplace"
+                  <button
+                    type="button"
+                    onClick={() => switchCanvasView('marketplace')}
                     className={`w-full px-2.5 py-2 rounded-md text-xs flex items-center justify-between transition-colors ${
-                      location.pathname === '/tools' && location.search.includes('tab=marketplace')
-                        ? 'bg-slate-800 text-white font-semibold border border-slate-700'
+                      activeCanvasView === 'marketplace'
+                        ? 'bg-emerald-600/20 text-emerald-400 font-semibold border border-emerald-500/40 shadow-sm'
                         : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <Globe className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                      <Globe className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
                       <span className="truncate">Marketplace</span>
                     </div>
                     {marketplaceTools.length > 0 && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 font-mono">
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${activeCanvasView === 'marketplace' ? 'bg-emerald-500/30 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
                         {marketplaceTools.length}
                       </span>
                     )}
-                  </Link>
+                  </button>
 
                   <button
-                    onClick={() => setShowUploadModal(true)}
+                    type="button"
+                    onClick={() => {
+                      switchCanvasView('playground')
+                      setShowUploadModal(true)
+                    }}
                     className="w-full px-2.5 py-2 rounded-md text-xs text-left text-slate-300 hover:bg-slate-800/60 hover:text-white flex items-center gap-2 transition-colors"
                     title="Import notes, lecture slides, or documents"
                   >
                     <Upload className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                    <span className="truncate">Import from Drive</span>
+                    <span className="truncate">Import Material (Files & Slides)</span>
                   </button>
                 </div>
               </div>
@@ -2856,50 +5447,63 @@ export default function Learningplayground() {
                   <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
                     History
                   </span>
-                  <Clock className="w-3 h-3 text-slate-500" />
+                  <div className="flex items-center gap-1">
+                    {user?.id && (
+                      <button
+                        onClick={fetchChatSessions}
+                        disabled={isLoadingHistory}
+                        className="p-1 rounded text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+                        title="Refresh session history"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isLoadingHistory ? 'animate-spin text-blue-400' : ''}`} />
+                      </button>
+                    )}
+                    <Clock className="w-3 h-3 text-slate-500" />
+                  </div>
                 </div>
 
-                <div className="space-y-0.5">
+                <div className="space-y-0.5 max-h-[240px] overflow-y-auto scrollbar-thin pr-0.5">
                   {filteredChats.length === 0 ? (
-                    <div className="space-y-0.5">
-                      <button
-                        onClick={() => handleSendMessage('Organic Chemistry reaction mechanisms')}
-                        className="w-full px-2.5 py-1.5 rounded-md text-xs text-left text-slate-400 hover:text-white hover:bg-slate-800/60 truncate transition-colors flex items-center gap-2"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                        <span className="truncate">Organic Chemistry</span>
-                      </button>
-                      <button
-                        onClick={() => handleSendMessage('Calculus II integration techniques and practice')}
-                        className="w-full px-2.5 py-1.5 rounded-md text-xs text-left text-slate-400 hover:text-white hover:bg-slate-800/60 truncate transition-colors flex items-center gap-2"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                        <span className="truncate">Calculus II</span>
-                      </button>
+                    <div className="px-2.5 py-3 text-center rounded-lg bg-slate-800/30 border border-slate-800/60">
+                      <p className="text-[11px] text-slate-500 font-medium">
+                        {searchQuery ? 'No matching chats found' : 'No previous chats'}
+                      </p>
+                      {!searchQuery && (
+                        <p className="text-[10px] text-slate-600 mt-0.5">
+                          Your study sessions will appear here
+                        </p>
+                      )}
                     </div>
                   ) : (
-                    filteredChats.slice(0, 5).map((chat) => {
+                    filteredChats.map((chat) => {
                       const isActive = activeChatId === chat.id
                       return (
                         <div
                           key={chat.id}
                           onClick={() => loadChatSession(chat)}
-                          className={`group px-2.5 py-1.5 rounded-md text-xs flex items-center justify-between cursor-pointer transition-all ${
+                          className={`group px-2.5 py-2 rounded-lg text-xs flex items-center justify-between cursor-pointer transition-all ${
                             isActive
-                              ? 'bg-slate-800 text-white font-medium border border-slate-700'
-                              : 'text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                              ? 'bg-blue-600/20 text-blue-300 font-medium border border-blue-500/40 shadow-sm'
+                              : 'text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent'
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0 pr-1">
-                            <MessageSquare className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                            <span className="truncate">{chat.title || 'Previous Chat'}</span>
+                          <div className="flex items-center gap-2 min-w-0 pr-1 flex-1">
+                            <MessageSquare className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-blue-400' : 'text-slate-400'}`} />
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <span className="truncate font-medium leading-tight">{chat.title || 'Previous Chat'}</span>
+                              {chat.updatedAt && (
+                                <span className="text-[10px] text-slate-500 mt-0.5">
+                                  {new Date(chat.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <button
                             onClick={(e) => deleteChatSession(chat.id, e)}
-                            className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-red-400 text-slate-500 transition-opacity rounded"
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 text-slate-500 hover:bg-red-500/10 transition-all rounded"
                             title="Delete chat"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       )
@@ -2944,199 +5548,294 @@ export default function Learningplayground() {
         </div>
       </aside>
 
-      {/* Floating Left Chat Panel (Collapsible) */}
-      <div
-        className={`relative z-20 flex flex-col bg-[#10151f]/95 backdrop-blur-xl transition-[width,transform,margin,opacity] duration-300 flex-shrink-0 overflow-hidden ${
-          isChatPanelOpen
-            ? 'w-[calc(100%-1rem)] sm:w-[380px] lg:w-[420px] translate-x-0 m-2 sm:my-3 sm:ml-3 sm:mr-1.5 h-[calc(100%-1rem)] sm:h-[calc(100%-1.5rem)] rounded-2xl border border-[#223247] shadow-2xl shadow-black/40'
-            : 'w-0 m-0 -translate-x-full h-full border-0 pointer-events-none'
-        }`}
-      >
-        {/* Chat Panel Header */}
-        <div className="p-3 sm:p-3.5 flex items-center justify-between gap-2 border-b border-[#223247] bg-[#0c1017]">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-[#16263d] border border-[#223247] flex items-center justify-center flex-shrink-0">
-              <Vela size={16} />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-xs sm:text-sm font-semibold text-white truncate">
-                {chatHistory.find((c) => c.id === activeChatId)?.title || 'Study Assistant'}
-              </h2>
-              <p className="text-[10px] text-[#7f93ad] truncate">
-                {messages.length > 0 ? `${messages.length} message${messages.length === 1 ? '' : 's'}` : 'Interactive session'}
-              </p>
-            </div>
-          </div>
+      {/* Fullscreen transparent overlay during chat panel resizing */}
+      {isChatPanelResizing && (
+        <div className="fixed inset-0 z-50 cursor-col-resize select-none bg-transparent" />
+      )}
 
-          <div className="flex items-center gap-1">
-            <button
-              onClick={handleStartNewSession}
-              className="p-1.5 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#21262E] transition-colors"
-              title="New Chat"
-            >
-              <SquarePen className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setIsChatPanelOpen(false)}
-              className="p-1.5 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#21262E] transition-colors"
-              title="Hide Chat"
-            >
-              <PanelLeftClose className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Scrollable Messages Thread */}
-        <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-4">
-          {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center px-2 py-6">
-              <div className="w-12 h-12 rounded-2xl bg-[#16263d]/80 border border-[#223247] flex items-center justify-center text-white mb-3 shadow-lg">
-                <Vela size={28} />
-              </div>
-              <h3 className="text-sm sm:text-base font-semibold text-white">How can I help you study?</h3>
-              <p className="text-xs text-[#8493a8] mt-1 max-w-xs leading-relaxed">
-                Prompt to build custom revision tools, quizzes, flashcards, diagrams, or ask any concept question.
-              </p>
-
-              <div className="w-full mt-6 space-y-2">
-                <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 text-left px-1 mb-1.5">
-                  Suggested Prompts
-                </div>
-                {suggestions.slice(0, 3).map((action) => (
-                  <button
-                    key={action.id}
-                    onClick={() => handleSendMessage(action.prompt)}
-                    className="w-full text-left p-3 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700/80 hover:border-slate-600 transition-all group"
-                  >
-                    <div className="flex items-center gap-2 text-xs font-semibold text-white group-hover:text-blue-300">
-                      <Lightbulb className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
-                      <span>{action.title}</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">{action.prompt}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            messages.map((m, idx) => {
-              const isUser = m.role === 'user'
-              return (
-                <div key={m.id || idx} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-                  {isUser ? (
-                    <div className="max-w-[88%] bg-[#21262E] border border-[#282E38] text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed shadow-sm">
-                      <p className="whitespace-pre-wrap">{m.content}</p>
-                    </div>
-                  ) : (
-                    <div className="flex items-start gap-2.5 max-w-[95%]">
-                      <div className="w-6 h-6 rounded-full bg-[#16263d] border border-[#223247] flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
-                        <Vela size={14} />
-                      </div>
-                      <div className="flex-1 min-w-0 bg-[#0e1626]/90 border border-[#1b2b40] rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs sm:text-sm text-[#e2e8f0] leading-relaxed shadow-sm space-y-2">
-                        <p className="whitespace-pre-wrap">{m.content}</p>
-                        {m.attachedTool && (
-                          <div className="mt-2.5 pt-2.5 border-t border-[#1e2e45] flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 text-[11px] text-[#93c5fd] font-semibold truncate">
-                              <Wrench className="w-3.5 h-3.5 text-[#3b82f6] flex-shrink-0" />
-                              <span className="truncate">{extractToolMetadata(m.attachedTool).title || 'Interactive Tool'}</span>
-                            </div>
-                            <button
-                              onClick={() => selectTool(m.attachedTool)}
-                              className="px-2.5 py-1 text-[11px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-lg transition-colors flex-shrink-0 shadow-sm"
-                            >
-                              View Tool
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })
-          )}
-
-          {isLoading && (
-            <div className="flex items-start gap-2.5 max-w-[95%]">
-              <div className="w-6 h-6 rounded-full bg-[#16263d] border border-[#223247] flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm animate-pulse">
-                <Vela size={14} />
-              </div>
-              <div className="bg-[#0e1626]/90 border border-[#1b2b40] rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs text-[#9fb0c5] shadow-sm flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#5A7D99] animate-ping" />
-                <span>{generationStage || 'Thinking and generating tool...'}</span>
-              </div>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Docked Composer at Bottom of Chat Panel */}
-        <div className="p-3 sm:p-3.5 border-t border-[#223247] bg-[#0c1017]">
-          {attachedDocument && (
-            <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-[#3b82f6]/40 bg-[#5A7D99]/20 px-2.5 py-1 text-xs text-[#93c5fd]">
-              <span className="flex items-center gap-1.5 truncate">
-                <FileText className="w-3.5 h-3.5 flex-shrink-0" />
-                <span className="truncate">{attachedDocument.title}</span>
-              </span>
-              <button
-                onClick={() => setAttachedDocument(null)}
-                className="text-[#bfdbfe] hover:text-white flex-shrink-0"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          <div className="rounded-xl border border-[#223247] bg-[#141b29] p-2 focus-within:border-[#385677] transition-colors">
-            <textarea
-              ref={textareaRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSendMessage()
-                }
+      {/* Floating Left Chat Panel (Collapsible - Only on Chat/Playground Page) */}
+      {activeCanvasView === 'playground' && (
+        <div
+          className={`relative z-20 flex flex-col bg-[#10151f]/95 backdrop-blur-xl transition-[transform,margin,opacity] ${
+            isChatPanelResizing ? 'transition-none select-none' : 'duration-300'
+          } flex-shrink-0 overflow-hidden ${
+            isChatPanelOpen
+              ? 'translate-x-0 m-2 sm:my-3 sm:ml-3 sm:mr-1.5 h-[calc(100%-1rem)] sm:h-[calc(100%-1.5rem)] rounded-2xl border border-[#223247] shadow-2xl shadow-black/40'
+              : 'w-0 m-0 -translate-x-full h-full border-0 pointer-events-none'
+          }`}
+          style={isChatPanelOpen ? { width: `min(${chatPanelWidth}px, calc(100vw - 1rem))` } : undefined}
+        >
+          {/* Draggable Vertical Resize Handle on Right Edge */}
+          {isChatPanelOpen && (
+            <div
+              onMouseDown={handleChatResizeStart}
+              onDoubleClick={() => {
+                setChatPanelWidth(400)
+                try {
+                  localStorage.setItem('lp_chat_panel_width', '400')
+                } catch {}
               }}
-              placeholder="Ask a question or build a study tool..."
-              className="w-full resize-none border-none bg-transparent py-1 text-xs sm:text-sm text-white placeholder-[#7f93ad] focus:outline-none min-h-[36px] max-h-28"
-              rows={1}
-            />
-
-            <div className="mt-1.5 flex items-center justify-between gap-1.5 border-t border-[#1d293d] pt-1.5">
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setShowUploadModal(true)}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#8493a8] hover:bg-[#1f2e45] hover:text-white transition-colors"
-                  title="Attach file, PDF, audio, or YouTube"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={toggleChatVoiceInput}
-                  className={`inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
-                    isChatListening ? 'bg-red-500 text-white animate-pulse' : 'text-[#8493a8] hover:bg-[#1f2e45] hover:text-white'
-                  }`}
-                  title="Voice Input (Whisper)"
-                >
-                  <Mic className="w-3.5 h-3.5" />
-                </button>
+              className="nodrag absolute top-0 bottom-0 right-0 w-2.5 cursor-col-resize hover:bg-blue-500/30 transition-colors z-30 group flex items-center justify-center"
+              title="Drag to resize chat panel • Double-click to reset width"
+            >
+              <div className="w-0.5 h-8 rounded-full bg-slate-700/80 group-hover:bg-blue-400 group-hover:h-14 transition-all" />
+            </div>
+          )}
+          {/* Chat Panel Header */}
+          <div className="p-3 sm:p-3.5 flex items-center justify-between gap-2 border-b border-[#223247] bg-[#0c1017]">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-[#16263d] border border-[#223247] flex items-center justify-center flex-shrink-0">
+                <Vela size={16} />
               </div>
+              <div className="min-w-0">
+                <h2 className="text-xs sm:text-sm font-semibold text-white truncate">
+                  {chatHistory.find((c) => c.id === activeChatId)?.title || 'Study Assistant'}
+                </h2>
+                <p className="text-[10px] text-[#7f93ad] truncate">
+                  {messages.length > 0 ? `${messages.length} message${messages.length === 1 ? '' : 's'}` : 'Interactive session'}
+                </p>
+              </div>
+            </div>
 
+            <div className="flex items-center gap-1">
               <button
-                onClick={() => handleSendMessage()}
-                disabled={isLoading || !inputValue.trim()}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#5A7D99] hover:bg-[#3D5E7A] text-white transition-all disabled:opacity-40 disabled:hover:bg-[#5A7D99]"
-                title="Send prompt"
+                onClick={handleStartNewSession}
+                className="p-1.5 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#21262E] transition-colors"
+                title="New Chat"
               >
-                <Send className="w-3.5 h-3.5" />
+                <SquarePen className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setIsChatPanelOpen(false)}
+                className="p-1.5 rounded-lg text-[#8493a8] hover:text-white hover:bg-[#21262E] transition-colors"
+                title="Hide Chat"
+              >
+                <PanelLeftClose className="w-4 h-4" />
               </button>
             </div>
           </div>
+
+          {/* Scrollable Messages Thread */}
+          <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-4">
+            {messages.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center px-2 py-6">
+                <div className="w-12 h-12 rounded-2xl bg-[#16263d]/80 border border-[#223247] flex items-center justify-center text-white mb-3 shadow-lg">
+                  <Vela size={28} />
+                </div>
+                <h3 className="text-sm sm:text-base font-semibold text-white">How can I help you study?</h3>
+                <p className="text-xs text-[#8493a8] mt-1 max-w-xs leading-relaxed">
+                  Prompt to build custom revision tools, quizzes, flashcards, diagrams, or ask any concept question.
+                </p>
+
+                <div className="w-full mt-6 space-y-2">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400 text-left px-1 mb-1.5">
+                    Suggested Prompts
+                  </div>
+                  {suggestions.slice(0, 3).map((action) => (
+                    <button
+                      key={action.id}
+                      onClick={() => handleSendMessage(action.prompt)}
+                      className="w-full text-left p-3 rounded-lg border border-slate-700/80 bg-slate-800/80 hover:bg-slate-700/80 hover:border-slate-600 transition-all group"
+                    >
+                      <div className="flex items-center gap-2 text-xs font-semibold text-white group-hover:text-blue-300">
+                        <Lightbulb className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                        <span>{action.title}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">{action.prompt}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              messages.map((m, idx) => {
+                const isUser = m.role === 'user'
+                return (
+                  <div key={m.id || idx} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+                    {isUser ? (
+                      <div className="max-w-[88%] bg-[#21262E] border border-[#282E38] text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed shadow-sm">
+                        <p className="whitespace-pre-wrap">{m.content}</p>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-2.5 max-w-[95%]">
+                        <div className="w-6 h-6 rounded-full bg-[#16263d] border border-[#223247] flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm">
+                          <Vela size={14} />
+                        </div>
+                        <div className="flex-1 min-w-0 bg-[#0e1626]/90 border border-[#1b2b40] rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs sm:text-sm text-[#e2e8f0] leading-relaxed shadow-sm space-y-2 group/msg">
+                          <p className="whitespace-pre-wrap">{m.content}</p>
+                          {m.attachedTool && (
+                            <div className="mt-2.5 pt-2.5 border-t border-[#1e2e45] flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5 text-[11px] text-[#93c5fd] font-semibold truncate">
+                                <Wrench className="w-3.5 h-3.5 text-[#3b82f6] flex-shrink-0" />
+                                <span className="truncate">{extractToolMetadata(m.attachedTool).title || 'Interactive Tool'}</span>
+                              </div>
+                              <button
+                                onClick={() => selectTool(m.attachedTool)}
+                                className="px-2.5 py-1 text-[11px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-lg transition-colors flex-shrink-0 shadow-sm"
+                              >
+                                View Tool
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Assistant Message Quick Actions */}
+                          <div className="pt-2 border-t border-[#1a283e] flex items-center justify-between gap-2 opacity-70 group-hover/msg:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  try {
+                                    if (navigator.clipboard?.writeText) {
+                                      navigator.clipboard.writeText(m.content)
+                                      setShareToastMessage('Copied response text')
+                                      setTimeout(() => setShareToastMessage(''), 2500)
+                                    }
+                                  } catch {}
+                                }}
+                                className="px-1.5 py-0.5 rounded text-[10px] text-[#8493a8] hover:text-white hover:bg-[#16263d] transition-colors flex items-center gap-1"
+                                title="Copy message text"
+                              >
+                                <Copy className="w-3 h-3 text-[#5A7D99]" />
+                                <span>Copy</span>
+                              </button>
+                              <button
+                                onClick={() => handleSendMessage(`Create interactive flashcards based on this concept: "${m.content.slice(0, 180)}"`)}
+                                className="px-1.5 py-0.5 rounded text-[10px] text-[#8493a8] hover:text-amber-300 hover:bg-[#16263d] transition-colors flex items-center gap-1"
+                                title="Generate flashcards from this answer"
+                              >
+                                <Zap className="w-3 h-3 text-amber-400" />
+                                <span>Cards</span>
+                              </button>
+                              <button
+                                onClick={() => handleSendMessage(`Create a 5-question active recall quiz based on: "${m.content.slice(0, 180)}"`)}
+                                className="px-1.5 py-0.5 rounded text-[10px] text-[#8493a8] hover:text-blue-300 hover:bg-[#16263d] transition-colors flex items-center gap-1"
+                                title="Generate quiz from this answer"
+                              >
+                                <CheckSquare className="w-3 h-3 text-blue-400" />
+                                <span>Quiz</span>
+                              </button>
+                            </div>
+                            <span className="text-[9px] font-mono text-[#64748b]">
+                              {new Date(m.timestamp || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+
+            {isLoading && (
+              <div className="flex items-start gap-2.5 max-w-[95%]">
+                <div className="w-6 h-6 rounded-full bg-[#16263d] border border-[#223247] flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm animate-pulse">
+                  <Vela size={14} />
+                </div>
+                <div className="bg-[#0e1626]/90 border border-[#1b2b40] rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs text-[#9fb0c5] shadow-sm flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#5A7D99] animate-ping" />
+                  <span>{generationStage || 'Thinking and generating tool...'}</span>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Docked Composer at Bottom of Chat Panel */}
+          <div className="p-3 sm:p-3.5 border-t border-[#223247] bg-[#0c1017]">
+            {attachedDocument && (
+              <div className="mb-2 flex items-center justify-between gap-2 rounded-lg border border-[#3b82f6]/40 bg-[#5A7D99]/20 px-2.5 py-1.5 text-xs text-[#93c5fd]">
+                <span className="flex items-center gap-1.5 truncate">
+                  <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">{attachedDocument.title}</span>
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenCitationViewer(null, attachedDocument.title)}
+                    className="px-2 py-0.5 rounded bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 text-[10px] font-semibold flex items-center gap-1 transition-colors border border-blue-500/40"
+                    title="Open Document Reader & Citations Split-Viewer"
+                  >
+                    <BookOpen className="w-3 h-3" />
+                    <span>Inspect</span>
+                  </button>
+                  <button
+                    onClick={() => setAttachedDocument(null)}
+                    className="text-[#bfdbfe] hover:text-white flex-shrink-0 p-0.5"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-xl border border-[#223247] bg-[#141b29] p-2 focus-within:border-[#385677] transition-colors">
+              <textarea
+                ref={textareaRef}
+                value={inputValue}
+                onChange={(e) => {
+                  setInputValue(e.target.value)
+                  if (textareaRef.current) {
+                    textareaRef.current.style.height = 'auto'
+                    textareaRef.current.style.height = `${Math.min(140, Math.max(36, textareaRef.current.scrollHeight))}px`
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSendMessage()
+                    if (textareaRef.current) {
+                      textareaRef.current.style.height = '36px'
+                    }
+                  }
+                }}
+                placeholder="Ask a question or build a study tool..."
+                className="w-full resize-none border-none bg-transparent py-1 text-xs sm:text-sm text-white placeholder-[#7f93ad] focus:outline-none min-h-[36px] max-h-36 overflow-y-auto"
+                rows={1}
+              />
+
+              <div className="mt-1.5 flex items-center justify-between gap-1.5 border-t border-[#1d293d] pt-1.5">
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowUploadModal(true)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[#8493a8] hover:bg-[#1f2e45] hover:text-white transition-colors"
+                    title="Attach file, PDF, audio, or YouTube"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleChatVoiceInput}
+                    className={`inline-flex h-7 items-center justify-center rounded-lg px-2 text-xs font-medium transition-colors ${
+                      isChatListening
+                        ? 'bg-red-500/20 text-red-300 border border-red-500/40 animate-pulse'
+                        : 'text-[#8493a8] hover:bg-[#1f2e45] hover:text-white'
+                    }`}
+                    title="Voice Input (Whisper)"
+                  >
+                    <Mic className="w-3.5 h-3.5 mr-1" />
+                    {isChatListening && <span>Listening...</span>}
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    handleSendMessage()
+                    if (textareaRef.current) {
+                      textareaRef.current.style.height = '36px'
+                    }
+                  }}
+                  disabled={isLoading || !inputValue.trim()}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#5A7D99] hover:bg-[#3D5E7A] text-white transition-all disabled:opacity-40 disabled:hover:bg-[#5A7D99]"
+                  title="Send prompt"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Center & Canvas Workspace */}
       <div className="flex-1 min-w-0 h-full overflow-hidden relative z-10" ref={toolContainerRef}>
@@ -3151,320 +5850,589 @@ export default function Learningplayground() {
                 <PanelLeft className="w-4 h-4" />
               </button>
             )}
-          </div>
 
-          <div className="flex items-center gap-2 pointer-events-auto">
-            {/* Canvas Notes & Pins Toolbar */}
-            <div className="flex items-center gap-1 bg-slate-800/95 border border-slate-700 rounded-lg p-1 shadow-md">
+            {activeCanvasView === 'playground' && (
               <button
-                onClick={() => handleAddStickyNote(380, 140)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
-                title="Add a Sticky Note (or double-click canvas)"
+                onClick={() => {
+                  setIsChatPanelOpen((prev) => !prev)
+                  if (!isChatPanelOpen && chatPanelWidth < 280) setChatPanelWidth(400)
+                }}
+                className={`rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-md transition-all flex items-center gap-2 ${
+                  isChatPanelOpen
+                    ? 'border-[#282E38] bg-[#1a2130]/90 text-[#cbd5e1] hover:bg-[#222c40] hover:text-white'
+                    : 'border-blue-500/50 bg-blue-600/90 text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500 active:scale-95'
+                }`}
+                title={isChatPanelOpen ? 'Collapse Chat (Ctrl+J)' : 'Open AI Study Assistant (Ctrl+J)'}
               >
-                <Plus className="w-3.5 h-3.5 text-amber-400" />
-                <span>Sticky Note</span>
-              </button>
-              <button
-                onClick={() => handleAddPinNode(420, 160)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
-                title="Pin a key formula or concept"
-              >
-                <Pin className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">Formula Pin</span>
-              </button>
-              <button
-                onClick={() => handleAddChecklistNode(450, 180)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
-                title="Add a study checklist"
-              >
-                <CheckSquare className="w-3.5 h-3.5 text-blue-400" />
-                <span className="hidden sm:inline">Checklist</span>
-              </button>
-            </div>
-
-            <button
-              onClick={handleStartNewSession}
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/95 px-3.5 py-2 text-xs font-semibold text-slate-200 shadow-md transition-colors hover:bg-slate-700 hover:text-white"
-            >
-              <SquarePen className="w-3.5 h-3.5" />
-              <span>New chat</span>
-            </button>
-            
-            <button
-              onClick={() => setRightPanelOpen(!rightPanelOpen)}
-              className={`rounded-lg border px-3 py-2 text-xs font-semibold shadow-md transition-colors ${rightPanelOpen || generatedTool ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-700 bg-slate-800/95 text-slate-300 hover:bg-slate-700 hover:text-white'}`}
-              title={rightPanelOpen ? 'Hide Tool Canvas' : 'Show Tool Canvas'}
-            >
-              <span className="inline-flex items-center gap-1.5">
-                {rightPanelOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRight className="w-3.5 h-3.5" />}
-                <span>{rightPanelOpen ? 'Hide tool' : 'Show tool'}</span>
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {generatedTool && (
-          <div className="absolute left-3 right-3 top-[5.75rem] z-20 flex justify-end pointer-events-none">
-            <div className="flex max-w-full flex-wrap items-center gap-2 rounded-[22px] border border-[#1b2b40] bg-[#09111d]/92 px-3 py-2 shadow-xl shadow-black/20 backdrop-blur-md pointer-events-auto">
-              <button
-                onClick={openInlineEditor}
-                className="rounded-full border border-[#223247] bg-[#101b2d] px-3 py-1.5 text-[11px] font-semibold text-[#e2e8f0] transition-colors hover:bg-[#16263d] hover:text-white"
-                title="Edit questions, cards, and content in canvas"
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <Edit3 className="w-3.5 h-3.5 text-[#5A7D99]" />
-                  <span>Edit</span>
-                </span>
-              </button>
-              <button
-                onClick={() => handleSaveActiveToolToLibrary(generatedTool)}
-                className="rounded-full border border-emerald-500/30 bg-emerald-500/15 px-3 py-1.5 text-[11px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500 hover:text-white"
-                title="Save this tool to your personal Saved Tools library"
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <Bookmark className="w-3.5 h-3.5" />
-                  <span>Save</span>
-                </span>
-              </button>
-              <button
-                onClick={() => handleOpenShareModal(generatedTool)}
-                className="rounded-full border border-[#223247] bg-[#101b2d] px-3 py-1.5 text-[11px] font-semibold text-[#e2e8f0] transition-colors hover:bg-[#16263d] hover:text-white"
-                title="Share with another student or copy direct link"
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  <Share2 className="w-3.5 h-3.5 text-[#5A7D99]" />
-                  <span>Share</span>
-                </span>
-              </button>
-              <div className="relative">
-                <button
-                  onClick={() => setShowExportMenu(!showExportMenu)}
-                  className="rounded-full border border-[#223247] bg-[#101b2d] px-3 py-1.5 text-[11px] font-semibold text-[#e2e8f0] transition-colors hover:bg-[#16263d] hover:text-white"
-                  title="Export or print study materials"
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    <Download className="w-3.5 h-3.5 text-[#5A7D99]" />
-                    <span>Export</span>
+                {isChatPanelOpen ? (
+                  <PanelLeftClose className="w-3.5 h-3.5 text-blue-400" />
+                ) : (
+                  <PanelLeft className="w-3.5 h-3.5 text-white" />
+                )}
+                <span>{isChatPanelOpen ? 'Hide Chat' : 'Open Chat'}</span>
+                {messages.length > 0 && (
+                  <span className={`rounded-full px-1.5 py-0.2 text-[10px] font-mono ${
+                    isChatPanelOpen ? 'bg-[#282E38] text-[#94a3b8]' : 'bg-white/20 text-white'
+                  }`}>
+                    {messages.length}
                   </span>
-                </button>
+                )}
+                <kbd className="hidden lg:inline-block ml-0.5 text-[9px] font-mono text-slate-400/80 bg-black/30 border border-white/10 px-1 py-0.2 rounded">
+                  Ctrl+J
+                </kbd>
+              </button>
+            )}
+          </div>
 
-                {showExportMenu && (
-                  <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-[#1e2d45] bg-[#21262E] p-1.5 shadow-2xl">
+          {activeCanvasView === 'playground' && (
+            <div className="flex items-center gap-2 pointer-events-auto">
+              {/* Canvas Notes & Pins Toolbar */}
+              <div className="flex items-center gap-1 bg-slate-800/95 border border-slate-700 rounded-lg p-1 shadow-md">
+                <button
+                  onClick={() => handleAddStickyNote(380, 140)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
+                  title="Add a Sticky Note (or double-click canvas)"
+                >
+                  <Plus className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Sticky Note</span>
+                </button>
+                <button
+                  onClick={() => handleAddPinNode(420, 160)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
+                  title="Pin a key formula or concept"
+                >
+                  <Pin className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden sm:inline">Formula Pin</span>
+                </button>
+                <button
+                  onClick={() => handleAddChecklistNode(450, 180)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
+                  title="Add a study checklist"
+                >
+                  <CheckSquare className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="hidden sm:inline">Checklist</span>
+                </button>
+                {attachedDocument && (
+                  <>
+                    <div className="h-4 w-px bg-slate-700 mx-0.5" />
                     <button
-                      onClick={handleExportMarkdown}
-                      className="w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-white transition-colors hover:bg-[#1a253c]"
+                      onClick={() => handleAddPdfReaderNode(attachedDocument.title, attachedDocument.fileUrl)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 transition-colors shadow-sm"
+                      title={`Open "${attachedDocument.title}" in Canvas Reader`}
                     >
-                      <span className="flex items-center gap-2">
-                        <FileText className="w-3.5 h-3.5 text-[#5A7D99]" />
-                        Download Markdown
-                      </span>
+                      <FileText className="w-3.5 h-3.5 text-blue-400" />
+                      <span className="hidden sm:inline">PDF Reader</span>
                     </button>
                     <button
-                      onClick={handlePrintStudySheet}
-                      className="mt-1 w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-white transition-colors hover:bg-[#1a253c]"
+                      onClick={() => handleOpenCitationViewer(null, attachedDocument.title)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                      title="Open Grounded Document Split-Viewer Drawer"
                     >
-                      <span className="flex items-center gap-2">
-                        <Printer className="w-3.5 h-3.5 text-[#5A7D99]" />
-                        Print / PDF Cheat Sheet
-                      </span>
+                      <BookOpen className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="hidden sm:inline">Citations Split-View</span>
                     </button>
-                  </div>
+                  </>
                 )}
               </div>
+
               <button
-                onClick={() => openPublishModal(generatedTool)}
-                className="rounded-full border border-[#3b82f6]/40 bg-[#3b82f6]/15 px-3 py-1.5 text-[11px] font-semibold text-[#93c5fd] transition-colors hover:bg-[#3b82f6] hover:text-white"
-                title="Publish this tool to the Community Marketplace"
+                onClick={handleStartNewSession}
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/95 px-3.5 py-2 text-xs font-semibold text-slate-200 shadow-md transition-colors hover:bg-slate-700 hover:text-white"
+              >
+                <SquarePen className="w-3.5 h-3.5" />
+                <span>New chat</span>
+              </button>
+              
+              <button
+                onClick={() => setRightPanelOpen(!rightPanelOpen)}
+                className={`rounded-lg border px-3 py-2 text-xs font-semibold shadow-md transition-colors ${rightPanelOpen || generatedTool ? 'border-blue-500 bg-blue-600 text-white' : 'border-slate-700 bg-slate-800/95 text-slate-300 hover:bg-slate-700 hover:text-white'}`}
+                title={rightPanelOpen ? 'Hide Tool Canvas' : 'Show Tool Canvas'}
               >
                 <span className="inline-flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5" />
-                  <span>Publish</span>
+                  {rightPanelOpen ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRight className="w-3.5 h-3.5" />}
+                  <span>{rightPanelOpen ? 'Hide tool' : 'Show tool'}</span>
                 </span>
               </button>
             </div>
-          </div>
-        )}
-
-        <div className="absolute inset-0 z-0 learning-canvas" onDoubleClick={handleCanvasDoubleClick}>
-          <ReactFlow
-            nodes={canvasNodes}
-            edges={[]}
-            nodeTypes={canvasNodeTypes}
-            onNodesChange={onCustomCanvasNodesChange}
-            onNodeDragStop={handleNodeDragStop}
-            fitView
-            fitViewOptions={{ padding: 0.18, minZoom: 0.7 }}
-            minZoom={0.35}
-            maxZoom={1.8}
-            defaultViewport={{ x: 0, y: 0, zoom: 0.88 }}
-            panOnScroll
-            selectionOnDrag={false}
-            nodesDraggable
-            proOptions={{ hideAttribution: true }}
-          >
-            <Background variant="dots" gap={26} size={1.5} color="rgba(148, 163, 184, 0.45)" />
-            <MiniMap
-              pannable
-              zoomable
-              nodeColor={(node) => {
-                if (node.type === 'tool') return '#60a5fa'
-                if (node.type === 'welcome') return '#34d399'
-                return '#94a3b8'
-              }}
-              maskColor="rgba(26, 32, 44, 0.75)"
-              className="!bg-[#242d3d]/95 !border !border-[#3e4d66] !rounded-2xl !shadow-xl"
-            />
-            <Controls className="!rounded-2xl !overflow-hidden !border !border-[#3e4d66] !bg-[#242d3d]/95 !backdrop-blur-md !shadow-xl" />
-          </ReactFlow>
+          )}
         </div>
 
-
-        {isToolMaximized && generatedTool && (
-          <div className="fixed inset-0 z-50 bg-[#04070d]/92 backdrop-blur-sm p-3 sm:p-5">
-            <div className="flex h-full flex-col rounded-[28px] border border-[#1f3046] bg-[#09111d] shadow-2xl">
-              <div className="flex items-center justify-between gap-3 border-b border-[#18283e] px-4 py-3">
-                <div className="min-w-0">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8fb7ff]">Expanded workspace</div>
-                  <h3 className="mt-1 truncate text-sm font-semibold text-white">{activeMeta.title}</h3>
-                </div>
-                <button
-                  onClick={() => setIsToolMaximized(false)}
-                  className="rounded-full border border-[#223247] bg-[#101b2d] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#16263d]"
-                  title="Exit Fullscreen (Escape)"
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    <Minimize2 className="w-3.5 h-3.5" />
-                    <span>Minimize</span>
-                  </span>
-                </button>
+        <div
+          className="w-full h-full learning-canvas relative overflow-hidden flex flex-col flex-1"
+          style={{ width: '100%', height: '100%', minHeight: '450px', position: 'relative', display: 'flex' }}
+          onDoubleClick={handleCanvasDoubleClick}
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDropFile}
+        >
+          {/* Drag & Drop Global Overlay */}
+          {isDraggingOver && (
+            <div className="absolute inset-4 z-40 flex flex-col items-center justify-center rounded-3xl border-2 border-dashed border-blue-400/80 bg-[#0c1017]/90 backdrop-blur-md shadow-2xl pointer-events-none">
+              <div className="w-14 h-14 rounded-2xl bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-300 mb-3 animate-bounce">
+                <Upload className="w-6 h-6" />
               </div>
-              <div className="flex-1 p-3 sm:p-4">
-                <iframe
-                  srcDoc={activeHtml}
-                  title="Expanded Interactive Tool Sandbox"
-                  className="h-full min-h-[420px] w-full rounded-[22px] border-none bg-white shadow-[0_24px_60px_rgba(15,23,42,0.24)]"
-                  allow="microphone"
-                  sandbox="allow-scripts allow-modals allow-forms"
-                />
-              </div>
+              <h3 className="text-base font-semibold text-white">Drop lecture notes, PDF, image, or audio</h3>
+              <p className="text-xs text-slate-400 mt-1 max-w-sm text-center">
+                Instantly parse and generate interactive study modules with grounded document citations
+              </p>
             </div>
+          )}
+
+          {/* Toast Notification */}
+          {shareToastMessage && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-[#0c1410]/95 px-4 py-2 text-xs font-semibold text-emerald-300 shadow-2xl backdrop-blur-xl animate-fade-in">
+              <Check className="w-4 h-4 text-emerald-400" />
+              <span>{shareToastMessage}</span>
+            </div>
+          )}
+
+          {/* Canvas Bottom Left Shortcut Hint */}
+          <div className="nodrag absolute bottom-4 left-4 z-20 hidden md:flex items-center gap-2 rounded-lg border border-[#282E38]/80 bg-[#0c1017]/80 px-2.5 py-1 text-[11px] text-slate-400 backdrop-blur-md select-none pointer-events-none">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+            <span>Double-click canvas to add note • Ctrl+J for assistant</span>
           </div>
-        )}
+
+          <div className="w-full h-full flex-1 relative" style={{ width: '100%', height: '100%', minHeight: '400px' }}>
+            <ReactFlowProvider>
+              <ReactFlow
+                style={{ width: '100%', height: '100%' }}
+                className="w-full h-full"
+                nodes={canvasNodes}
+                edges={[]}
+                nodeTypes={canvasNodeTypes}
+                onNodesChange={onCustomCanvasNodesChange}
+                onNodeDragStop={handleNodeDragStop}
+                fitView
+                fitViewOptions={{ padding: 0.25, maxZoom: 0.78, minZoom: 0.35, duration: 350 }}
+                minZoom={0.25}
+                maxZoom={1.8}
+                defaultViewport={{ x: 60, y: 30, zoom: 0.72 }}
+                panOnScroll
+                selectionOnDrag={false}
+                nodesDraggable
+                proOptions={{ hideAttribution: true }}
+              >
+                <CanvasViewAutoFitter
+                  activeView={activeCanvasView}
+                  nodeCount={canvasNodes.length}
+                  hasTool={Boolean(generatedTool)}
+                />
+                <CanvasViewportControls />
+                <Background variant="dots" gap={26} size={1.5} color="rgba(148, 163, 184, 0.45)" />
+                <MiniMap
+                  pannable
+                  zoomable
+                  nodeColor={(node) => {
+                    if (node.type === 'tool') return '#60a5fa'
+                    if (node.type === 'welcome') return '#34d399'
+                    if (node.type === 'pageHeader') return '#38bdf8'
+                    if (node.type === 'toolCard') return '#3b82f6'
+                    if (node.type === 'sharedCard') return '#a855f7'
+                    if (node.type === 'marketplaceCard') return '#10b981'
+                    if (node.type === 'pin') return '#fbbf24'
+                    if (node.type === 'checklist') return '#38bdf8'
+                    return '#94a3b8'
+                  }}
+                  maskColor="rgba(26, 32, 44, 0.75)"
+                  className="!bg-[#242d3d]/95 !border !border-[#3e4d66] !rounded-2xl !shadow-xl"
+                />
+              </ReactFlow>
+            </ReactFlowProvider>
+          </div>
+        </div>
       </div>
 
       {/* In-Canvas Direct Inline Editor Modal */}
-      {showEditModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-          <div className="w-full max-w-2xl bg-[#1A1E24] border border-[#282E38] rounded-[8px] p-6 shadow-2xl space-y-5 max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-[#282E38] pb-3 flex-shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-[6px] bg-[#5A7D99]/20 border border-[#5A7D99]/40 flex items-center justify-center text-[#5A7D99]">
-                  <Edit3 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-sm text-white">Edit Tool in Canvas</h3>
-                  <p className="text-[11px] text-[#6E7580]">Customize cards, questions, and answers before saving</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="p-1 rounded-[6px] text-[#6E7580] hover:text-white hover:bg-[#21262E]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-              <div>
-                <label className="block text-xs font-semibold text-[#CDD1D6] mb-1">Tool Title</label>
-                <input
-                  type="text"
-                  value={editingTitle}
-                  onChange={(e) => setEditingTitle(e.target.value)}
-                  className="w-full bg-[#131519] border border-[#282E38] rounded-[6px] px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#CDD1D6] mb-1">Description</label>
-                <input
-                  type="text"
-                  value={editingDesc}
-                  onChange={(e) => setEditingDesc(e.target.value)}
-                  className="w-full bg-[#131519] border border-[#282E38] rounded-[6px] px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-semibold text-[#CDD1D6]">
-                    Tool Items / Cards ({editingItems.length})
-                  </label>
-                  <button
-                    onClick={handleAddEditorItem}
-                    className="px-2.5 py-1 rounded-[6px] bg-[#21262E] hover:bg-[#5A7D99] text-xs font-semibold text-white border border-[#282E38] transition-all flex items-center gap-1"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Item</span>
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {editingItems.map((item, idx) => (
-                    <div key={idx} className="p-3 rounded-[6px] bg-[#131519] border border-[#282E38] space-y-2 relative group">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-mono text-[#5A7D99] font-bold">ITEM {idx + 1}</span>
-                        <button
-                          onClick={() => handleDeleteEditorItem(idx)}
-                          className="p-1 text-[#6E7580] hover:text-red-400 rounded transition-colors"
-                          title="Delete card"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <input
-                        type="text"
-                        value={item.front || item.question || item.concept || item.title || ''}
-                        onChange={(e) => handleUpdateEditorItem(idx, item.front !== undefined ? 'front' : (item.question !== undefined ? 'question' : 'title'), e.target.value)}
-                        placeholder="Front / Question / Term"
-                        className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
-                      />
-
-                      <textarea
-                        value={item.back || item.answer || item.explanation || item.detail || ''}
-                        onChange={(e) => handleUpdateEditorItem(idx, item.back !== undefined ? 'back' : (item.answer !== undefined ? 'answer' : 'explanation'), e.target.value)}
-                        placeholder="Back / Answer / Explanation"
-                        rows={2}
-                        className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99] resize-none"
-                      />
+      {showEditModal && (() => {
+        const canonical = editingToolType || extractToolMetadata(generatedTool).toolType || resolveCanonicalToolType(generatedTool?.toolType || generatedTool?.tool_type || generatedTool?.type, generatedTool)
+        const toolDisplayName = formatToolTypeName(canonical)
+        return (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="w-full max-w-3xl bg-[#1A1E24] border border-[#282E38] rounded-[8px] p-6 shadow-2xl space-y-5 max-h-[85vh] flex flex-col">
+              <div className="flex items-center justify-between border-b border-[#282E38] pb-3 flex-shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-[6px] bg-[#5A7D99]/20 border border-[#5A7D99]/40 flex items-center justify-center text-[#5A7D99]">
+                    <Edit3 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-sm text-white">Edit {toolDisplayName} in Canvas</h3>
+                      <span className="px-2 py-0.5 rounded-[4px] bg-[#5A7D99]/20 border border-[#5A7D99]/40 text-[#5A7D99] text-[10px] font-mono font-bold uppercase">
+                        {canonical}
+                      </span>
                     </div>
-                  ))}
+                    <p className="text-[11px] text-[#6E7580]">Customize questions, options, terms, and content before saving</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="p-1 rounded-[6px] text-[#6E7580] hover:text-white hover:bg-[#21262E]"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                <div>
+                  <label className="block text-xs font-semibold text-[#CDD1D6] mb-1">Tool Title</label>
+                  <input
+                    type="text"
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    className="w-full bg-[#131519] border border-[#282E38] rounded-[6px] px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#CDD1D6] mb-1">Description</label>
+                  <input
+                    type="text"
+                    value={editingDesc}
+                    onChange={(e) => setEditingDesc(e.target.value)}
+                    className="w-full bg-[#131519] border border-[#282E38] rounded-[6px] px-3.5 py-2 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-[#CDD1D6]">
+                      {canonical === 'quiz' && `Questions & Multiple Choice Options (${editingItems.length})`}
+                      {canonical === 'matching' && `Matching Pairs (${editingItems.length})`}
+                      {canonical === 'timeline' && `Milestones & Sequence (${editingItems.length})`}
+                      {(canonical === 'crossword' || canonical === 'wordsearch') && `Puzzle Words & Clues (${editingItems.length})`}
+                      {canonical === 'true-false' && `True/False Statements (${editingItems.length})`}
+                      {canonical === 'cloze' && `Active Recall Blanks (${editingItems.length})`}
+                      {canonical === 'flashcards' && `Flashcard Deck (${editingItems.length})`}
+                    </label>
+                    <button
+                      onClick={handleAddEditorItem}
+                      className="px-2.5 py-1 rounded-[6px] bg-[#21262E] hover:bg-[#5A7D99] text-xs font-semibold text-white border border-[#282E38] transition-all flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add {canonical === 'quiz' ? 'Question' : canonical === 'matching' ? 'Pair' : canonical === 'timeline' ? 'Milestone' : 'Item'}</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {editingItems.map((item, idx) => (
+                      <div key={idx} className="p-3.5 rounded-[6px] bg-[#131519] border border-[#282E38] space-y-3 relative group">
+                        <div className="flex items-center justify-between gap-2 border-b border-[#21262E] pb-2">
+                          <span className="text-[10px] font-mono text-[#5A7D99] font-bold">
+                            {canonical === 'quiz' && `QUESTION ${idx + 1}`}
+                            {canonical === 'matching' && `PAIR ${idx + 1}`}
+                            {canonical === 'timeline' && `MILESTONE ${idx + 1}`}
+                            {(canonical === 'crossword' || canonical === 'wordsearch') && `ENTRY ${idx + 1}`}
+                            {canonical === 'true-false' && `STATEMENT ${idx + 1}`}
+                            {canonical === 'cloze' && `CLOZE PROMPT ${idx + 1}`}
+                            {canonical === 'flashcards' && `CARD ${idx + 1}`}
+                          </span>
+                          <button
+                            onClick={() => handleDeleteEditorItem(idx)}
+                            className="p-1 text-[#6E7580] hover:text-red-400 rounded transition-colors"
+                            title="Delete item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* ── 1. QUIZ MCQ EDITOR ── */}
+                        {canonical === 'quiz' && (
+                          <div className="space-y-2.5">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Question Prompt</label>
+                              <input
+                                type="text"
+                                value={item.question || ''}
+                                onChange={(e) => handleUpdateEditorItem(idx, 'question', e.target.value)}
+                                placeholder="Enter multiple-choice question stem..."
+                                className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">
+                                Choices (Click letter button to select correct answer)
+                              </label>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {['A', 'B', 'C', 'D'].map((letter, choiceIdx) => {
+                                  const isCorrect = (item.answer || 'A').toUpperCase() === letter
+                                  const choiceVal = item.choices?.[choiceIdx] || ''
+                                  return (
+                                    <div key={letter} className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSelectQuizAnswer(idx, letter)}
+                                        className={`w-7 h-7 rounded-[4px] text-xs font-bold font-mono transition-all flex items-center justify-center flex-shrink-0 ${
+                                          isCorrect
+                                            ? 'bg-emerald-500 text-slate-900 border border-emerald-400 shadow-sm'
+                                            : 'bg-[#21262E] text-[#8E8E93] border border-[#282E38] hover:text-white hover:bg-[#282E38]'
+                                        }`}
+                                        title={`Mark ${letter} as correct answer`}
+                                      >
+                                        {isCorrect ? '✓' : letter}
+                                      </button>
+                                      <input
+                                        type="text"
+                                        value={choiceVal}
+                                        onChange={(e) => handleUpdateChoice(idx, choiceIdx, e.target.value)}
+                                        placeholder={`Option ${letter}...`}
+                                        className={`flex-1 bg-[#1A1E24] border rounded-[6px] px-2.5 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none ${
+                                          isCorrect ? 'border-emerald-500/60 bg-emerald-950/10' : 'border-[#282E38] focus:border-[#5A7D99]'
+                                        }`}
+                                      />
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Explanation & Reasoning</label>
+                              <textarea
+                                value={item.explanation || ''}
+                                onChange={(e) => handleUpdateEditorItem(idx, 'explanation', e.target.value)}
+                                placeholder="Why is this answer correct? High-yield takeaway..."
+                                rows={2}
+                                className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99] resize-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── 2. MATCHING PAIRS EDITOR ── */}
+                        {canonical === 'matching' && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Left Term / Concept</label>
+                              <input
+                                type="text"
+                                value={item.left || item.term || item.front || ''}
+                                onChange={(e) => handleUpdateEditorItem(idx, 'left', e.target.value)}
+                                placeholder="Term or concept..."
+                                className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Right Definition / Match</label>
+                              <textarea
+                                value={item.right || item.definition || item.back || ''}
+                                onChange={(e) => handleUpdateEditorItem(idx, 'right', e.target.value)}
+                                placeholder="Matching explanation or definition..."
+                                rows={2}
+                                className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99] resize-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── 3. TIMELINE & ORDERING EDITOR ── */}
+                        {canonical === 'timeline' && (
+                          <div className="space-y-2.5">
+                            <div className="flex items-center gap-2">
+                              <div className="w-20">
+                                <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Step #</label>
+                                <input
+                                  type="number"
+                                  value={item.position !== undefined ? item.position : idx + 1}
+                                  onChange={(e) => handleUpdateEditorItem(idx, 'position', Number(e.target.value))}
+                                  className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#5A7D99]"
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Milestone Event / Phase</label>
+                                <input
+                                  type="text"
+                                  value={item.text || item.title || item.front || ''}
+                                  onChange={(e) => handleUpdateEditorItem(idx, 'text', e.target.value)}
+                                  placeholder="Milestone title or historical event..."
+                                  className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Significance & Details</label>
+                              <textarea
+                                value={item.detail || item.explanation || item.back || ''}
+                                onChange={(e) => handleUpdateEditorItem(idx, 'detail', e.target.value)}
+                                placeholder="Milestone context, date, or operational details..."
+                                rows={2}
+                                className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99] resize-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── 4. CROSSWORD & WORD SEARCH EDITOR ── */}
+                        {(canonical === 'crossword' || canonical === 'wordsearch') && (
+                          <div className="space-y-2.5">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Target Word (Uppercase A-Z)</label>
+                              <input
+                                type="text"
+                                value={item.word || item.front || ''}
+                                onChange={(e) => handleUpdateEditorItem(idx, 'word', e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
+                                placeholder="WORD (letters only)..."
+                                className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs font-mono font-bold text-sky-300 placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Clue / Definition</label>
+                              <textarea
+                                value={item.clue || item.back || item.definition || ''}
+                                onChange={(e) => handleUpdateEditorItem(idx, 'clue', e.target.value)}
+                                placeholder="Clue or definition for this word..."
+                                rows={2}
+                                className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99] resize-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── 5. TRUE / FALSE EDITOR ── */}
+                        {canonical === 'true-false' && (
+                          <div className="space-y-2.5">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Statement</label>
+                              <input
+                                type="text"
+                                value={item.question || item.front || ''}
+                                onChange={(e) => handleUpdateEditorItem(idx, 'question', e.target.value)}
+                                placeholder="Enter statement to evaluate..."
+                                className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                              />
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <label className="text-[11px] font-semibold text-[#8E8E93]">Correct Answer:</label>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateEditorItem(idx, 'isTrue', true)}
+                                  className={`px-3 py-1 rounded-[4px] text-xs font-bold transition-all ${
+                                    item.isTrue !== false
+                                      ? 'bg-emerald-500 text-slate-900 shadow-sm'
+                                      : 'bg-[#21262E] text-[#8E8E93] border border-[#282E38] hover:text-white'
+                                  }`}
+                                >
+                                  True
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateEditorItem(idx, 'isTrue', false)}
+                                  className={`px-3 py-1 rounded-[4px] text-xs font-bold transition-all ${
+                                    item.isTrue === false
+                                      ? 'bg-rose-500 text-white shadow-sm'
+                                      : 'bg-[#21262E] text-[#8E8E93] border border-[#282E38] hover:text-white'
+                                  }`}
+                                >
+                                  False
+                                </button>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Explanation</label>
+                              <textarea
+                                value={item.explanation || item.back || ''}
+                                onChange={(e) => handleUpdateEditorItem(idx, 'explanation', e.target.value)}
+                                placeholder="Explanation of why statement is True or False..."
+                                rows={2}
+                                className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99] resize-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── 6. CLOZE BLURTING EDITOR ── */}
+                        {canonical === 'cloze' && (
+                          <div className="space-y-2.5">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Sentence with [bracketed] target word</label>
+                              <input
+                                type="text"
+                                value={item.sentence || item.front || ''}
+                                onChange={(e) => handleUpdateEditorItem(idx, 'sentence', e.target.value)}
+                                placeholder="e.g. The [mitochondria] produces ATP via oxidative phosphorylation."
+                                className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                              />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div>
+                                <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Hidden Target Word</label>
+                                <input
+                                  type="text"
+                                  value={item.answer || ''}
+                                  onChange={(e) => handleUpdateEditorItem(idx, 'answer', e.target.value)}
+                                  placeholder="Target word to test..."
+                                  className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Optional Hint</label>
+                                <input
+                                  type="text"
+                                  value={item.hint || ''}
+                                  onChange={(e) => handleUpdateEditorItem(idx, 'hint', e.target.value)}
+                                  placeholder="Helpful hint..."
+                                  className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── 7. FLASHCARDS & NOTES (DEFAULT) ── */}
+                        {canonical === 'flashcards' && (
+                          <div className="space-y-2.5">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Front / Prompt / Concept</label>
+                              <input
+                                type="text"
+                                value={item.front || item.question || item.concept || item.title || ''}
+                                onChange={(e) => handleUpdateEditorItem(idx, 'front', e.target.value)}
+                                placeholder="Front of flashcard / Concept prompt..."
+                                className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-[#8E8E93] mb-1">Back / Detailed Explanation</label>
+                              <textarea
+                                value={item.back || item.answer || item.explanation || item.detail || ''}
+                                onChange={(e) => handleUpdateEditorItem(idx, 'back', e.target.value)}
+                                placeholder="Back of flashcard / Explanation..."
+                                rows={2}
+                                className="w-full bg-[#1A1E24] border border-[#282E38] rounded-[6px] px-3 py-1.5 text-xs text-white placeholder-[#6E7580] focus:outline-none focus:border-[#5A7D99] resize-none"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#282E38] flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowEditModal(false)}
-                className="px-4 py-2 rounded-[6px] text-xs font-semibold text-[#8E8E93] hover:text-white"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveInlineEdit}
-                className="px-5 py-2 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-xs font-bold text-white flex items-center gap-2 transition-all shadow-md"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>Apply Changes</span>
-              </button>
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#282E38] flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 rounded-[6px] text-xs font-semibold text-[#8E8E93] hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveInlineEdit}
+                  className="px-5 py-2 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-xs font-bold text-white flex items-center gap-2 transition-all shadow-md"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Apply Changes</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Upgraded Multi-Modal RAG Upload Modal */}
       {showUploadModal && (
@@ -3702,11 +6670,22 @@ export default function Learningplayground() {
               </button>
               <button
                 type="button"
-                onClick={handleUploadDocument}
-                disabled={isUploading || (!uploadFile && !youtubeUrl && !ocrImageFile)}
+                onClick={
+                  uploadTab === 'youtube'
+                    ? handleIngestYouTube
+                    : uploadTab === 'image-ocr'
+                    ? handleIngestOCRImage
+                    : handleUploadDocument
+                }
+                disabled={
+                  isUploadingDoc ||
+                  (uploadTab === 'document' && !uploadFile) ||
+                  (uploadTab === 'youtube' && !youtubeUrl.trim()) ||
+                  (uploadTab === 'image-ocr' && !ocrImageFile)
+                }
                 className="px-4 py-1.5 rounded-[6px] bg-[#5A7D99] hover:bg-[#3D5E7A] text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md disabled:opacity-30"
               >
-                {isUploading ? (
+                {isUploadingDoc ? (
                   <>
                     <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>Attaching Source...</span>
@@ -4069,123 +7048,7 @@ export default function Learningplayground() {
         </div>
       )}
 
-      {/* INLINE TOOL EDITOR MODAL */}
-      {showEditModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#1A1E24] border border-[#282E38] rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-fade-in">
-            {/* Modal Header */}
-            <div className="p-4 px-6 border-b border-[#282E38] flex items-center justify-between bg-[#131519]">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-[#5A7D99]/15 border border-[#5A7D99]/30 flex items-center justify-center text-[#5A7D99]">
-                  <Edit3 className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-white">Edit Interactive Tool</h3>
-                  <p className="text-[11px] text-[#94a3b8]">Modify titles, definitions, questions, and flashcard content</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="p-1 rounded-lg text-[#94a3b8] hover:text-white hover:bg-[#282E38] transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
 
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto flex-1 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#cbd5e1] mb-1.5">Tool Title</label>
-                <input
-                  type="text"
-                  value={editingTitle}
-                  onChange={(e) => setEditingTitle(e.target.value)}
-                  className="w-full bg-[#282E38] border border-[#282E38] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5A7D99] transition-colors"
-                  placeholder="e.g., Photosynthesis Flashcards"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#cbd5e1] mb-1.5">Description</label>
-                <input
-                  type="text"
-                  value={editingDesc}
-                  onChange={(e) => setEditingDesc(e.target.value)}
-                  className="w-full bg-[#282E38] border border-[#282E38] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#5A7D99] transition-colors"
-                  placeholder="e.g., Core light-dependent and light-independent mechanisms"
-                />
-              </div>
-
-              <div className="pt-2 border-t border-[#282E38]">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-bold text-[#cbd5e1]">Study Items & Cards ({editingItems.length})</h4>
-                  <button
-                    onClick={handleAddEditorItem}
-                    className="px-2.5 py-1 rounded-lg bg-[#5A7D99]/15 hover:bg-[#5A7D99]/25 text-[#5A7D99] text-xs font-semibold flex items-center gap-1 border border-[#5A7D99]/30 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Card / Item</span>
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  {editingItems.map((item, idx) => (
-                    <div key={idx} className="p-3.5 rounded-xl bg-[#282E38]/70 border border-[#282E38] space-y-2 relative group">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-[#5A7D99]">Card {idx + 1}</span>
-                        <button
-                          onClick={() => handleDeleteEditorItem(idx)}
-                          className="p-1 text-[#ef4444] hover:bg-[#ef4444]/15 rounded-md transition-colors"
-                          title="Delete Item"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <div>
-                        <input
-                          type="text"
-                          value={item.front || item.question || item.concept || item.word || item.left || ''}
-                          onChange={(e) => handleUpdateEditorItem(idx, 'front', e.target.value)}
-                          placeholder="Front / Term / Question"
-                          className="w-full bg-[#1A1E24] border border-[#282E38] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#5A7D99]"
-                        />
-                      </div>
-
-                      <div>
-                        <textarea
-                          rows={2}
-                          value={item.back || item.answer || item.definition || item.explanation || item.detail || item.right || ''}
-                          onChange={(e) => handleUpdateEditorItem(idx, 'back', e.target.value)}
-                          placeholder="Back / Definition / Detailed Explanation"
-                          className="w-full bg-[#1A1E24] border border-[#282E38] rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#5A7D99] resize-none"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 px-6 border-t border-[#282E38] flex items-center justify-end gap-2.5 bg-[#131519]">
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#94a3b8] hover:text-white hover:bg-[#282E38] transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveInlineEdit}
-                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-[#5A7D99] hover:bg-[#3D5E7A] shadow-md transition-colors flex items-center gap-1.5"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>Save Changes</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* SHARE & COLLABORATE MODAL */}
       {showShareModal && (
@@ -4278,18 +7141,155 @@ export default function Learningplayground() {
         </div>
       )}
 
+      {/* EXPANDED FULLSCREEN WORKSPACE MODAL */}
+      {isToolMaximized && generatedTool && (
+        <div className="fixed inset-0 z-[100] bg-[#04070d]/95 backdrop-blur-md p-3 sm:p-5 flex flex-col animate-fade-in">
+          <div className="flex h-full w-full flex-col rounded-[28px] border border-[#1f3046] bg-[#09111d] shadow-2xl overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#18283e] px-5 py-3 bg-[#0e1626] flex-shrink-0">
+              <div className="min-w-0 flex items-center gap-3">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7dd3fc]">
+                  <Layers className="w-3.5 h-3.5 text-[#5A7D99]" />
+                  <span>Fullscreen Workspace</span>
+                </div>
+                <div className="h-3.5 w-px bg-[#282E38]" />
+                <h3 className="truncate text-sm font-semibold text-white max-w-[220px] sm:max-w-md">
+                  {activeMeta.title}
+                </h3>
+                {activeMeta.toolType && (
+                  <span className="rounded-[4px] border border-[#282E38] bg-[#131519] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8fb7ff]">
+                    {activeMeta.toolType}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 rounded-[6px] border border-[#1b2b40] bg-[#09111d]/92 px-2 py-1 shadow-md">
+                  <button
+                    onClick={openInlineEditor}
+                    className="rounded-[4px] border border-[#223247] bg-[#101b2d] px-2.5 py-1 text-[11px] font-semibold text-[#e2e8f0] transition-colors hover:bg-[#16263d] hover:text-white"
+                    title="Edit questions, cards, and content in canvas"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <Edit3 className="w-3.5 h-3.5 text-[#5A7D99]" />
+                      <span>Edit</span>
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => handleSaveActiveToolToLibrary(generatedTool)}
+                    className="rounded-[4px] border border-emerald-500/30 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500 hover:text-white"
+                    title="Save this tool to your personal Saved Tools library"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <Bookmark className="w-3.5 h-3.5" />
+                      <span>Save</span>
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => handleOpenShareModal(generatedTool)}
+                    className="rounded-[4px] border border-[#223247] bg-[#101b2d] px-2.5 py-1 text-[11px] font-semibold text-[#e2e8f0] transition-colors hover:bg-[#16263d] hover:text-white"
+                    title="Share with another student or copy direct link"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <Share2 className="w-3.5 h-3.5 text-[#5A7D99]" />
+                      <span>Share</span>
+                    </span>
+                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowExportMenu(!showExportMenu)}
+                      className="rounded-[4px] border border-[#223247] bg-[#101b2d] px-2.5 py-1 text-[11px] font-semibold text-[#e2e8f0] transition-colors hover:bg-[#16263d] hover:text-white"
+                      title="Export or print study materials"
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <Download className="w-3.5 h-3.5 text-[#5A7D99]" />
+                        <span>Export</span>
+                      </span>
+                    </button>
+
+                    {showExportMenu && (
+                      <div className="absolute right-0 top-full mt-1.5 z-50 w-52 rounded-[6px] border border-[#1e2d45] bg-[#21262E] p-1.5 shadow-2xl">
+                        <button
+                          onClick={() => {
+                            setShowExportMenu(false)
+                            handleExportMarkdown()
+                          }}
+                          className="w-full rounded-[4px] px-3 py-2 text-left text-xs font-semibold text-white transition-colors hover:bg-[#1a253c] flex items-center gap-2"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-[#5A7D99]" />
+                          <span>Download Markdown</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowExportMenu(false)
+                            handlePrintStudySheet()
+                          }}
+                          className="mt-1 w-full rounded-[4px] px-3 py-2 text-left text-xs font-semibold text-white transition-colors hover:bg-[#1a253c] flex items-center gap-2"
+                        >
+                          <Printer className="w-3.5 h-3.5 text-[#5A7D99]" />
+                          <span>Print / PDF Cheat Sheet</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => openPublishModal(generatedTool)}
+                    className="rounded-[4px] border border-[#3b82f6]/40 bg-[#3b82f6]/15 px-2.5 py-1 text-[11px] font-semibold text-[#93c5fd] transition-colors hover:bg-[#3b82f6] hover:text-white"
+                    title="Publish this tool to the Community Marketplace"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5" />
+                      <span>Publish</span>
+                    </span>
+                  </button>
+                </div>
+                <button
+                  onClick={() => setIsToolMaximized(false)}
+                  className="rounded-[4px] border border-[#223247] bg-[#101b2d] px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#16263d] flex items-center gap-1.5 shadow-sm"
+                  title="Exit Fullscreen (Escape)"
+                >
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  <span>Minimize</span>
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 p-3 sm:p-4 min-h-0 bg-[#060b13]">
+              <iframe
+                srcDoc={activeHtml}
+                title="Expanded Interactive Tool Sandbox"
+                className="h-full w-full rounded-[22px] border-none bg-white shadow-[0_24px_60px_rgba(15,23,42,0.24)]"
+                allow="microphone"
+                sandbox="allow-scripts allow-modals allow-forms"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FULL-SCREEN GLOBAL DRAG & DROP OVERLAY */}
       {isGlobalDragging && (
         <div className="fixed inset-0 z-50 bg-[#131519]/90 backdrop-blur-md flex flex-col items-center justify-center p-6 border-2 border-dashed border-[#5A7D99] pointer-events-none animate-fade-in">
           <div className="w-16 h-16 rounded-[8px] bg-[#1A1E24] border border-[#5A7D99]/40 flex items-center justify-center text-[#5A7D99] mb-3 animate-pulse">
             <Upload className="w-8 h-8 text-[#5A7D99]" />
-
           </div>
           <h2 className="text-base font-bold text-white mb-1">Drop Files for RAG Context</h2>
           <p className="text-xs text-[#8E8E93]">Release to attach PDF, DOCX, or TXT file</p>
         </div>
       )}
+
+      {/* GROUNDED DOCUMENT SPLIT-VIEWER & IN-CANVAS TEXT ANNOTATION */}
+      <CitationSplitViewer
+        isOpen={showCitationViewer}
+        onClose={() => setShowCitationViewer(false)}
+        documentTitle={activeCitationDocTitle}
+        activeCitation={activeCitationTarget}
+        apiBase={API_BASE}
+        authToken={session?.access_token}
+        onGenerateFromHighlight={handleGenerateFromHighlight}
+        onPromptChat={(prompt) => {
+          handleSendMessage(prompt)
+          setShowCitationViewer(false)
+        }}
+      />
     </div>
   )
 }

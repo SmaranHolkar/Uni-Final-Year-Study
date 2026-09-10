@@ -82,15 +82,14 @@ const deleteLimiter = createMarketplaceRateLimiter({
 // Public marketplace listing (allows read access to public tools)
 router.get('/marketplace/tools/public', optionalAuth, getPublicTools);
 
-// Get single tool by ID (for direct sharing and loading)
-router.get('/marketplace/tools/:id', optionalAuth, getToolById);
-
-
 // Live marketplace updates stream
 router.get('/marketplace/tools/stream', requireAuth, streamMarketplaceEvents);
 
 // User's saved/created tools
 router.get('/marketplace/tools/saved', requireAuth, getSavedTools);
+
+// Get tools shared with the current user
+router.get('/marketplace/tools/shared-with-me', requireAuth, getSharedToolsWithMe);
 
 // Save or fork a tool into the user's collection
 router.post('/marketplace/tools/save', requireAuth, saveForkLimiter, saveTool);
@@ -101,13 +100,13 @@ router.post('/marketplace/tools/vote', requireAuth, voteLimiter, voteTool);
 // Publish (or un-publish) a tool to the public marketplace
 router.post('/marketplace/tools/publish', requireAuth, publishLimiter, publishTool);
 
-// Delete a tool from the user's collection
-router.delete('/marketplace/tools/:id', requireAuth, deleteLimiter, deleteTool);
-
 // Share a tool to another user via email
 router.post('/marketplace/tools/share-to-user', requireAuth, shareToolToUser);
 
-// Get tools shared with the current user
-router.get('/marketplace/tools/shared-with-me', requireAuth, getSharedToolsWithMe);
+// Get single tool by ID (for direct sharing and loading) - placed after specific GET routes
+router.get('/marketplace/tools/:id', optionalAuth, getToolById);
+
+// Delete a tool from the user's collection
+router.delete('/marketplace/tools/:id', requireAuth, deleteLimiter, deleteTool);
 
 export default router;

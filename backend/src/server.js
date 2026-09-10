@@ -50,10 +50,19 @@ async function runAutoMigrations() {
             ) THEN
                 ALTER TABLE public.w_embeddings ADD COLUMN page_number INT DEFAULT 1;
             END IF;
+            IF NOT EXISTS (
+                SELECT 1 
+                FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = 'w_embeddings' 
+                AND column_name = 'file_url'
+            ) THEN
+                ALTER TABLE public.w_embeddings ADD COLUMN file_url TEXT;
+            END IF;
         END $$;
 
         CREATE TABLE IF NOT EXISTS public.canvas_notes (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            id VARCHAR(128) PRIMARY KEY DEFAULT gen_random_uuid()::text,
             user_id UUID NOT NULL,
             session_id TEXT,
             type VARCHAR(32) DEFAULT 'sticky',
@@ -69,9 +78,43 @@ async function runAutoMigrations() {
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
+        -- Ensure canvas_notes.id is VARCHAR(128) so client node IDs (e.g. pdf_123, sticky_456) can be saved
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'canvas_notes' AND column_name = 'id' AND udt_name = 'uuid'
+            ) THEN
+                ALTER TABLE public.canvas_notes ALTER COLUMN id TYPE VARCHAR(128) USING id::text;
+                ALTER TABLE public.canvas_notes ALTER COLUMN id SET DEFAULT gen_random_uuid()::text;
+            END IF;
+        END $$;
         CREATE INDEX IF NOT EXISTS idx_canvas_notes_user_session ON public.canvas_notes (user_id, session_id);
+
+        CREATE TABLE IF NOT EXISTS public.learning_playground_sessions (
+            id VARCHAR(128) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+            user_id UUID NOT NULL,
+            title VARCHAR(180) NOT NULL DEFAULT 'Learning Playground Session',
+            latest_prompt VARCHAR(400) NOT NULL DEFAULT '',
+            messages JSONB NOT NULL DEFAULT '[]'::jsonb,
+            generated_tool JSONB,
+            context JSONB,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'learning_playground_sessions' AND column_name = 'id' AND udt_name IN ('int8', 'int4', 'uuid')
+            ) THEN
+                ALTER TABLE public.learning_playground_sessions ALTER COLUMN id TYPE VARCHAR(128) USING id::text;
+                ALTER TABLE public.learning_playground_sessions ALTER COLUMN id SET DEFAULT gen_random_uuid()::text;
+            END IF;
+        END $$;
+        CREATE INDEX IF NOT EXISTS idx_learning_playground_sessions_user_created ON public.learning_playground_sessions (user_id, created_at DESC);
       `);
-      console.log('[DB MIGRATIONS] w_embeddings & canvas_notes tables verified');
+      console.log('[DB MIGRATIONS] w_embeddings, canvas_notes & learning_playground_sessions verified');
     } finally {
       client.release();
     }

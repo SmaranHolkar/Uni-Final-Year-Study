@@ -62,10 +62,9 @@ export async function createCanvasNote(req, res) {
       isPinned = false,
     } = req.body;
 
-    let query;
-    let params;
+    const safeId = id && typeof id === 'string' && id.trim() ? id.trim() : (typeof id === 'number' ? String(id) : null);
 
-    if (id) {
+    if (safeId) {
       query = `
         INSERT INTO public.canvas_notes (
           id, user_id, session_id, type, title, content, items, color,
@@ -86,7 +85,7 @@ export async function createCanvasNote(req, res) {
         RETURNING *;
       `;
       params = [
-        id, userId, sessionId, type, title, content, JSON.stringify(items),
+        safeId, userId, sessionId, type, title, content, JSON.stringify(items),
         color, Number(positionX) || 100, Number(positionY) || 100,
         Number(width) || 260, Number(height) || 220, Boolean(isPinned)
       ];

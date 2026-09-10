@@ -151,7 +151,7 @@ export async function transcribeAudioFile(filePath, originalFilename = 'lecture_
   const titlePrompt = `Generate a concise 3-6 word academic title for this lecture transcription:\n\n"${transcriptionText.slice(0, 1000)}"\n\nReturn ONLY the title string.`;
   let title = 'Lecture Audio Recording';
   try {
-    const aiTitle = await toolGenAI(titlePrompt, 'llama-3.1-8b-instant', 0.2, 50);
+    const aiTitle = await toolGenAI(titlePrompt, undefined, 0.2, 50);
     if (aiTitle && aiTitle.trim()) {
       title = aiTitle.replace(/["\n]/g, '').trim();
     }
@@ -229,7 +229,7 @@ export async function extractTextFromImage(filePath, originalFilename = 'notes.j
   const titlePrompt = `Generate a concise 3-6 word academic title for this handwritten notes transcription:\n\n"${extractedText.slice(0, 1000)}"\n\nReturn ONLY the title string.`;
   let title = 'Scanned Study Notes';
   try {
-    const aiTitle = await toolGenAI(titlePrompt, 'llama-3.1-8b-instant', 0.2, 50);
+    const aiTitle = await toolGenAI(titlePrompt, undefined, 0.2, 50);
     if (aiTitle && aiTitle.trim()) {
       title = aiTitle.replace(/["\n]/g, '').trim();
     }

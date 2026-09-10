@@ -2,6 +2,7 @@ import fs from 'fs';
 import pool from '../../shared/config/dbPool.js';
 import { getEmbedding, describeImage } from '../ai/ml.engine.js';
 import { extractTextFromFile, chunkText, chunkTextWithParagraphs, extractPageImages } from './document.service.js';
+import { supabaseAdmin, supabase } from '../../shared/config/supabaseClient.js';
 
 /*  PROCESS & STORE DOCUMENT   */
 
@@ -27,17 +28,36 @@ export async function processAndStoreDocument(req, res) {
       return res.status(401).json({ error: 'User authentication required' });
     }
 
-    /*  CHECK FOR DUPLICATES  */
-    const duplicateCheck = await client.query(
-      'SELECT COUNT(*) FROM public.w_embeddings WHERE title = $1 AND user_id = $2',
-      [title, userId]
-    );
+    /* UPLOAD RAW BINARY TO SUPABASE STORAGE "userDocuments" BUCKET */
+    let storageFileUrl = null;
+    const storageClient = supabaseAdmin || supabase;
 
-    if (parseInt(duplicateCheck.rows[0].count) > 0) {
-      return res.status(409).json({
-        error: 'Document already exists',
-        message: `A document with the title "${title}" has already been uploaded. Please use a different title or delete the existing document first.`
-      });
+    if (storageClient && uploadedFilePath) {
+      try {
+        const fileBuffer = fs.readFileSync(uploadedFilePath);
+        const safeFileName = `${userId}/${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        
+        const { data: uploadData, error: uploadErr } = await storageClient.storage
+          .from('userDocuments')
+          .upload(safeFileName, fileBuffer, {
+            contentType: req.file.mimetype || 'application/pdf',
+            upsert: true,
+          });
+
+        if (!uploadErr && uploadData) {
+          // Generate 1-year signed access URL
+          const { data: signedData } = await storageClient.storage
+            .from('userDocuments')
+            .createSignedUrl(safeFileName, 60 * 60 * 24 * 365);
+          
+          storageFileUrl = signedData?.signedUrl || storageClient.storage.from('userDocuments').getPublicUrl(safeFileName).data?.publicUrl;
+          console.log(`[STORAGE] Successfully saved raw PDF to userDocuments bucket: ${storageFileUrl}`);
+        } else if (uploadErr) {
+          console.warn('[STORAGE NOTICE] Storage upload returned note:', uploadErr.message);
+        }
+      } catch (storErr) {
+        console.warn('[STORAGE NOTICE] Storage upload skipped:', storErr.message);
+      }
     }
 
     /*  EXTRACT TEXT  */
@@ -47,30 +67,11 @@ export async function processAndStoreDocument(req, res) {
       throw new Error('Document contains insufficient readable text');
     }
 
-    /*  CHECK FOR CONTENT DUPLICATES (by first 500 chars of extracted text)  */
-    const newTextPrefix = text.trim().slice(0, 500);
-    const contentDuplicateCheck = await client.query(
-      `SELECT doc.title
-       FROM (
-         SELECT DISTINCT ON (title)
-           title,
-           chunk_text
-         FROM public.w_embeddings
-         WHERE user_id = $1
-         ORDER BY title, created_at ASC, id ASC
-       ) AS doc
-       WHERE LEFT(TRIM(doc.chunk_text), 500) = $2
-       LIMIT 1`,
-      [userId, newTextPrefix]
+    /*  CLEAN UP EXISTING EMBEDDINGS FOR THIS TITLE & USER (Enables seamless re-upload/update)  */
+    await client.query(
+      'DELETE FROM public.w_embeddings WHERE user_id = $1 AND (title = $2 OR REPLACE(title, \'+\', \' \') = $3)',
+      [userId, title, title.replace(/\+/g, ' ')]
     );
-
-    if (contentDuplicateCheck.rows.length > 0) {
-      const existingTitle = contentDuplicateCheck.rows[0].title;
-      return res.status(409).json({
-        error: 'Document already exists',
-        message: `This document's content matches an existing document titled "${existingTitle}". Please delete the existing document first or upload different content.`
-      });
-    }
 
     /*  IMAGE ENRICHMENT (PDF only) — non-fatal  */
     let imagesDescribed = 0;
@@ -131,8 +132,8 @@ export async function processAndStoreDocument(req, res) {
         await client.query(
           `
           INSERT INTO public.w_embeddings
-          (title, chunk_text, embedding, user_id, paragraph_index, page_number, created_at)
-          VALUES ($1, $2, $3::vector, $4, $5, $6, NOW())
+          (title, chunk_text, embedding, user_id, paragraph_index, page_number, file_url, created_at)
+          VALUES ($1, $2, $3::vector, $4, $5, $6, $7, NOW())
           `,
           [
             title,
@@ -140,7 +141,8 @@ export async function processAndStoreDocument(req, res) {
             `[${embedding.join(',')}]`,
             userId,
             chunkObj.paragraphIndex || (i + 1),
-            chunkObj.pageNumber || 1
+            chunkObj.pageNumber || 1,
+            storageFileUrl || null
           ]
         );
 
@@ -161,7 +163,13 @@ export async function processAndStoreDocument(req, res) {
 
     res.json({
       success: true,
-      document: { id: documentId, title, originalName: req.file.originalname, userId },
+      document: {
+        id: documentId,
+        title,
+        originalName: req.file.originalname,
+        userId,
+        fileUrl: storageFileUrl || null
+      },
       stats: {
         textLength: text.length,
         totalChunks: structuredChunks.length,
@@ -249,33 +257,100 @@ export async function getUserDocuments(req, res) {
   }
 }
 
-/*  GET DOCUMENT PARAGRAPHS (FOR PARAGRAPH INSPECTOR)  */
+/*  GET DOCUMENT PARAGRAPHS (FOR PARAGRAPH INSPECTOR & CITATION SPLIT-VIEWER)  */
 export async function getDocumentParagraphs(req, res) {
   try {
     const userId = req.user?.id;
-    const { title } = req.query;
+    const rawTitle = (req.query.title || '').trim();
 
     if (!userId) {
       return res.status(401).json({ error: 'User authentication required' });
     }
 
-    if (!title) {
-      return res.status(400).json({ error: 'Document title is required' });
+    let rows = [];
+    let matchedTitle = rawTitle;
+
+    if (rawTitle) {
+      const cleanTitle = rawTitle.replace(/\+/g, ' ');
+      const queryRes = await pool.query(
+        `
+        SELECT id, title, chunk_text, COALESCE(paragraph_index, 1) as paragraph_index, COALESCE(page_number, 1) as page_number, file_url, created_at
+        FROM public.w_embeddings
+        WHERE user_id = $1 AND (
+          title = $2 OR
+          title ILIKE $2 OR
+          title ILIKE $3 OR
+          REPLACE(title, '+', ' ') ILIKE $3
+        )
+        ORDER BY paragraph_index ASC, id ASC
+        `,
+        [userId, rawTitle, `%${cleanTitle}%`]
+      );
+      rows = queryRes.rows;
+      if (rows.length > 0) {
+        matchedTitle = rows[0].title;
+      }
     }
 
-    const { rows } = await pool.query(
-      `
-      SELECT id, title, chunk_text, paragraph_index, page_number, created_at
-      FROM public.w_embeddings
-      WHERE user_id = $1 AND title = $2
-      ORDER BY paragraph_index ASC, id ASC
-      `,
-      [userId, title]
-    );
+    // If still no rows (or no title passed), fetch most recent document for this user
+    if (rows.length === 0) {
+      const recentRes = await pool.query(
+        `
+        SELECT id, title, chunk_text, COALESCE(paragraph_index, 1) as paragraph_index, COALESCE(page_number, 1) as page_number, file_url, created_at
+        FROM public.w_embeddings
+        WHERE user_id = $1 AND title = (
+          SELECT title FROM public.w_embeddings WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1
+        )
+        ORDER BY paragraph_index ASC, id ASC
+        `,
+        [userId]
+      );
+      rows = recentRes.rows;
+      if (rows.length > 0) {
+        matchedTitle = rows[0].title;
+      }
+    }
+
+    let resolvedFileUrl = rows.find((r) => r.file_url)?.file_url || null;
+
+    // If fileUrl is missing in the database row, dynamically query the userDocuments Supabase bucket
+    if (!resolvedFileUrl && (supabaseAdmin || supabase)) {
+      const storageClient = supabaseAdmin || supabase;
+      try {
+        const { data: fileList, error: listErr } = await storageClient.storage
+          .from('userDocuments')
+          .list(userId, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
+
+        if (!listErr && Array.isArray(fileList) && fileList.length > 0) {
+          const cleanSearchSlug = (matchedTitle || rawTitle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const matchedFile = fileList.find((f) => f.name.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanSearchSlug)) || fileList[0];
+
+          if (matchedFile) {
+            const filePath = `${userId}/${matchedFile.name}`;
+            const { data: signedData } = await storageClient.storage
+              .from('userDocuments')
+              .createSignedUrl(filePath, 60 * 60 * 24 * 365);
+
+            resolvedFileUrl = signedData?.signedUrl || storageClient.storage.from('userDocuments').getPublicUrl(filePath).data?.publicUrl;
+
+            // Cache to w_embeddings for future instant lookups
+            if (resolvedFileUrl && matchedTitle) {
+              pool.query(
+                'UPDATE public.w_embeddings SET file_url = $1 WHERE user_id = $2 AND title = $3',
+                [resolvedFileUrl, userId, matchedTitle]
+              ).catch(() => {});
+            }
+          }
+        }
+      } catch (storageLookupErr) {
+        console.warn('[STORAGE LOOKUP NOTE]:', storageLookupErr.message);
+      }
+    }
 
     res.json({
       success: true,
-      title,
+      title: matchedTitle || rawTitle || 'Course Document',
+      fileUrl: resolvedFileUrl || null,
       paragraphs: rows.map(r => ({
         id: r.id,
         text: r.chunk_text,

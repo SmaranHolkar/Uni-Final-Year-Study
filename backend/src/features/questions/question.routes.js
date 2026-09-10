@@ -11,6 +11,7 @@ import {
 	markSpacedRepetitionReviewed,
 	saveLearningPlaygroundSession,
 	getLearningPlaygroundSessions,
+	deleteLearningPlaygroundSession,
 	saveMarketplaceToolToCollection,
 	getUserSavedTools,
 } from './question.controller.js';
@@ -22,6 +23,7 @@ router.post('/generate-mindmap', requireAuth, generateMindmap);
 router.post('/chat-tools', optionalAuth, enforceDailyQuota('learning_tool_generate'), generateLearningTool);
 router.post('/learning-playground/sessions', requireAuth, saveLearningPlaygroundSession);
 router.get('/learning-playground/sessions', requireAuth, getLearningPlaygroundSessions);
+router.delete('/learning-playground/sessions/:id', requireAuth, deleteLearningPlaygroundSession);
 router.get('/suggestions', requireAuth, getSuggestionsForUser);
 router.get('/tier-status', requireAuth, getTierStatus);
 router.get('/spaced-repetition/due', requireAuth, getDueSpacedRepetition);

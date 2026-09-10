@@ -71,8 +71,7 @@ export function getBlueprintByKey(typeKey) {
 
 /**
  * Returns the matching blueprint markdown content based on user prompt & toolType.
- * Priority 1: Specific Revision Tool Archetypes (21 types)
- * Priority 2: 3D / Science Simulations
+ * Matches against Revision Tool Archetypes in blueprints/revision_tools/
  * @param {string} promptText
  * @param {string} toolType
  * @returns {{ name: string, content: string, typeKey?: string } | null}
@@ -81,7 +80,7 @@ export function getBlueprintForPrompt(promptText = '', toolType = '') {
   initRevisionToolRegistry();
   const text = `${promptText} ${toolType}`.toLowerCase();
 
-  // 1. Match against 21 Revision Tool Blueprints First
+  // Match against Revision Tool Blueprints
   for (const tool of revisionToolRegistry) {
     for (const alias of tool.aliases) {
       if (alias && alias.length > 2 && text.includes(alias)) {
@@ -92,34 +91,6 @@ export function getBlueprintForPrompt(promptText = '', toolType = '') {
         };
       }
     }
-  }
-
-  // 2. Check for 3D simulation requests
-  const is3D = ['3d', 'three.js', 'threejs', '3d model', 'molecule viewer', '3d cell', '3d solar', '3d orbit', '3d structure'].some(k => text.includes(k));
-  if (is3D) {
-    const content = loadBlueprintFromPath(path.join(BLUEPRINTS_DIR, 'three_3d_simulation.md'));
-    if (content) return { name: 'Three.js 3D Simulation Blueprint', content };
-  }
-
-  // 3. Check for Chemistry simulation requests
-  const isChemistry = ['chemistry', 'chemical', 'titration', 'acid', 'base', 'beaker', 'flask', 'reagent', 'reaction', 'stoichiometry', 'compound'].some(k => text.includes(k));
-  if (isChemistry) {
-    const content = loadBlueprintFromPath(path.join(BLUEPRINTS_DIR, 'chemistry_simulator.md'));
-    if (content) return { name: 'Chemistry Simulator Blueprint', content };
-  }
-
-  // 4. Check for Physics simulation requests
-  const isPhysics = ['physics', 'pendulum', 'projectile', 'gravity', 'orbit', 'spring', 'force', 'motion', 'kinetics', 'optics', 'circuit', 'electricity'].some(k => text.includes(k));
-  if (isPhysics) {
-    const content = loadBlueprintFromPath(path.join(BLUEPRINTS_DIR, 'physics_simulation.md'));
-    if (content) return { name: 'Physics Simulation Blueprint', content };
-  }
-
-  // 5. Check for general simulation requests
-  const isSimulation = ['simulation', 'simulator', 'lab', 'sandbox', 'interactive experiment', 'interactive model', 'virtual lab'].some(k => text.includes(k));
-  if (isSimulation) {
-    const content = loadBlueprintFromPath(path.join(BLUEPRINTS_DIR, 'general_simulation.md'));
-    if (content) return { name: 'General Interactive Simulation Blueprint', content };
   }
 
   return null;

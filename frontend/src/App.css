@@ -22,11 +22,12 @@
   left: -14rem;
   width: 14rem;
   height: 100vh;
-  background: var(--sidebar, var(--card));
+  background: var(--sidebar, #0b0e14);
   color: var(--sidebar-foreground, var(--card-foreground));
   transition: left 0.3s ease, transform 0.3s ease;
   z-index: 99;
-  border-right: 1px solid var(--sidebar-border, var(--border));
+  border-right: 1px solid var(--sidebar-border, rgba(255, 255, 255, 0.08));
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.45);
   overflow-y: auto;
   scrollbar-width: thin;
 }

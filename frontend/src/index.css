@@ -34,13 +34,13 @@
   --chart-3: var(--forest);
   --chart-4: var(--slate);
   --chart-5: var(--dim);
-  --sidebar: var(--surface);
+  --sidebar: #0b0e14;
   --sidebar-foreground: var(--white);
   --sidebar-primary: var(--slate-soft);
   --sidebar-primary-foreground: var(--bg);
-  --sidebar-accent: color-mix(in srgb, var(--surface) 86%, var(--slate-soft));
+  --sidebar-accent: rgba(255, 255, 255, 0.05);
   --sidebar-accent-foreground: var(--white);
-  --sidebar-border: var(--border);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: var(--slate-soft);
   --font-sans: 'DM Sans', sans-serif;
   --font-serif: 'DM Serif Display', serif;
@@ -109,13 +109,13 @@
   --chart-4: var(--slate);
   --chart-5: var(--dim);
 
-  --sidebar: var(--surface);
+  --sidebar: #0b0e14;
   --sidebar-foreground: var(--white);
   --sidebar-primary: var(--slate-soft);
   --sidebar-primary-foreground: var(--bg);
-  --sidebar-accent: color-mix(in srgb, var(--surface) 86%, var(--slate-soft));
+  --sidebar-accent: rgba(255, 255, 255, 0.05);
   --sidebar-accent-foreground: var(--white);
-  --sidebar-border: var(--border);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: var(--slate-soft);
 
   --font-sans: 'DM Sans', sans-serif;

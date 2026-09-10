@@ -83,7 +83,7 @@ Return ONLY valid JSON (no markdown formatting):
 
   let subQueries = [cleanTopic, `${cleanTopic} overview explanation`, `${cleanTopic} key concepts research`];
   try {
-    const rawPlan = await getChatCompletion(planPrompt, 'llama-3.1-8b-instant', 0.2, 300, { forceJson: true });
+    const rawPlan = await getChatCompletion(planPrompt, undefined, 0.2, 300, { forceJson: true });
     const parsedPlan = JSON.parse(rawPlan.replace(/```json|```/g, '').trim());
     if (Array.isArray(parsedPlan.queries) && parsedPlan.queries.length) {
       subQueries = parsedPlan.queries.slice(0, 4);

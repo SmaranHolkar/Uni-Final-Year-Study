@@ -241,10 +241,49 @@ export async function generateLearningTool(req, res) {
 
 
 
-// Save a Learning Playground session (messages + latest generated tool)
+let isSessionsMigrationChecked = false;
+
+async function ensureSessionsTableMigrated() {
+  if (isSessionsMigrationChecked) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS public.learning_playground_sessions (
+        id VARCHAR(128) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        user_id UUID NOT NULL,
+        title VARCHAR(180) NOT NULL DEFAULT 'Learning Playground Session',
+        latest_prompt VARCHAR(400) NOT NULL DEFAULT '',
+        messages JSONB NOT NULL DEFAULT '[]'::jsonb,
+        generated_tool JSONB,
+        context JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'learning_playground_sessions' 
+            AND column_name = 'id' AND (data_type LIKE '%int%' OR udt_name IN ('int8', 'int4', 'int2', 'uuid'))
+        ) THEN
+          ALTER TABLE public.learning_playground_sessions ALTER COLUMN id DROP IDENTITY IF EXISTS;
+          ALTER TABLE public.learning_playground_sessions ALTER COLUMN id DROP DEFAULT;
+          ALTER TABLE public.learning_playground_sessions ALTER COLUMN id TYPE VARCHAR(128) USING id::text;
+          ALTER TABLE public.learning_playground_sessions ALTER COLUMN id SET DEFAULT gen_random_uuid()::text;
+        END IF;
+      END $$;
+    `);
+    isSessionsMigrationChecked = true;
+  } catch (err) {
+    console.warn('[DB MIGRATION SESSION CHECK]:', err.message);
+  }
+}
+
+// Save or update a Learning Playground session (messages + latest generated tool)
 export async function saveLearningPlaygroundSession(req, res) {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ success: false, message: 'Auth required' });
+
+  await ensureSessionsTableMigrated();
 
   try {
     const {
@@ -262,58 +301,68 @@ export async function saveLearningPlaygroundSession(req, res) {
 
     const safeTitle = String(title || '').trim().slice(0, 180) || 'Learning Playground Session';
     const safePrompt = String(latestPrompt || '').trim().slice(0, 400);
+    const targetSessionId = sessionId ? String(sessionId) : `chat_${Date.now()}`;
 
-    if (sessionId) {
-      // Update existing session
-      const updateQuery = `
-        UPDATE public.learning_playground_sessions
-        SET title = COALESCE(NULLIF($1, ''), title),
-            latest_prompt = COALESCE(NULLIF($2, ''), latest_prompt),
-            messages = $3::jsonb,
-            generated_tool = $4::jsonb,
-            context = $5::jsonb,
-            updated_at = NOW()
-        WHERE id = $6 AND user_id = $7
-        RETURNING id, user_id, title, latest_prompt, created_at, updated_at;
-      `;
-      const { rows } = await pool.query(updateQuery, [
+    // Upsert query: insert or update by ID and user_id
+    const upsertQuery = `
+      INSERT INTO public.learning_playground_sessions
+        (id, user_id, title, latest_prompt, messages, generated_tool, context, created_at, updated_at)
+      VALUES
+        ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, NOW(), NOW())
+      ON CONFLICT (id) DO UPDATE
+      SET title = COALESCE(NULLIF(EXCLUDED.title, ''), public.learning_playground_sessions.title),
+          latest_prompt = COALESCE(NULLIF(EXCLUDED.latest_prompt, ''), public.learning_playground_sessions.latest_prompt),
+          messages = EXCLUDED.messages,
+          generated_tool = EXCLUDED.generated_tool,
+          context = EXCLUDED.context,
+          updated_at = NOW()
+      WHERE public.learning_playground_sessions.user_id = $2
+      RETURNING id, user_id, title, latest_prompt, messages, generated_tool, context, created_at, updated_at;
+    `;
+
+    try {
+      const { rows } = await pool.query(upsertQuery, [
+        targetSessionId,
+        userId,
         safeTitle,
         safePrompt,
         JSON.stringify(messages),
         JSON.stringify(generatedTool),
         JSON.stringify(context),
-        sessionId,
-        userId,
       ]);
 
       if (rows.length > 0) {
         return res.status(200).json({ success: true, data: rows[0] });
       }
-      // If no rows were updated (e.g. wrong userId), fall through to insert
+      return res.status(403).json({ success: false, message: 'Session belongs to another user or could not be updated' });
+    } catch (queryErr) {
+      // If column type was still bigint or identity, alter column id to varchar and retry
+      if (queryErr.code === '22P02' || queryErr.code === '42601' || queryErr.message?.includes('bigint') || queryErr.message?.includes('identity')) {
+        console.log('[AUTO-HEAL] Altering learning_playground_sessions.id to VARCHAR(128)...');
+        await pool.query(`
+          ALTER TABLE public.learning_playground_sessions ALTER COLUMN id DROP IDENTITY IF EXISTS;
+          ALTER TABLE public.learning_playground_sessions ALTER COLUMN id DROP DEFAULT;
+          ALTER TABLE public.learning_playground_sessions ALTER COLUMN id TYPE VARCHAR(128) USING id::text;
+          ALTER TABLE public.learning_playground_sessions ALTER COLUMN id SET DEFAULT gen_random_uuid()::text;
+        `).catch(() => {});
+        const retryResult = await pool.query(upsertQuery, [
+          targetSessionId,
+          userId,
+          safeTitle,
+          safePrompt,
+          JSON.stringify(messages),
+          JSON.stringify(generatedTool),
+          JSON.stringify(context),
+        ]);
+        if (retryResult.rows.length > 0) {
+          return res.status(200).json({ success: true, data: retryResult.rows[0] });
+        }
+      }
+      throw queryErr;
     }
-
-    // Insert new session
-    const query = `
-      INSERT INTO public.learning_playground_sessions
-        (user_id, title, latest_prompt, messages, generated_tool, context, created_at, updated_at)
-      VALUES
-        ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, NOW(), NOW())
-      RETURNING id, user_id, title, latest_prompt, created_at, updated_at;
-    `;
-
-    const { rows } = await pool.query(query, [
-      userId,
-      safeTitle,
-      safePrompt,
-      JSON.stringify(messages),
-      JSON.stringify(generatedTool),
-      JSON.stringify(context),
-    ]);
-
-    return res.status(201).json({ success: true, data: rows[0] });
   } catch (err) {
     console.error('SAVE LEARNING PLAYGROUND SESSION ERROR:', err);
-    return res.status(500).json({ success: false, message: 'Failed to save session' });
+    return res.status(500).json({ success: false, message: 'Failed to save session', error: err.message });
   }
 }
 
@@ -322,23 +371,43 @@ export async function getLearningPlaygroundSessions(req, res) {
   const userId = req.user?.id;
   if (!userId) return res.status(401).json({ success: false, message: 'Auth required' });
 
+  await ensureSessionsTableMigrated();
+
   try {
     const query = `
       SELECT id, user_id, title, latest_prompt, messages, generated_tool, context, created_at, updated_at
       FROM public.learning_playground_sessions
       WHERE user_id = $1
-      ORDER BY created_at DESC
+      ORDER BY updated_at DESC, created_at DESC
       LIMIT 100;
     `;
-    console.log('Fetching sessions for user:', userId);
     const { rows } = await pool.query(query, [userId]);
-    console.log('Sessions found:', rows.length);
     return res.json({ success: true, data: rows, count: rows.length });
   } catch (err) {
     console.error('GET LEARNING PLAYGROUND SESSIONS ERROR:', err);
-    console.error('User ID:', req.user?.id);
-    console.error('Error details:', err.message, err.code);
     return res.status(500).json({ success: false, message: 'Failed to fetch sessions', error: err.message });
+  }
+}
+
+// Delete a Learning Playground session
+export async function deleteLearningPlaygroundSession(req, res) {
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ success: false, message: 'Auth required' });
+
+  await ensureSessionsTableMigrated();
+
+  const { id } = req.params;
+  if (!id) return res.status(400).json({ success: false, message: 'Session ID required' });
+
+  try {
+    await pool.query(
+      `DELETE FROM public.learning_playground_sessions WHERE id = $1 AND user_id = $2`,
+      [String(id), userId]
+    );
+    return res.json({ success: true, message: 'Session deleted successfully' });
+  } catch (err) {
+    console.error('DELETE LEARNING PLAYGROUND SESSION ERROR:', err);
+    return res.status(500).json({ success: false, message: 'Failed to delete session', error: err.message });
   }
 }
 

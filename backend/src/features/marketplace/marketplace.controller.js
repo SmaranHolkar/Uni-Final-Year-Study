@@ -198,6 +198,12 @@ export async function getToolById(req, res) {
 
     if (!id) return res.status(400).json({ error: 'Tool id is required' });
 
+    // Validate UUID format before SQL query to prevent Postgres 22P02 error
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (!isUuid) {
+      return res.status(404).json({ error: 'Tool not found' });
+    }
+
     const result = await pool.query(
       `SELECT
          t.id, t.title, t.description, t.tool_type, t.category, t.tags,

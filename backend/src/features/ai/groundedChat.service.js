@@ -40,7 +40,11 @@ export async function executeGroundedChat({
           COALESCE(page_number, 1) as page_number,
           (embedding <-> $1::vector) as distance
         FROM public.w_embeddings
-        WHERE user_id = $2 AND title = ANY($3::text[])
+        WHERE user_id = $2 AND (
+          title = ANY($3::text[]) OR
+          REPLACE(title, '+', ' ') = ANY($3::text[]) OR
+          title ILIKE ANY($3::text[])
+        )
         ORDER BY embedding <-> $1::vector ASC
         LIMIT 10
       `;

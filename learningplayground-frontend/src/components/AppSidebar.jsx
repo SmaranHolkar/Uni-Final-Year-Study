@@ -16,9 +16,9 @@ import Vela from './Vela'
 
 const NAV_ITEMS = [
   { icon: MessageSquare, label: 'Playground',    href: '/' },
-  { icon: Bookmark,      label: 'Saved Tools',   href: '/tools?tab=my-tools' },
-  { icon: Share2,        label: 'Shared with Me', href: '/tools?tab=shared' },
-  { icon: Globe,         label: 'Marketplace',   href: '/tools?tab=marketplace' },
+  { icon: Bookmark,      label: 'Saved Tools',   href: '/?view=my-tools' },
+  { icon: Share2,        label: 'Shared with Me', href: '/?view=shared' },
+  { icon: Globe,         label: 'Marketplace',   href: '/?view=marketplace' },
 ]
 
 export default function AppSidebar() {
@@ -28,14 +28,11 @@ export default function AppSidebar() {
   const [hovered, setHovered] = useState(false)
 
   const isActive = (href) => {
-    const base = href.split('?')[0]
-    const tab = new URLSearchParams(href.split('?')[1] || '').get('tab')
-    const currentTab = new URLSearchParams(location.search).get('tab')
-    if (base === '/' && location.pathname === '/') return true
-    if (base === '/tools' && location.pathname === '/tools') {
-      if (!tab) return true
-      return tab === currentTab
-    }
+    const params = new URLSearchParams(location.search)
+    const currentView = params.get('view') || params.get('tab')
+    const hrefView = new URLSearchParams(href.split('?')[1] || '').get('view')
+    if (href === '/' && location.pathname === '/' && !currentView) return true
+    if (hrefView && hrefView === currentView) return true
     return false
   }
 

@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Send, Sparkles, Lightbulb, TrendingUp, AlertCircle, Network, Clock, History, X, Zap, Share2, Image, Camera, BookOpen, Volume2, ShieldCheck } from 'lucide-react'
+import {
+  Send, Sparkles, Lightbulb, TrendingUp, AlertCircle, Network, Clock, History, X, Zap,
+  Share2, Image, Camera, BookOpen, Volume2, ShieldCheck, Bookmark, Globe, Maximize2, Minimize2,
+  Check, ArrowRight, CornerDownLeft, Sparkle, Search, Folder, User, Layers, ArrowUpRight, Plus, Eye
+} from 'lucide-react'
 import { useAuth } from '../AuthContext'
 import { useLocation } from 'react-router-dom'
 import Vela from '../components/Vela'
@@ -8,31 +12,28 @@ import '../App.css'
 import { DotGrid } from '../components/Reveal.jsx'
 import PlaygroundLoader from '../components/PlaygroundLoader'
 
-
-
 const defaultSuggestions = [
   {
     id: 1,
     icon: Lightbulb,
     title: 'Create a study plan',
-    prompt: 'Help me create a study plan for my upcoming exams.',
-    color: 'hsl(142, 70%, 50%)',
+    prompt: 'Help me create a structured study plan for my upcoming exams.',
+    tag: 'Planning',
   },
   {
     id: 2,
     icon: TrendingUp,
     title: 'Practice questions',
     prompt: 'Generate practice questions on topics I recently studied.',
-    color: 'hsl(195, 85%, 55%)',
+    tag: 'Active Recall',
   },
   {
     id: 3,
     icon: AlertCircle,
-    title: 'Explain a concept',
-    prompt: 'Explain a complex concept in simple terms.',
-    color: 'hsl(280, 70%, 60%)',
+    title: 'Explain a complex concept',
+    prompt: 'Explain a complex concept in intuitive, first-principles terms.',
+    tag: 'Deep Dive',
   },
-
 ]
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost:5000' : (import.meta.env.VITE_API_URL || 'http://localhost:5000')
@@ -363,7 +364,7 @@ function Learningplayground() {
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
+      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 180) + 'px'
     }
   }, [inputValue])
 
@@ -376,8 +377,6 @@ function Learningplayground() {
 
     // Set initial session title if coming from a recent document quiz
     if (!activeSessionTitle && initialQuizResults) {
-      // Trying to pull currentDocumentTitle if available from AuthContext (if exposed), 
-      // otherwise fallback to a generic recent session label
       setActiveSessionTitle("Recent Document Quiz")
     }
 
@@ -386,10 +385,10 @@ function Learningplayground() {
     if (recommendedTools.length > 0) {
       setSuggestions(recommendedTools.map((tool, idx) => ({
         id: `rec-${idx}`,
-        icon: Zap, // I'll use Zap for recommended tools
+        icon: Zap,
         title: tool.title,
         prompt: tool.prompt,
-        color: ['hsl(142, 70%, 50%)', 'hsl(195, 85%, 55%)', 'hsl(280, 70%, 60%)'][idx % 3],
+        tag: 'Recommended Plan',
         description: tool.description
       })))
       return
@@ -401,24 +400,24 @@ function Learningplayground() {
         {
           id: 'mindmap',
           icon: Network,
-          title: 'Create Mindmap',
-          prompt: 'Create a mindmap of my recent quiz mistakes to help me connect the concepts.',
-          color: 'hsl(195, 85%, 55%)',
+          title: 'Create Concept Mindmap',
+          prompt: 'Create a mindmap connecting the topics and questions I missed in my quiz.',
+          tag: 'Concept Map',
           isMindmapTrigger: true
         },
         {
           id: 'flashcards',
           icon: Lightbulb,
-          title: 'Review Flashcards',
-          prompt: 'Generate flashcards for the topics I got wrong in my recent quiz.',
-          color: 'hsl(142, 70%, 50%)',
+          title: 'Review Flashcard Deck',
+          prompt: 'Generate an active-recall flashcard deck for the topics I missed in my recent quiz.',
+          tag: 'Flashcards',
         },
         {
           id: 'explain',
           icon: AlertCircle,
-          title: 'Explain Mistakes',
-          prompt: 'Explain why I got those specific questions wrong and how to think about them correctly.',
-          color: 'hsl(280, 70%, 60%)',
+          title: 'Deconstruct Mistakes',
+          prompt: 'Explain why I got those specific questions wrong and how to reason through them correctly.',
+          tag: 'Deep Review',
         }
       ])
       return
@@ -429,9 +428,9 @@ function Learningplayground() {
         {
           id: 'perfect',
           icon: Sparkles,
-          title: 'Explore deeper',
-          prompt: 'I got a perfect score! Give me advanced questions on these topics to challenge me.',
-          color: 'hsl(142, 70%, 50%)',
+          title: 'Advanced Mastery Challenge',
+          prompt: 'I got a perfect score. Provide challenging synthesis questions and edge cases to deepen my understanding.',
+          tag: 'Mastery',
         }
       ])
       return
@@ -461,32 +460,29 @@ function Learningplayground() {
         const studyPlan = data?.suggestions?.studyPlan || []
         const encouragement = data?.suggestions?.encouragement
 
-        // Create a suggestion card for EACH weak area the student has
         urgentAreas.forEach((area, idx) => {
           if (area && String(area).trim()) {
             list.push({
               id: idx + 1,
               icon: AlertCircle,
-              title: `Study ${area}`,
-              prompt: `Create a detailed study guide for ${area}. I need help with this topic.`,
-              color: ['hsl(0, 70%, 60%)', 'hsl(280, 70%, 60%)', 'hsl(195, 85%, 55%)'][idx % 3],
+              title: `Review ${area}`,
+              prompt: `Create a targeted study guide and practice breakdown for ${area}.`,
+              tag: 'Focus Area',
             })
           }
         })
 
-        // If no weak areas, still show the study plan tip
         if (list.length < 3 && (studyPlan[0] || encouragement)) {
           list.push({
             id: 3,
             icon: Lightbulb,
-            title: 'AI Study Suggestion',
+            title: 'Personalized Study Plan',
             prompt: studyPlan[0] || encouragement || 'Create a personalized study plan for me.',
-            color: 'hsl(142, 70%, 50%)',
+            tag: 'Action Plan',
           })
         }
 
         if (list.length === 0) {
-          // No quiz history — tell the user to do a quiz
           if (data?.message || (!urgentAreas.length && !studyPlan.length)) {
             setSuggestions([])
           } else {
@@ -570,25 +566,22 @@ function Learningplayground() {
     const wrongQuestions = rawQuiz.filter(q => q.isCorrect === false)
     const allCorrect = wrongQuestions.length === 0 && rawQuiz.length > 0
 
-    // Inject quiz context into the playground
     setActiveQuizResults(rawQuiz)
     setActiveWrongQs(wrongQuestions.length > 0 ? wrongQuestions : null)
     setActiveSessionTitle(quizSession.title || 'Past Study Session')
     setGeneratedTool(null)
     setShowSessionModal(false)
 
-    // Greet the user with context
     const score = rawQuiz.filter(q => q.isCorrect).length
     const total = rawQuiz.length
     const fallbackGreeting = allCorrect
-      ? `Loaded your study session: **${quizSession.title}**\n\nYou scored ${score}/${total} — perfect score! 🎉 I am now grounded in your quiz's source documents and can generate advanced challenge questions to push your knowledge further.`
-      : `Loaded your study session: **${quizSession.title}**\n\nYou scored ${score}/${total}. I found **${wrongQuestions.length} topic${wrongQuestions.length !== 1 ? 's' : ''}** you missed and loaded the source document for review. Use the suggestions below to create a mindmap, flashcards, or explanations based on those gaps.`
+      ? `Loaded study session: **${quizSession.title}**\n\nYou scored ${score}/${total} (100%). Source context is active. You can generate advanced challenge tools or explore connected topics.`
+      : `Loaded study session: **${quizSession.title}**\n\nYou scored ${score}/${total} with **${wrongQuestions.length} topic${wrongQuestions.length !== 1 ? 's' : ''}** flagged for review. Use the prompts below to build a concept mindmap, flashcards, or step-by-step explanations.`
 
-    // Show loading state
     setMessages([{
       id: Date.now(),
       role: 'assistant',
-      content: `Loading your study session: **${quizSession.title}**...\n\nGrounding in source documents & analyzing performance...`,
+      content: `Loading study session: **${quizSession.title}**...`,
       timestamp: new Date(),
     }])
 
@@ -601,7 +594,7 @@ function Learningplayground() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          prompt: `I just loaded my past quiz session titled "${quizSession.title}". I scored ${score} out of ${total}. Please briefly analyze this performance in a friendly way and ask me how I would like to review or proceed.`,
+          prompt: `I just loaded my past quiz session titled "${quizSession.title}". I scored ${score} out of ${total}. Please briefly analyze this performance in a direct, friendly manner and ask how I would like to review.`,
           context: wrongQuestions.length > 0 ? wrongQuestions : null,
           metacognitiveAnalysis: null,
           documentTitle: quizSession.title
@@ -627,7 +620,6 @@ function Learningplayground() {
       console.warn('AI dynamic greeting failed, using fallback', e)
     }
 
-    // Fallback if AI fails or returns a non-chat tool
     setMessages([{
       id: Date.now() + 2,
       role: 'assistant',
@@ -641,7 +633,7 @@ function Learningplayground() {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file (PNG, JPG, WEBP).')
+      alert('Please select a valid image file (PNG, JPG, WEBP).')
       return
     }
     const previewUrl = URL.createObjectURL(file)
@@ -698,14 +690,15 @@ function Learningplayground() {
           key={`${chunkId}-${match.index}`}
           onClick={() => openParagraphInspector(title, Number(paraIndex))}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: '2px',
-            margin: '0 3px', padding: '1px 7px', borderRadius: '12px',
-            background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.35)',
-            color: 'var(--primary)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer'
+            display: 'inline-flex', alignItems: 'center', gap: '4px',
+            margin: '0 4px', padding: '2px 8px', borderRadius: '6px',
+            background: 'rgba(90, 125, 153, 0.16)', border: '1px solid rgba(90, 125, 153, 0.35)',
+            color: 'var(--foreground)', fontSize: '0.78rem', fontWeight: 500, cursor: 'pointer',
+            transition: 'all 0.15s ease'
           }}
           title={`Inspect paragraph ${paraIndex} of "${title}"`}
         >
-          <BookOpen size={11} />
+          <BookOpen size={11} style={{ opacity: 0.7 }} />
           <span>{title.length > 20 ? title.slice(0, 18) + '…' : title} ¶{paraIndex}</span>
         </button>
       );
@@ -722,15 +715,15 @@ function Learningplayground() {
   // Initial greeting effect for fresh sessions with context
   useEffect(() => {
     if (messages.length === 0) {
-      let greeting = "Hi! I'm **Vela**, your AI learning assistant. How can I help you today?"
+      let greeting = "Welcome to the Learning Playground. Ask any question, explore study concepts, or request custom interactive tools."
 
       if (activeAnalysis) {
-        greeting = `Hi! I'm **Vela**. I've finished analyzing your recent quiz results.\n\nYou're doing great, but I noticed some ${activeAnalysis.patternSpecificity}. I've prepared a personalized action plan for you below. Which one should we start with?`
+        greeting = `Quiz performance analyzed.\n\nIdentified focus area: ${activeAnalysis.patternSpecificity}. Recommended next steps are available below. Choose a module or request a custom review.`
       } else if (initialPromptFromAnalysis) {
         setInputValue(initialPromptFromAnalysis)
         return
       } else if (activeWrongQs) {
-        greeting = `Hi! I'm **Vela**. I see you have some topics to review from your last session. Let's tackle those knowledge gaps together!`
+        greeting = `Loaded ${activeWrongQs.length} review item${activeWrongQs.length !== 1 ? 's' : ''} from your latest session. Use the prompts below to generate a concept mindmap, flashcards, or detailed breakdowns.`
       }
 
       const initialMessage = {
@@ -741,7 +734,7 @@ function Learningplayground() {
       }
       setMessages([initialMessage])
     }
-  }, [activeAnalysis, activeWrongQs, initialPromptFromAnalysis, messages.length]) // Added dependencies for safety
+  }, [activeAnalysis, activeWrongQs, initialPromptFromAnalysis, messages.length])
 
   // Handles fetchSavedTools logic.
   const fetchSavedTools = async () => {
@@ -806,20 +799,20 @@ function Learningplayground() {
 
       setMessages(prev => [...prev, {
         id: Date.now(), role: 'assistant',
-        content: `📤 Tool shared successfully with **${shareEmail}**!`,
+        content: `Tool shared successfully with ${shareEmail}.`,
         timestamp: new Date(),
       }])
       setShowShareModal(false)
       setShareEmail('')
     } catch {
-      setShareError('Something went wrong. Please try again.')
+      setShareError('Failed to share tool. Please check the email and try again.')
     } finally {
       setShareLoading(false)
     }
   }
 
   const handleMindmapGeneration = () => {
-    setInputValue('Create a mindmap of my recent quiz mistakes to help me connect the concepts.')
+    setInputValue('Create a mindmap connecting the topics and questions I missed in my quiz.')
     textareaRef.current?.focus()
   }
 
@@ -860,11 +853,10 @@ function Learningplayground() {
     setGeneratedImageLoading(false)
     setShowSessionModal(false)
 
-    // Add a system message confirming the session was loaded
     const sysMessage = {
       id: Date.now(),
       role: 'assistant',
-      content: `Loaded learning session: **${sessionData.title || 'Past Session'}**. Continue from where you left off.`,
+      content: `Loaded session: **${sessionData.title || 'Past Session'}**.`,
       timestamp: new Date(),
     }
     setMessages(prev => [...prev, sysMessage])
@@ -926,7 +918,7 @@ function Learningplayground() {
           category: 'study-guide',
           tags: [],
           generated_tool: generatedTool,
-          latest_prompt: messages[messages.length - 2]?.content || '', // Get the user's prompt
+          latest_prompt: messages[messages.length - 2]?.content || '',
           visibility: 'private',
         }),
       })
@@ -935,27 +927,26 @@ function Learningplayground() {
         const data = await res.json()
         setMessages(prev => [...prev, {
           id: Date.now(), role: 'assistant',
-          content: `✅ Tool saved to your collection! Find it in the "Saved Tools" tab.`,
+          content: `Tool saved to collection. View it in Saved Tools.`,
           timestamp: new Date(),
         }])
         await fetchSavedTools()
         return data.tool?.id || null
       } else {
-        let message = 'Failed to save tool. Please try again.'
+        let message = 'Failed to save tool.'
         let duplicateToolId = null
         try {
           const payload = await res.json()
-          if (payload?.error) message = 'Something went wrong. Please try again.'
+          if (payload?.error) message = payload.error
           if (payload?.duplicate_tool_id) duplicateToolId = payload.duplicate_tool_id
         } catch {
           // Keep fallback message
         }
 
-        // If this exact tool was already saved earlier, reuse it so publish flow can continue.
         if (duplicateToolId) {
           setMessages(prev => [...prev, {
             id: Date.now(), role: 'assistant',
-            content: `ℹ️ This tool is already in your Saved Tools. Reusing the existing copy.`,
+            content: `Tool already exists in Saved Tools. Reusing existing entry.`,
             timestamp: new Date(),
           }])
           return duplicateToolId
@@ -963,7 +954,7 @@ function Learningplayground() {
 
         setMessages(prev => [...prev, {
           id: Date.now(), role: 'assistant',
-          content: `❌ ${message}`,
+          content: message,
           timestamp: new Date(),
         }])
         return null
@@ -972,7 +963,7 @@ function Learningplayground() {
       console.error('Failed to save tool to collection:', err)
       setMessages(prev => [...prev, {
         id: Date.now(), role: 'assistant',
-        content: `❌ Error saving tool. Please try again.`,
+        content: `Error saving tool. Please try again.`,
         timestamp: new Date(),
       }])
       return null
@@ -995,7 +986,7 @@ function Learningplayground() {
         setMessages(prev => [...prev, {
           id: Date.now(),
           role: 'assistant',
-          content: `ℹ️ Publish cancelled. Tool is still saved privately.`,
+          content: `Publish cancelled. Tool remains private.`,
           timestamp: new Date(),
         }])
         return
@@ -1022,7 +1013,7 @@ function Learningplayground() {
         let message = publish ? 'Failed to publish tool.' : 'Failed to unpublish tool.'
         try {
           const payload = await res.json()
-          if (payload?.error) message = 'Something went wrong. Please try again.'
+          if (payload?.error) message = payload.error
         } catch {
           // Keep fallback message.
         }
@@ -1030,7 +1021,7 @@ function Learningplayground() {
         setMessages(prev => [...prev, {
           id: Date.now(),
           role: 'assistant',
-          content: `❌ ${message}`,
+          content: message,
           timestamp: new Date(),
         }])
         return
@@ -1040,8 +1031,8 @@ function Learningplayground() {
         id: Date.now(),
         role: 'assistant',
         content: publish
-          ? `🌐 Tool published to Marketplace.`
-          : `🙈 Tool unpublished from Marketplace.`,
+          ? `Tool published to the Marketplace.`
+          : `Tool unpublished from Marketplace.`,
         timestamp: new Date(),
       }])
 
@@ -1051,7 +1042,7 @@ function Learningplayground() {
       setMessages(prev => [...prev, {
         id: Date.now(),
         role: 'assistant',
-        content: `❌ Could not update publish status. Please try again.`,
+        content: `Could not update publish status. Please try again.`,
         timestamp: new Date(),
       }])
     } finally {
@@ -1068,7 +1059,7 @@ function Learningplayground() {
       setMessages(prev => [...prev, {
         id: Date.now(),
         role: 'assistant',
-        content: `❌ Tool name is required before publishing.`,
+        content: `Tool name is required before publishing.`,
         timestamp: new Date(),
       }])
       return null
@@ -1093,7 +1084,7 @@ function Learningplayground() {
     if (!publishMetadata) {
       setMessages(prev => [...prev, {
         id: Date.now(), role: 'assistant',
-        content: `ℹ️ Publish cancelled. Your tool was not sent to Marketplace.`,
+        content: `Publish cancelled. Tool was not published to Marketplace.`,
         timestamp: new Date(),
       }])
       return
@@ -1115,21 +1106,21 @@ function Learningplayground() {
       if (res.ok) {
         setMessages(prev => [...prev, {
           id: Date.now(), role: 'assistant',
-          content: `🌐 Tool shared to the Marketplace! Others can now find and fork it.`,
+          content: `Tool published to Marketplace. Others can now discover and study from it.`,
           timestamp: new Date(),
         }])
         await fetchSavedTools()
       } else {
-        let message = `Tool was saved privately but couldn't be published. Try from the Saved Tools tab.`
+        let message = `Tool was saved privately, but publishing encountered an issue.`
         try {
           const payload = await res.json()
-          if (payload?.error) message = 'Something went wrong. Please try again.'
+          if (payload?.error) message = payload.error
         } catch {
           // Keep fallback message
         }
         setMessages(prev => [...prev, {
           id: Date.now(), role: 'assistant',
-          content: `❌ ${message}`,
+          content: message,
           timestamp: new Date(),
         }])
       }
@@ -1142,46 +1133,36 @@ function Learningplayground() {
   const handleSuggestionClick = (suggestion) => {
     setInputValue(suggestion.prompt)
     if (suggestion.isMindmapTrigger) {
-      // Trigger a special handler if they click the mindmap suggestion
       handleMindmapGeneration()
     } else {
       textareaRef.current?.focus()
     }
   }
 
-
-
   // Handles renderGeneratedTool logic.
   const renderGeneratedTool = () => {
     if (!generatedTool && !generationStage) return null
 
-    // ── Loading state — anime.js powered PlaygroundLoader ──────────────────────
     if (generationStage && !generatedTool) {
       return <PlaygroundLoader stage={generationStage} phase={buildPhase} />
     }
 
-
     if (!generatedTool) return null
-
-
 
     if (generatedTool.toolType === 'image') {
       return (
         <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%',
-          maxWidth: '800px', margin: '0 auto', background: 'var(--card)', border: '1px solid var(--border)',
-          borderRadius: '1rem', padding: '1.5rem', marginTop: '1rem'
+          display: 'flex', flexDirection: 'column', width: '100%',
+          maxWidth: '820px', margin: '0 auto 1.5rem', background: 'var(--card)', border: '1px solid var(--border)',
+          borderRadius: '0.75rem', padding: '1.25rem', overflow: 'hidden'
         }}>
-          <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600, color: 'var(--foreground)' }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--foreground)', letterSpacing: '-0.01em' }}>
                 {generatedTool.title}
               </h3>
-              <p style={{ margin: '0.25rem 0 0', fontSize: '0.9rem', color: 'var(--muted-foreground)' }}>
+              <p style={{ margin: '0.2rem 0 0', fontSize: '0.82rem', color: 'var(--muted-foreground)' }}>
                 {generatedTool.description}
-              </p>
-              <p style={{ margin: '0.5rem 0 0', fontSize: '0.72rem', color: 'var(--muted-foreground)', fontFamily: 'monospace' }}>
-                API: {API_BASE}
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
@@ -1189,27 +1170,41 @@ function Learningplayground() {
                 onClick={saveToolToCollection}
                 style={{
                   background: 'var(--primary)',
-                  color: '#ffffff',
+                  color: 'var(--primary-foreground)',
                   border: 'none',
-                  borderRadius: '0.375rem',
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
+                  borderRadius: '0.5rem',
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 500,
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'opacity 0.15s ease'
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}
               >
-                💾 Save
+                <Bookmark size={13} />
+                <span>Save</span>
               </button>
               <button
                 onClick={shareToolToMarketplace}
-                style={{ background: 'transparent', color: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: '0.375rem', padding: '0.5rem 1rem', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--primary)'; e.currentTarget.style.color = '#fff' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--primary)' }}
+                style={{
+                  background: 'transparent',
+                  color: 'var(--foreground)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '0.5rem',
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'background 0.15s ease'
+                }}
               >
-                🌐 Share
+                <Globe size={13} />
+                <span>Publish</span>
               </button>
               <button
                 onClick={() => {
@@ -1221,33 +1216,29 @@ function Learningplayground() {
                 }}
                 style={{
                   background: 'transparent', border: 'none', color: 'var(--muted-foreground)',
-                  cursor: 'pointer', fontSize: '1.5rem', lineHeight: 1
+                  cursor: 'pointer', padding: '0.35rem', borderRadius: '0.35rem', display: 'flex', alignItems: 'center'
                 }}
+                title="Dismiss"
               >
-                ✕
+                <X size={16} />
               </button>
             </div>
           </div>
 
-          <div style={{ width: '100%', borderRadius: '0.5rem', overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--muted)', minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}>
+          <div style={{
+            width: '100%', borderRadius: '0.5rem', overflow: 'hidden',
+            border: '1px solid var(--border)', background: '#0e1117',
+            minHeight: '260px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column'
+          }}>
             {generatedImageLoading && (
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>
-                <div style={{ marginBottom: '0.75rem', display: 'flex', justifyContent: 'center', gap: '0.4rem' }}>
-                  <span style={{ display: 'inline-block', width: '0.5rem', height: '0.5rem', borderRadius: '50%', background: 'var(--primary)', animation: 'pulse 1.5s infinite' }} />
-                  <span style={{ display: 'inline-block', width: '0.5rem', height: '0.5rem', borderRadius: '50%', background: 'var(--primary)', animation: 'pulse 1.5s infinite 0.3s' }} />
-                  <span style={{ display: 'inline-block', width: '0.5rem', height: '0.5rem', borderRadius: '50%', background: 'var(--primary)', animation: 'pulse 1.5s infinite 0.6s' }} />
-                </div>
-                Generating image with FLUX...
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
+                <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--primary)', animation: 'pulse 1.5s infinite', marginRight: '8px' }} />
+                Generating diagram image...
               </div>
             )}
             {generatedImageError && (
-              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--destructive)' }}>
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--destructive)', fontSize: '0.85rem' }}>
                 <div>{generatedImageError}</div>
-                {generatedImageUrl && (
-                  <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--muted-foreground)', wordBreak: 'break-all' }}>
-                    Source: {generatedImageUrl.slice(0, 140)}{generatedImageUrl.length > 140 ? '...' : ''}
-                  </div>
-                )}
               </div>
             )}
             {generatedImageUrl && (
@@ -1255,9 +1246,9 @@ function Learningplayground() {
                 src={generatedImageUrl}
                 alt={generatedTool.title}
                 onError={() => {
-                  setGeneratedImageError('Image could not be displayed in browser. Try generating again.');
+                  setGeneratedImageError('Image could not be rendered in browser.');
                 }}
-                style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain', maxHeight: '70vh' }}
+                style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain', maxHeight: '65vh' }}
               />
             )}
           </div>
@@ -1265,7 +1256,7 @@ function Learningplayground() {
       )
     }
 
-    // ALL tools are iframes - render the interactive app
+    // ALL interactive tools are rendered cleanly in iframe
     if (generatedTool.app?.html) {
       const toolFrame = (
         <div
@@ -1273,72 +1264,103 @@ function Learningplayground() {
             position: 'fixed',
             inset: 0,
             zIndex: 2147483647,
-            background: 'var(--background)',
+            background: '#0e1117',
             display: 'flex',
             flexDirection: 'column',
           } : {
-            border: '2px solid var(--primary)',
+            border: '1px solid var(--border)',
             background: 'var(--card)',
-            borderRadius: '1rem',
-            padding: '1.5rem',
+            borderRadius: '0.75rem',
+            padding: '1.25rem',
             marginBottom: '1.5rem',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.25)',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem', ...(isToolMaximized ? { padding: '1rem 1.5rem', background: 'var(--card)', borderBottom: '1px solid var(--border)', flexShrink: 0 } : {}) }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            marginBottom: '1rem',
+            ...(isToolMaximized ? { padding: '1rem 1.5rem', background: 'var(--card)', borderBottom: '1px solid var(--border)', flexShrink: 0 } : {})
+          }}>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--foreground)' }}>
-                {generatedTool.title}
-              </h3>
-              <p style={{ margin: '0.35rem 0 0 0', color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--foreground)', letterSpacing: '-0.01em' }}>
+                  {generatedTool.title}
+                </h3>
+                <span style={{
+                  fontSize: '0.7rem',
+                  padding: '2px 7px',
+                  borderRadius: '999px',
+                  border: '1px solid var(--border)',
+                  color: 'var(--muted-foreground)',
+                  background: 'rgba(255,255,255,0.03)',
+                  textTransform: 'uppercase',
+                  fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.05em'
+                }}>
+                  {generatedTool.toolType}
+                </span>
+              </div>
+              <p style={{ margin: '0.2rem 0 0 0', color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>
                 {generatedTool.description}
               </p>
-              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.75rem', color: 'var(--muted-foreground)', fontFamily: 'monospace' }}>
-                {generatedTool.toolType}
-              </p>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0, alignItems: 'center' }}>
               <button
                 onClick={saveToolToCollection}
                 style={{
                   background: 'var(--primary)',
-                  color: '#ffffff',
+                  color: 'var(--primary-foreground)',
                   border: 'none',
-                  borderRadius: '0.375rem',
-                  padding: '0.5rem 1rem',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
+                  borderRadius: '0.5rem',
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 500,
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'opacity 0.15s ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'translateY(0)'; }}
               >
-                💾 Save
+                <Bookmark size={13} />
+                <span>Save</span>
               </button>
               <button
                 onClick={shareToolToMarketplace}
-                style={{ background: 'transparent', color: 'var(--primary)', border: '1px solid var(--primary)', borderRadius: '0.375rem', padding: '0.5rem 1rem', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--primary)'; e.currentTarget.style.color = '#fff' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--primary)' }}
+                style={{
+                  background: 'transparent',
+                  color: 'var(--foreground)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '0.5rem',
+                  padding: '0.45rem 0.85rem',
+                  fontSize: '0.82rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  transition: 'all 0.15s ease'
+                }}
               >
-                🌐 Share
+                <Globe size={13} />
+                <span>Publish</span>
               </button>
               <button
                 onClick={() => setIsToolMaximized(v => !v)}
-                title={isToolMaximized ? 'Minimise' : 'Maximise'}
+                title={isToolMaximized ? 'Minimize' : 'Maximize'}
                 style={{
                   background: 'transparent',
                   border: '1px solid var(--border)',
                   color: 'var(--muted-foreground)',
-                  borderRadius: '0.375rem',
-                  padding: '0.5rem 0.6rem',
-                  fontSize: '1rem',
+                  borderRadius: '0.5rem',
+                  padding: '0.45rem',
                   cursor: 'pointer',
-                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                {isToolMaximized ? '⊡' : '⛶'}
+                {isToolMaximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
               </button>
               <button
                 onClick={() => {
@@ -1351,12 +1373,14 @@ function Learningplayground() {
                   border: 'none',
                   color: 'var(--muted-foreground)',
                   cursor: 'pointer',
-                  fontSize: '1.5rem',
-                  padding: '0.25rem',
+                  padding: '0.35rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '0.35rem',
                 }}
                 aria-label="Close"
               >
-                ✕
+                <X size={16} />
               </button>
             </div>
           </div>
@@ -1371,8 +1395,8 @@ function Learningplayground() {
               display: 'block',
             } : {
               width: '100%',
-              minHeight: '500px',
-              borderRadius: '0.75rem',
+              minHeight: '520px',
+              borderRadius: '0.5rem',
               border: '1px solid var(--border)',
               background: '#fff',
               display: 'block',
@@ -1389,24 +1413,23 @@ function Learningplayground() {
       return toolFrame
     }
 
-    // If HTML generation failed, show error with regenerate option
     const lastUserPrompt = [...messages].reverse().find(m => m.role === 'user')?.content || ''
     return (
       <div
         style={{
-          border: '2px solid var(--destructive)',
+          border: '1px solid var(--border)',
           background: 'var(--card)',
-          borderRadius: '1rem',
+          borderRadius: '0.75rem',
           padding: '1.5rem',
           marginBottom: '1.5rem',
           textAlign: 'center',
         }}
       >
-        <p style={{ color: 'var(--destructive)', fontWeight: 600, margin: 0, fontSize: '1rem' }}>
-          Tool generation failed
+        <p style={{ color: 'var(--destructive)', fontWeight: 600, margin: 0, fontSize: '0.95rem' }}>
+          Interactive tool generation encountered an error
         </p>
-        <p style={{ color: 'var(--muted-foreground)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-          The AI couldn't build a valid interactive app. Try rephrasing — e.g. "create a quiz about X" or "make flashcards on Y".
+        <p style={{ color: 'var(--muted-foreground)', fontSize: '0.85rem', marginTop: '0.35rem' }}>
+          Try rephrasing your prompt with specific study topics or formats.
         </p>
         {lastUserPrompt && (
           <button
@@ -1416,18 +1439,18 @@ function Learningplayground() {
               setTimeout(() => textareaRef.current?.focus(), 0)
             }}
             style={{
-              marginTop: '1rem',
+              marginTop: '0.85rem',
               background: 'var(--primary)',
               color: 'var(--primary-foreground)',
               border: 'none',
               borderRadius: '0.5rem',
-              padding: '0.5rem 1.25rem',
-              fontSize: '0.875rem',
-              fontWeight: 600,
+              padding: '0.45rem 1rem',
+              fontSize: '0.82rem',
+              fontWeight: 500,
               cursor: 'pointer',
             }}
           >
-            Try again
+            Retry generation
           </button>
         )}
       </div>
@@ -1609,15 +1632,15 @@ function Learningplayground() {
   const skeletonShimmerStyle = {
     position: 'relative',
     overflow: 'hidden',
-    background: 'color-mix(in oklch, var(--muted) 80%, var(--card) 20%)',
+    background: 'var(--card)',
   }
 
   const renderSuggestionSkeletons = () => (
     <div style={{ width: '100%' }}>
       <div
         style={{
-          height: '0.9rem',
-          width: '10rem',
+          height: '0.85rem',
+          width: '8rem',
           borderRadius: '999px',
           marginBottom: '1rem',
           ...skeletonShimmerStyle,
@@ -1628,8 +1651,8 @@ function Learningplayground() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: '1rem',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+          gap: '0.85rem',
         }}
       >
         {Array.from({ length: 3 }).map((_, index) => (
@@ -1638,9 +1661,9 @@ function Learningplayground() {
             style={{
               borderRadius: '0.75rem',
               border: '1px solid var(--border)',
-              background: 'oklch(0.18 0.01 240.0)',
-              padding: '1.25rem',
-              minHeight: '118px',
+              background: 'var(--card)',
+              padding: '1.1rem',
+              minHeight: '105px',
             }}
             aria-hidden
           >
@@ -1648,18 +1671,17 @@ function Learningplayground() {
               <div
                 className="lp-skeleton"
                 style={{
-                  width: '20px',
-                  height: '20px',
-                  borderRadius: '999px',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '6px',
                   flexShrink: 0,
-                  marginTop: '2px',
                   ...skeletonShimmerStyle,
                 }}
               />
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div className="lp-skeleton" style={{ height: '0.95rem', width: '56%', borderRadius: '0.35rem', ...skeletonShimmerStyle }} />
-                <div className="lp-skeleton" style={{ height: '0.75rem', width: '94%', borderRadius: '0.35rem', ...skeletonShimmerStyle }} />
-                <div className="lp-skeleton" style={{ height: '0.75rem', width: '72%', borderRadius: '0.35rem', ...skeletonShimmerStyle }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                <div className="lp-skeleton" style={{ height: '0.85rem', width: '55%', borderRadius: '0.25rem', ...skeletonShimmerStyle }} />
+                <div className="lp-skeleton" style={{ height: '0.75rem', width: '90%', borderRadius: '0.25rem', ...skeletonShimmerStyle }} />
+                <div className="lp-skeleton" style={{ height: '0.75rem', width: '65%', borderRadius: '0.25rem', ...skeletonShimmerStyle }} />
               </div>
             </div>
           </div>
@@ -1669,51 +1691,44 @@ function Learningplayground() {
   )
 
   const renderSessionSkeletons = ({ variant = 'default', count = 4 }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={`${variant}-skeleton-${index}`}
           style={{
-            padding: '1rem',
+            padding: '0.9rem 1rem',
             borderRadius: '0.5rem',
             border: '1px solid var(--border)',
             background: 'var(--card)',
           }}
           aria-hidden
         >
-          <div className="lp-skeleton" style={{ height: '0.95rem', width: variant === 'saved' ? '42%' : '55%', borderRadius: '0.35rem', ...skeletonShimmerStyle }} />
-          <div className="lp-skeleton" style={{ height: '0.75rem', width: '38%', borderRadius: '0.35rem', marginTop: '0.4rem', ...skeletonShimmerStyle }} />
+          <div className="lp-skeleton" style={{ height: '0.9rem', width: variant === 'saved' ? '45%' : '60%', borderRadius: '0.25rem', ...skeletonShimmerStyle }} />
+          <div className="lp-skeleton" style={{ height: '0.75rem', width: '35%', borderRadius: '0.25rem', marginTop: '0.4rem', ...skeletonShimmerStyle }} />
 
           {variant === 'quiz' && (
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.55rem' }}>
-              <div className="lp-skeleton" style={{ height: '0.72rem', width: '30%', borderRadius: '999px', ...skeletonShimmerStyle }} />
-              <div className="lp-skeleton" style={{ height: '0.72rem', width: '24%', borderRadius: '999px', ...skeletonShimmerStyle }} />
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <div className="lp-skeleton" style={{ height: '0.7rem', width: '28%', borderRadius: '4px', ...skeletonShimmerStyle }} />
+              <div className="lp-skeleton" style={{ height: '0.7rem', width: '22%', borderRadius: '4px', ...skeletonShimmerStyle }} />
             </div>
           )}
 
           {variant === 'playground' && (
-            <>
-              <div className="lp-skeleton" style={{ height: '0.8rem', width: '82%', borderRadius: '0.35rem', marginTop: '0.45rem', ...skeletonShimmerStyle }} />
-              <div className="lp-skeleton" style={{ height: '0.7rem', width: '30%', borderRadius: '0.35rem', marginTop: '0.4rem', ...skeletonShimmerStyle }} />
-            </>
+            <div className="lp-skeleton" style={{ height: '0.75rem', width: '80%', borderRadius: '0.25rem', marginTop: '0.4rem', ...skeletonShimmerStyle }} />
           )}
 
           {variant === 'saved' && (
             <>
-              <div className="lp-skeleton" style={{ height: '0.8rem', width: '50%', borderRadius: '0.35rem', marginTop: '0.4rem', ...skeletonShimmerStyle }} />
-              <div className="lp-skeleton" style={{ height: '0.8rem', width: '85%', borderRadius: '0.35rem', marginTop: '0.45rem', ...skeletonShimmerStyle }} />
-              <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.5rem' }}>
-                <div className="lp-skeleton" style={{ height: '1.2rem', width: '4.3rem', borderRadius: '999px', ...skeletonShimmerStyle }} />
-                <div className="lp-skeleton" style={{ height: '1.2rem', width: '4.9rem', borderRadius: '999px', ...skeletonShimmerStyle }} />
+              <div className="lp-skeleton" style={{ height: '0.75rem', width: '80%', borderRadius: '0.25rem', marginTop: '0.4rem', ...skeletonShimmerStyle }} />
+              <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.45rem' }}>
+                <div className="lp-skeleton" style={{ height: '1rem', width: '3.5rem', borderRadius: '4px', ...skeletonShimmerStyle }} />
+                <div className="lp-skeleton" style={{ height: '1rem', width: '4rem', borderRadius: '4px', ...skeletonShimmerStyle }} />
               </div>
             </>
           )}
 
           {variant === 'shared' && (
-            <>
-              <div className="lp-skeleton" style={{ height: '0.78rem', width: '46%', borderRadius: '0.35rem', marginTop: '0.45rem', ...skeletonShimmerStyle }} />
-              <div className="lp-skeleton" style={{ height: '0.7rem', width: '34%', borderRadius: '0.35rem', marginTop: '0.35rem', ...skeletonShimmerStyle }} />
-            </>
+            <div className="lp-skeleton" style={{ height: '0.75rem', width: '40%', borderRadius: '0.25rem', marginTop: '0.4rem', ...skeletonShimmerStyle }} />
           )}
         </div>
       ))}
@@ -1724,7 +1739,7 @@ function Learningplayground() {
     <main
       className="main-content min-h-screen"
       style={{
-        background: 'var(--background)',
+        background: '#11141a',
         color: 'var(--foreground)',
         fontFamily: 'var(--font-sans)',
         display: 'flex',
@@ -1734,115 +1749,160 @@ function Learningplayground() {
         position: 'relative'
       }}
     >
-      <DotGrid />
+      <DotGrid opacity={0.15} />
+
+      {/* Top Navigation Bar */}
+      <header
+        style={{
+          padding: '0.9rem 1.75rem 0.9rem 4.5rem',
+          borderBottom: '1px solid var(--border)',
+          background: 'rgba(17, 20, 26, 0.85)',
+          backdropFilter: 'blur(12px)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '1rem',
+          zIndex: 20,
+          flexShrink: 0
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--foreground)', letterSpacing: '-0.01em' }}>
+              Learning Playground
+            </h1>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+              Interactive Study & Tool Generation Studio
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          {isLoadingTierStatus ? (
+            <span
+              className="lp-skeleton"
+              aria-hidden
+              style={{
+                height: '1.4rem',
+                width: '6.5rem',
+                borderRadius: '999px',
+                ...skeletonShimmerStyle,
+              }}
+            />
+          ) : (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '0.25rem 0.65rem', borderRadius: '999px',
+              border: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)',
+              fontSize: '0.75rem', color: 'var(--muted-foreground)'
+            }}>
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--primary)' }} />
+              <span>Tools remaining: <strong style={{ color: 'var(--foreground)' }}>{toolsQuota?.remaining ?? 0}</strong></span>
+            </div>
+          )}
+
+          <button
+            onClick={() => {
+              setSessionModalMode('quiz')
+              setSavedToolsTab('sessions')
+              fetchQuizSessions()
+              setShowSessionModal(true)
+            }}
+            style={{
+              padding: '0.4rem 0.75rem',
+              borderRadius: '0.5rem',
+              border: '1px solid rgba(90, 125, 153, 0.35)',
+              background: 'rgba(90, 125, 153, 0.12)',
+              color: 'var(--foreground)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              transition: 'background 0.15s ease'
+            }}
+          >
+            <Network size={14} style={{ opacity: 0.8 }} />
+            <span>Link Quiz</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setSessionModalMode('playground')
+              setSavedToolsTab('playground')
+              fetchPlaygroundSessions()
+              fetchSavedTools()
+              setShowSessionModal(true)
+            }}
+            style={{
+              padding: '0.4rem 0.75rem',
+              borderRadius: '0.5rem',
+              border: '1px solid var(--border)',
+              background: 'rgba(255, 255, 255, 0.03)',
+              color: 'var(--foreground)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <History size={14} style={{ opacity: 0.8 }} />
+            <span>History</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Main Scrollable Canvas */}
       <div
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '2rem 2rem 2rem 4.5rem',
+          padding: '1.5rem 2rem 2rem 4.5rem',
           position: 'relative',
           zIndex: 10,
           display: 'flex',
           flexDirection: 'column',
-          gap: '1.5rem',
+          gap: '1.25rem',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-          <h2 style={{ margin: 0, fontSize: '1.1rem', color: 'var(--foreground)' }}>Learning Playground</h2>
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-            {isLoadingTierStatus ? (
-              <span
-                className="lp-skeleton"
-                aria-hidden
-                style={{
-                  height: '0.8rem',
-                  width: '7.5rem',
-                  borderRadius: '999px',
-                  ...skeletonShimmerStyle,
-                }}
-              />
-            ) : (
-              <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
-                Free Tier • Tools: <strong style={{ color: 'var(--foreground)' }}>{toolsQuota?.remaining ?? 0}</strong> left
-              </span>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button
-              onClick={() => {
-                setSessionModalMode('quiz')
-                setSavedToolsTab('sessions')
-                fetchQuizSessions()
-                setShowSessionModal(true)
-              }}
-              style={{
-                padding: '0.45rem 0.9rem',
-                borderRadius: '0.5rem',
-                border: '1px solid var(--primary)',
-                background: 'rgba(59, 130, 246, 0.1)',
-                color: 'var(--primary)',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-              }}
-            >
-              <Network size={16} />
-              Link Quiz Session
-            </button>
-            <button
-              onClick={() => {
-                setSessionModalMode('playground')
-                setSavedToolsTab('playground')
-                fetchPlaygroundSessions()
-                fetchSavedTools()
-                setShowSessionModal(true)
-              }}
-              style={{
-                padding: '0.45rem 0.9rem',
-                borderRadius: '0.5rem',
-                border: '1px solid var(--border)',
-                background: 'var(--card)',
-                color: 'var(--foreground)',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-              }}
-            >
-              <History size={16} />
-              History
-            </button>
-          </div>
-        </div>
-
-        {/* Active Session Header */}
+        {/* Active Session Context Banner */}
         {activeSessionTitle && (
           <div style={{
-            background: 'rgba(59, 130, 246, 0.1)',
-            border: '1px solid rgba(59, 130, 246, 0.3)',
-            padding: '0.6rem 1.25rem',
+            background: 'var(--card)',
+            border: '1px solid var(--border)',
+            padding: '0.5rem 1rem',
             borderRadius: '0.5rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '1.5rem',
-            fontSize: '0.88rem',
+            gap: '1rem',
+            fontSize: '0.82rem',
             color: 'var(--foreground)',
-            maxWidth: 'fit-content',
-            margin: '0 auto 0.5rem'
+            maxWidth: '720px',
+            margin: '0 auto'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <BookOpen size={16} color="var(--primary)" />
-              <span>Grounded in Quiz: <strong style={{ color: 'var(--primary)' }}>{activeSessionTitle}</strong></span>
-              {activeWrongQs && <span style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>({activeWrongQs.length} mistake{activeWrongQs.length !== 1 ? 's' : ''} loaded)</span>}
+              <BookOpen size={14} style={{ color: 'var(--primary)' }} />
+              <span>Grounded in: <strong>{activeSessionTitle}</strong></span>
+              {activeWrongQs && (
+                <span style={{
+                  fontSize: '0.72rem',
+                  padding: '1px 6px',
+                  borderRadius: '4px',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  color: '#f87171',
+                  border: '1px solid rgba(239, 68, 68, 0.25)'
+                }}>
+                  {activeWrongQs.length} mistake{activeWrongQs.length !== 1 ? 's' : ''} loaded
+                </span>
+              )}
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
               <button
                 onClick={() => {
                   setSessionModalMode('quiz')
@@ -1852,17 +1912,17 @@ function Learningplayground() {
                 }}
                 style={{
                   background: 'transparent',
-                  border: '1px solid var(--primary)',
-                  color: 'var(--primary)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--muted-foreground)',
                   fontSize: '0.75rem',
-                  fontWeight: 600,
+                  fontWeight: 500,
                   cursor: 'pointer',
-                  padding: '0.2rem 0.6rem',
-                  borderRadius: '0.25rem',
-                  transition: 'all 0.2s'
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: '0.35rem',
+                  transition: 'color 0.15s ease'
                 }}
               >
-                Change Quiz
+                Change
               </button>
               <button
                 onClick={() => {
@@ -1876,15 +1936,18 @@ function Learningplayground() {
                   fontSize: '0.75rem',
                   cursor: 'pointer',
                   padding: '0.2rem',
+                  display: 'flex',
+                  alignItems: 'center'
                 }}
                 title="Clear quiz session context"
               >
-                ✕
+                <X size={13} />
               </button>
             </div>
           </div>
         )}
 
+        {/* Empty State / Suggestions */}
         {messages.length === 0 ? (
           <div
             style={{
@@ -1893,39 +1956,49 @@ function Learningplayground() {
               alignItems: 'center',
               justifyContent: 'center',
               flexDirection: 'column',
-              gap: '2rem',
-              padding: '2rem',
-              maxWidth: '900px',
+              gap: '1.75rem',
+              padding: '1.5rem',
+              maxWidth: '820px',
               margin: '0 auto',
               width: '100%',
             }}
           >
-            <div style={{ textAlign: 'center', color: 'var(--muted-foreground)' }}>
-              <Vela size={120} className="mb-6" />
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                padding: '0.2rem 0.65rem', borderRadius: '999px',
+                border: '1px solid var(--border)', background: 'rgba(255,255,255,0.03)',
+                fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.08em',
+                color: 'var(--muted-foreground)', marginBottom: '0.75rem',
+                fontFamily: 'var(--font-mono)'
+              }}>
+                <Sparkles size={11} style={{ color: 'var(--primary)' }} />
+                Interactive Study Canvas
+              </div>
               <h2
                 style={{
-                  fontSize: '1.5rem',
-                  fontWeight: '600',
-                  marginBottom: '0.5rem',
+                  fontSize: '1.65rem',
+                  fontWeight: 600,
+                  marginBottom: '0.4rem',
                   color: 'var(--foreground)',
+                  letterSpacing: '-0.02em',
                 }}
               >
-                Learning Playground
+                Design customized learning tools.
               </h2>
-              <p style={{ fontSize: '0.95rem' }}>
-                Build your own learning tools, explore ideas, or get help with any topic
+              <p style={{ fontSize: '0.9rem', color: 'var(--muted-foreground)', maxWidth: '520px', margin: '0 auto', lineHeight: 1.5 }}>
+                Ask questions, explore complex concepts, or generate interactive study modules tailored to your knowledge gaps.
               </p>
-
             </div>
 
             {suggestions.length === 0 && user?.id && (
               <p style={{
-                fontSize: '0.95rem',
+                fontSize: '0.85rem',
                 color: 'var(--muted-foreground)',
                 textAlign: 'center',
                 padding: '0.5rem 0',
               }}>
-                Please do a quiz first so I can suggest what to study next!
+                Complete a quiz session to receive targeted study suggestions.
               </p>
             )}
 
@@ -1933,23 +2006,28 @@ function Learningplayground() {
 
             {!isLoadingSuggestions && suggestions.length > 0 && (
               <div style={{ width: '100%' }}>
-                <h3
-                  style={{
-                    fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: 'var(--muted-foreground)',
-                    marginBottom: '1rem',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  Suggestions for you
-                </h3>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  marginBottom: '0.75rem', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border)'
+                }}>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: 'var(--muted-foreground)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                      fontFamily: 'var(--font-mono)'
+                    }}
+                  >
+                    Suggested Prompts
+                  </span>
+                </div>
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                    gap: '1rem',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                    gap: '0.85rem',
                   }}
                 >
                   {suggestions.map((suggestion) => {
@@ -1959,63 +2037,74 @@ function Learningplayground() {
                         key={suggestion.id}
                         onClick={() => handleSuggestionClick(suggestion)}
                         style={{
-                          padding: '1.25rem',
-                          borderRadius: '0.75rem',
+                          padding: '1.1rem',
+                          borderRadius: '0.65rem',
                           border: '1px solid var(--border)',
-                          background: 'oklch(0.18 0.01 240.0)',
+                          background: 'var(--card)',
                           textAlign: 'left',
                           cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          position: 'relative',
-                          overflow: 'hidden',
+                          transition: 'all 0.15s ease',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          minHeight: '110px'
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = suggestion.color
-                          e.currentTarget.style.background = 'oklch(0.22 0.01 240.0)'
-                          e.currentTarget.style.transform = 'translateY(-2px)'
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+                          e.currentTarget.style.borderColor = 'var(--primary)'
+                          e.currentTarget.style.background = '#252b35'
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.borderColor = 'var(--border)'
-                          e.currentTarget.style.background = 'oklch(0.18 0.01 240.0)'
-                          e.currentTarget.style.transform = 'translateY(0)'
-                          e.currentTarget.style.boxShadow = 'none'
+                          e.currentTarget.style.background = 'var(--card)'
                         }}
                       >
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: '0.75rem',
-                          }}
-                        >
-                          <Icon
-                            size={20}
-                            style={{ color: suggestion.color, flexShrink: 0, marginTop: '2px' }}
-                          />
-                          <div style={{ flex: 1 }}>
-                            <h4
-                              style={{
-                                fontSize: '0.95rem',
-                                fontWeight: '600',
-                                marginBottom: '0.25rem',
-                                color: 'var(--foreground)',
-                              }}
-                            >
-                              {suggestion.title}
-                            </h4>
-                            <p
-                              style={{
-                                fontSize: '0.85rem',
-                                color: 'var(--muted-foreground)',
-                                lineHeight: '1.4',
-                              }}
-                            >
-                              {suggestion.prompt.length > 80
-                                ? `${suggestion.prompt.substring(0, 80)}...`
-                                : suggestion.prompt}
-                            </p>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', marginBottom: '0.5rem' }}>
+                          <div style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            width: '28px', height: '28px', borderRadius: '6px',
+                            background: 'rgba(255, 255, 255, 0.04)', color: 'var(--primary)'
+                          }}>
+                            <Icon size={14} />
                           </div>
+                          {suggestion.tag && (
+                            <span style={{
+                              fontSize: '0.68rem',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: 'rgba(255, 255, 255, 0.03)',
+                              color: 'var(--muted-foreground)',
+                              border: '1px solid var(--border)',
+                              fontFamily: 'var(--font-mono)'
+                            }}>
+                              {suggestion.tag}
+                            </span>
+                          )}
+                        </div>
+
+                        <div>
+                          <h3
+                            style={{
+                              fontSize: '0.88rem',
+                              fontWeight: 600,
+                              margin: '0 0 0.2rem 0',
+                              color: 'var(--foreground)',
+                              letterSpacing: '-0.01em'
+                            }}
+                          >
+                            {suggestion.title}
+                          </h3>
+                          <p
+                            style={{
+                              fontSize: '0.78rem',
+                              color: 'var(--muted-foreground)',
+                              lineHeight: '1.4',
+                              margin: 0,
+                            }}
+                          >
+                            {suggestion.prompt.length > 70
+                              ? `${suggestion.prompt.substring(0, 70)}...`
+                              : suggestion.prompt}
+                          </p>
                         </div>
                       </button>
                     )
@@ -2030,59 +2119,68 @@ function Learningplayground() {
               key={message.id}
               style={{
                 display: 'flex',
-                justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
+                flexDirection: 'column',
+                alignItems: message.role === 'user' ? 'flex-end' : 'flex-start',
+                width: '100%',
+                maxWidth: '820px',
+                margin: '0 auto',
               }}
             >
+              {message.role === 'assistant' && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  marginBottom: '0.35rem', paddingLeft: '0.2rem'
+                }}>
+                  <div style={{
+                    width: '18px', height: '18px', borderRadius: '4px',
+                    background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <Sparkles size={10} color="#fff" />
+                  </div>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--foreground)' }}>Vela</span>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--muted-foreground)' }}>
+                    {message.timestamp ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                  </span>
+                </div>
+              )}
+
               <div
                 style={{
-                  maxWidth: '70%',
-                  padding: '1rem 1.25rem',
-                  borderRadius: '1rem',
-                  background: message.role === 'user' ? 'var(--primary)' : 'var(--card)',
-                  border: message.role === 'assistant' ? '1px solid var(--border)' : 'none',
+                  maxWidth: message.role === 'user' ? '75%' : '100%',
+                  padding: '0.85rem 1.1rem',
+                  borderRadius: '0.65rem',
+                  background: message.role === 'user'
+                    ? '#1E2530'
+                    : 'var(--card)',
+                  border: message.role === 'user'
+                    ? '1px solid rgba(90, 125, 153, 0.4)'
+                    : '1px solid var(--border)',
                   color: message.role === 'user' ? '#ffffff' : 'var(--foreground)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '0.5rem',
-                  position: 'relative'
+                  gap: '0.4rem',
+                  lineHeight: '1.6',
+                  fontSize: '0.88rem'
                 }}
               >
-                {message.role === 'assistant' && (
-                  <div style={{
-                    position: 'absolute',
-                    left: '-55px',
-                    top: '0',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '2px'
-                  }}>
-                    <Vela size={30} loading={isLoading} />
-                    <span style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: 'bold', textTransform: 'uppercase' }}>Vela</span>
-                  </div>
-                )}
                 {message.image && (
                   <img
                     src={message.image}
                     alt="Uploaded notes/diagram"
                     style={{
-                      maxWidth: '240px',
-                      maxHeight: '180px',
-                      borderRadius: '0.5rem',
+                      maxWidth: '220px',
+                      maxHeight: '160px',
+                      borderRadius: '0.4rem',
                       objectFit: 'contain',
                       marginBottom: '0.25rem',
-                      background: 'rgba(0,0,0,0.3)'
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid var(--border)'
                     }}
                   />
                 )}
                 <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                   {renderMessageWithCitations(message.content)}
-                </div>
-                <div style={{ fontSize: '0.75rem', marginTop: '0.5rem', opacity: 0.7 }}>
-                  {message.timestamp.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
                 </div>
               </div>
             </div>
@@ -2092,38 +2190,42 @@ function Learningplayground() {
         {renderGeneratedTool()}
 
         {isLoading && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+          <div style={{
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'flex-start', width: '100%', maxWidth: '820px', margin: '0 auto'
+          }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              marginBottom: '0.35rem', paddingLeft: '0.2rem'
+            }}>
+              <div style={{
+                width: '18px', height: '18px', borderRadius: '4px',
+                background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                <Sparkles size={10} color="#fff" />
+              </div>
+              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--foreground)' }}>Vela</span>
+            </div>
+
             <div
               style={{
-                padding: '1rem 1.25rem',
-                borderRadius: '1rem',
+                padding: '0.75rem 1rem',
+                borderRadius: '0.65rem',
                 background: 'var(--card)',
                 border: '1px solid var(--border)',
-                position: 'relative'
+                display: 'flex',
+                gap: '0.75rem',
+                alignItems: 'center'
               }}
             >
-              <div style={{
-                position: 'absolute',
-                left: '-55px',
-                top: '0',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '2px'
-              }}>
-                <Vela size={30} loading={true} />
-                <span style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: 'bold', textTransform: 'uppercase' }}>Vela</span>
+              <div className="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
               </div>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-                <span style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', fontWeight: 500 }}>
-                  {generationStage || 'Thinking...'}
-                </span>
-              </div>
+              <span style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)' }}>
+                {generationStage || 'Synthesizing response...'}
+              </span>
             </div>
           </div>
         )}
@@ -2131,142 +2233,140 @@ function Learningplayground() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Composer Dock */}
       <div
         style={{
-          padding: '1.5rem 2rem',
+          padding: '1rem 2rem 1.25rem 4.5rem',
           borderTop: '1px solid var(--border)',
-          background: 'var(--card)',
+          background: 'rgba(17, 20, 26, 0.92)',
+          backdropFilter: 'blur(16px)',
+          flexShrink: 0
         }}
       >
-        {attachedImage && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            marginBottom: '0.75rem',
-            padding: '0.4rem 0.75rem',
-            borderRadius: '0.5rem',
-            background: 'var(--background)',
-            border: '1px solid var(--border)',
-            width: 'fit-content'
-          }}>
-            <img src={attachedImage.previewUrl} alt="Attached" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px' }} />
-            <span style={{ fontSize: '0.8rem', color: 'var(--foreground)', fontWeight: 500 }}>Image notes attached</span>
-            <button
-              type="button"
-              onClick={() => setAttachedImage(null)}
-              style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', fontSize: '0.9rem', padding: '0 0.25rem' }}
-            >
-              ✕
-            </button>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end' }}>
-          <input
-            type="file"
-            ref={imageInputRef}
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={handleImageSelect}
-          />
-
-          <button
-            type="button"
-            onClick={() => imageInputRef.current?.click()}
-            style={{
-              padding: '0.875rem',
-              borderRadius: '0.75rem',
-              border: '1px solid var(--border)',
-              background: attachedImage ? 'rgba(59, 130, 246, 0.15)' : 'var(--background)',
-              color: attachedImage ? '#3b82f6' : 'var(--muted-foreground)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.2s',
-            }}
-            title="Attach diagram, handwritten formulas, or study notes"
-          >
-            <Image size={18} />
-          </button>
-
-          <div style={{ flex: 1, position: 'relative' }}>
-            <textarea
-              ref={textareaRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={attachedImage ? "Ask a question about this image..." : (activeSessionTitle ? `Ask about "${activeSessionTitle}" or create flashcards...` : "Ask me anything...")}
-              disabled={isLoading}
-              rows={1}
-              style={{
-                width: '100%',
-                padding: '0.875rem 1rem',
-                borderRadius: '0.75rem',
-                border: '1px solid var(--border)',
-                background: 'var(--background)',
-                color: 'var(--foreground)',
-                fontSize: '0.95rem',
-                resize: 'none',
-                maxHeight: '150px',
-                overflowY: 'auto',
-                fontFamily: 'inherit',
-                outline: 'none',
-                transition: 'border-color 0.2s',
-              }}
-              onFocus={(e) => {
-                e.target.style.borderColor = 'var(--primary)'
-              }}
-              onBlur={(e) => {
-                e.target.style.borderColor = 'var(--border)'
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={(!inputValue.trim() && !attachedImage) || isLoading}
-            style={{
-              padding: '0.875rem 1.5rem',
-              borderRadius: '0.75rem',
-              border: 'none',
-              background: (inputValue.trim() || attachedImage) && !isLoading ? 'var(--primary)' : 'var(--muted)',
-              color: '#ffffff',
-              cursor: (inputValue.trim() || attachedImage) && !isLoading ? 'pointer' : 'not-allowed',
+        <div style={{ maxWidth: '820px', margin: '0 auto' }}>
+          {attachedImage && (
+            <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
-              fontWeight: '500',
-              fontSize: '0.95rem',
-              transition: 'all 0.2s',
-              opacity: (inputValue.trim() || attachedImage) && !isLoading ? 1 : 0.5,
-            }}
-            onMouseEnter={(e) => {
-              if ((inputValue.trim() || attachedImage) && !isLoading) {
-                e.target.style.transform = 'translateY(-1px)'
-                e.target.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = 'translateY(0)'
-              e.target.style.boxShadow = 'none'
+              marginBottom: '0.5rem',
+              padding: '0.3rem 0.65rem',
+              borderRadius: '0.4rem',
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
+              width: 'fit-content'
+            }}>
+              <img src={attachedImage.previewUrl} alt="Attached" style={{ width: '24px', height: '24px', objectFit: 'cover', borderRadius: '3px' }} />
+              <span style={{ fontSize: '0.75rem', color: 'var(--foreground)', fontWeight: 500 }}>Image notes attached</span>
+              <button
+                type="button"
+                onClick={() => setAttachedImage(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', padding: '0 2px', display: 'flex', alignItems: 'center' }}
+                title="Remove attachment"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-end' }}>
+            <input
+              type="file"
+              ref={imageInputRef}
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handleImageSelect}
+            />
+
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              style={{
+                padding: '0.75rem',
+                borderRadius: '0.5rem',
+                border: attachedImage ? '1px solid var(--primary)' : '1px solid var(--border)',
+                background: attachedImage ? 'rgba(90, 125, 153, 0.2)' : 'var(--card)',
+                color: attachedImage ? 'var(--foreground)' : 'var(--muted-foreground)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s ease',
+              }}
+              title="Attach handwritten notes, diagrams, or questions"
+            >
+              <Image size={16} />
+            </button>
+
+            <div style={{ flex: 1, position: 'relative' }}>
+              <textarea
+                ref={textareaRef}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={attachedImage ? "Ask a question about this image..." : (activeSessionTitle ? `Ask about "${activeSessionTitle}" or generate review tools...` : "Ask Vela, create flashcards, generate mindmaps, or build a tool...")}
+                disabled={isLoading}
+                rows={1}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 0.9rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid var(--border)',
+                  background: 'var(--card)',
+                  color: 'var(--foreground)',
+                  fontSize: '0.88rem',
+                  resize: 'none',
+                  maxHeight: '160px',
+                  overflowY: 'auto',
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  lineHeight: 1.4,
+                  transition: 'border-color 0.15s ease',
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = 'var(--primary)'
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'var(--border)'
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={(!inputValue.trim() && !attachedImage) || isLoading}
+              style={{
+                padding: '0.75rem 1.1rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                background: (inputValue.trim() || attachedImage) && !isLoading ? 'var(--primary)' : 'rgba(255, 255, 255, 0.05)',
+                color: (inputValue.trim() || attachedImage) && !isLoading ? 'var(--primary-foreground)' : 'var(--muted-foreground)',
+                cursor: (inputValue.trim() || attachedImage) && !isLoading ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                fontWeight: 500,
+                fontSize: '0.85rem',
+                transition: 'all 0.15s ease',
+                opacity: (inputValue.trim() || attachedImage) && !isLoading ? 1 : 0.5,
+              }}
+            >
+              <Send size={15} />
+              <span>Send</span>
+            </button>
+          </form>
+
+          <p
+            style={{
+              fontSize: '0.72rem',
+              color: 'var(--muted-foreground)',
+              marginTop: '0.45rem',
+              textAlign: 'center',
             }}
           >
-            <Send size={18} />
-            Send
-          </button>
-        </form>
-        <p
-          style={{
-            fontSize: '0.75rem',
-            color: 'var(--muted-foreground)',
-            marginTop: '0.75rem',
-            textAlign: 'center',
-          }}
-        >
-          Press Enter to send, Shift + Enter for new line
-        </p>
+            Return to send · Shift + Return for new line
+          </p>
+        </div>
       </div>
 
       <style>{`
@@ -2277,8 +2377,8 @@ function Learningplayground() {
         }
 
         .typing-indicator span {
-          width: 8px;
-          height: 8px;
+          width: 5px;
+          height: 5px;
           border-radius: 50%;
           background: var(--muted-foreground);
           animation: typing 1.4s infinite;
@@ -2301,7 +2401,7 @@ function Learningplayground() {
           }
           30% {
             opacity: 1;
-            transform: translateY(-4px);
+            transform: translateY(-3px);
           }
         }
 
@@ -2313,10 +2413,10 @@ function Learningplayground() {
           background: linear-gradient(
             90deg,
             rgba(255, 255, 255, 0),
-            rgba(255, 255, 255, 0.14),
+            rgba(255, 255, 255, 0.06),
             rgba(255, 255, 255, 0)
           );
-          animation: lp-skeleton-shimmer 1.2s ease-in-out infinite;
+          animation: lp-skeleton-shimmer 1.4s ease-in-out infinite;
         }
 
         @keyframes lp-skeleton-shimmer {
@@ -2326,87 +2426,108 @@ function Learningplayground() {
         }
       `}</style>
 
-      {/* Session Loading Modal */}
+      {/* Session Loading / History Modal */}
       {showSessionModal && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 2000,
-          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
-          display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center'
-        }}>
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+        }} onClick={() => setShowSessionModal(false)}>
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="learningplayground-session-modal-title"
             style={{
               background: 'var(--background)', border: '1px solid var(--border)',
-              borderRadius: '1rem', padding: '2rem', width: '90%', maxWidth: '500px',
-              maxHeight: '80vh', overflowY: 'auto'
+              borderRadius: '0.75rem', padding: '1.5rem', width: '100%', maxWidth: '520px',
+              maxHeight: '82vh', overflowY: 'auto', boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
             }}
             tabIndex={-1}
             ref={sessionModalRef}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header with Tabs */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h3 id="learningplayground-session-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold' }}>
-                {sessionModalMode === 'quiz'
-                  ? 'Past Study Sessions'
-                  : 'Learning Playground History'}
-              </h3>
-              <button aria-label="Close session history" onClick={() => setShowSessionModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.5rem', color: 'var(--muted-foreground)' }}>✕</button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 id="learningplayground-session-modal-title" style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                  {sessionModalMode === 'quiz'
+                    ? 'Past Quiz Sessions'
+                    : 'Playground Archive'}
+                </h3>
+                <p style={{ margin: '0.15rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
+                  Load previous context or review saved tools
+                </p>
+              </div>
+              <button
+                aria-label="Close session history"
+                onClick={() => setShowSessionModal(false)}
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: 'var(--muted-foreground)', padding: '0.25rem', display: 'flex', alignItems: 'center'
+                }}
+              >
+                <X size={18} />
+              </button>
             </div>
 
             {/* Tab Navigation */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
+            <div style={{
+              display: 'flex', gap: '0.35rem', marginBottom: '1.25rem',
+              padding: '0.25rem', background: 'var(--card)', borderRadius: '0.5rem', border: '1px solid var(--border)'
+            }}>
               {sessionModalMode === 'quiz' ? (
                 <button
                   onClick={() => setSavedToolsTab('sessions')}
                   style={{
-                    padding: '0.5rem 1rem',
+                    flex: 1,
+                    padding: '0.45rem 0.75rem',
                     borderRadius: '0.375rem',
                     border: 'none',
-                    background: savedToolsTab === 'sessions' ? 'var(--primary)' : 'transparent',
-                    color: savedToolsTab === 'sessions' ? '#ffffff' : 'var(--muted-foreground)',
+                    background: savedToolsTab === 'sessions' ? 'var(--surface)' : 'transparent',
+                    color: savedToolsTab === 'sessions' ? 'var(--foreground)' : 'var(--muted-foreground)',
                     cursor: 'pointer',
-                    fontWeight: savedToolsTab === 'sessions' ? 600 : 400,
-                    fontSize: '0.9rem',
-                    transition: 'all 0.2s'
+                    fontWeight: 500,
+                    fontSize: '0.82rem',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  📚 Study Sessions
+                  Quiz Sessions
                 </button>
               ) : (
                 <>
                   <button
                     onClick={() => setSavedToolsTab('playground')}
                     style={{
-                      padding: '0.5rem 1rem',
+                      flex: 1,
+                      padding: '0.45rem 0.5rem',
                       borderRadius: '0.375rem',
                       border: 'none',
-                      background: savedToolsTab === 'playground' ? 'var(--primary)' : 'transparent',
-                      color: savedToolsTab === 'playground' ? '#ffffff' : 'var(--muted-foreground)',
+                      background: savedToolsTab === 'playground' ? 'var(--surface)' : 'transparent',
+                      color: savedToolsTab === 'playground' ? 'var(--foreground)' : 'var(--muted-foreground)',
                       cursor: 'pointer',
-                      fontWeight: savedToolsTab === 'playground' ? 600 : 400,
-                      fontSize: '0.9rem',
-                      transition: 'all 0.2s'
+                      fontWeight: 500,
+                      fontSize: '0.8rem',
+                      transition: 'all 0.15s ease'
                     }}
                   >
-                    🧠 Playground History
+                    Sessions
                   </button>
                   <button
                     onClick={() => setSavedToolsTab('saved')}
                     style={{
-                      padding: '0.5rem 1rem',
+                      flex: 1,
+                      padding: '0.45rem 0.5rem',
                       borderRadius: '0.375rem',
                       border: 'none',
-                      background: savedToolsTab === 'saved' ? 'var(--primary)' : 'transparent',
-                      color: savedToolsTab === 'saved' ? '#ffffff' : 'var(--muted-foreground)',
+                      background: savedToolsTab === 'saved' ? 'var(--surface)' : 'transparent',
+                      color: savedToolsTab === 'saved' ? 'var(--foreground)' : 'var(--muted-foreground)',
                       cursor: 'pointer',
-                      fontWeight: savedToolsTab === 'saved' ? 600 : 400,
-                      fontSize: '0.9rem',
-                      transition: 'all 0.2s'
+                      fontWeight: 500,
+                      fontSize: '0.8rem',
+                      transition: 'all 0.15s ease'
                     }}
                   >
-                    💾 Saved Tools
+                    Saved Tools
                   </button>
                   <button
                     onClick={() => {
@@ -2414,18 +2535,19 @@ function Learningplayground() {
                       fetchSharedTools()
                     }}
                     style={{
-                      padding: '0.5rem 1rem',
+                      flex: 1,
+                      padding: '0.45rem 0.5rem',
                       borderRadius: '0.375rem',
                       border: 'none',
-                      background: savedToolsTab === 'shared' ? 'var(--primary)' : 'transparent',
-                      color: savedToolsTab === 'shared' ? '#ffffff' : 'var(--muted-foreground)',
+                      background: savedToolsTab === 'shared' ? 'var(--surface)' : 'transparent',
+                      color: savedToolsTab === 'shared' ? 'var(--foreground)' : 'var(--muted-foreground)',
                       cursor: 'pointer',
-                      fontWeight: savedToolsTab === 'shared' ? 600 : 400,
-                      fontSize: '0.9rem',
-                      transition: 'all 0.2s'
+                      fontWeight: 500,
+                      fontSize: '0.8rem',
+                      transition: 'all 0.15s ease'
                     }}
                   >
-                    📤 Shared with me
+                    Shared With Me
                   </button>
                 </>
               )}
@@ -2437,12 +2559,12 @@ function Learningplayground() {
                 {isLoadingQuizSessions ? (
                   renderSessionSkeletons({ variant: 'quiz' })
                 ) : quizSessions.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>
-                    <p>No past study sessions found.</p>
-                    <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>Complete a quiz to see your sessions here.</p>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
+                    <p>No past quiz sessions found.</p>
+                    <p style={{ fontSize: '0.78rem', marginTop: '0.25rem' }}>Complete a quiz first to load study gaps here.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                     {quizSessions.map(qs => {
                       const rawQuiz = typeof qs.quiz === 'string' ? (() => { try { return JSON.parse(qs.quiz) } catch { return [] } })() : (qs.quiz || [])
                       const score = rawQuiz.filter(q => q.isCorrect).length
@@ -2453,22 +2575,22 @@ function Learningplayground() {
                           key={qs.id}
                           onClick={() => handleLoadQuizSession(qs)}
                           style={{
-                            padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border)',
+                            padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)',
                             background: 'var(--card)', textAlign: 'left', cursor: 'pointer',
-                            transition: 'border-color 0.2s'
+                            transition: 'all 0.15s ease'
                           }}
                           onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
                           onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
                         >
-                          <div style={{ fontWeight: 600, color: 'var(--foreground)' }}>{qs.title || 'Untitled Session'}</div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>
-                            {new Date(qs.created_at).toLocaleString()}
+                          <div style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.88rem' }}>{qs.title || 'Untitled Session'}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem' }}>
+                            {new Date(qs.created_at).toLocaleDateString()} · {new Date(qs.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                           {total > 0 && (
-                            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem', fontSize: '0.8rem' }}>
-                              <span style={{ color: 'var(--chart-2)', fontWeight: 600 }}>✓ {score}/{total} correct</span>
+                            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.4rem', fontSize: '0.75rem' }}>
+                              <span style={{ color: '#4ade80', fontWeight: 500 }}>{score}/{total} correct</span>
                               {wrongCount > 0 && (
-                                <span style={{ color: 'var(--destructive)', fontWeight: 600 }}>✗ {wrongCount} to review</span>
+                                <span style={{ color: '#f87171', fontWeight: 500 }}>{wrongCount} to review</span>
                               )}
                             </div>
                           )}
@@ -2486,30 +2608,29 @@ function Learningplayground() {
                 {isLoadingPlaygroundSessions ? (
                   renderSessionSkeletons({ variant: 'playground' })
                 ) : playgroundSessions.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>
-                    <p>No playground sessions found.</p>
-                    <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>Save a chat or generated tool to see it here.</p>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
+                    <p>No playground sessions archived yet.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                     {playgroundSessions.map(sessionItem => (
                       <button
                         key={sessionItem.id}
                         onClick={() => handleLoadSession(sessionItem)}
                         style={{
-                          padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border)',
+                          padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)',
                           background: 'var(--card)', textAlign: 'left', cursor: 'pointer',
-                          transition: 'border-color 0.2s'
+                          transition: 'all 0.15s ease'
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
                         onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
                       >
-                        <div style={{ fontWeight: 600, color: 'var(--foreground)' }}>{sessionItem.title || 'Untitled Playground Session'}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>
-                          {sessionItem.latest_prompt ? String(sessionItem.latest_prompt).slice(0, 90) : 'No prompt saved'}
+                        <div style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.88rem' }}>{sessionItem.title || 'Untitled Playground Session'}</div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)', marginTop: '0.2rem' }}>
+                          {sessionItem.latest_prompt ? String(sessionItem.latest_prompt).slice(0, 85) : 'No prompt saved'}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.35rem' }}>
-                          {new Date(sessionItem.created_at).toLocaleString()}
+                        <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', marginTop: '0.3rem' }}>
+                          {new Date(sessionItem.created_at).toLocaleDateString()}
                         </div>
                       </button>
                     ))}
@@ -2524,12 +2645,12 @@ function Learningplayground() {
                 {isLoadingSavedTools ? (
                   renderSessionSkeletons({ variant: 'saved' })
                 ) : savedTools.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
                     <p>No saved tools yet.</p>
-                    <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>Create or fork tools from the marketplace to save them here.</p>
+                    <p style={{ fontSize: '0.78rem', marginTop: '0.25rem' }}>Generate and save tools to access them here.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                     {savedTools.map(tool => (
                       <button
                         key={tool.id}
@@ -2545,33 +2666,33 @@ function Learningplayground() {
                           }
                         }}
                         style={{
-                          padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border)',
+                          padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)',
                           background: 'var(--card)', textAlign: 'left', cursor: 'pointer',
-                          transition: 'border-color 0.2s'
+                          transition: 'all 0.15s ease'
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
                         onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 600, color: 'var(--foreground)' }}>{tool.title || 'Untitled Tool'}</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.88rem' }}>{tool.title || 'Untitled Tool'}</div>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', marginTop: '0.2rem', fontFamily: 'var(--font-mono)' }}>
                               {tool.tool_type} · {new Date(tool.created_at).toLocaleDateString()}
                             </div>
                             {tool.description && (
-                              <div style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', marginTop: '0.35rem' }}>
-                                {String(tool.description).slice(0, 100)}
+                              <div style={{ fontSize: '0.78rem', color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>
+                                {String(tool.description).slice(0, 90)}
                               </div>
                             )}
                             {Array.isArray(tool.tags) && tool.tags.length > 0 && (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.45rem' }}>
-                                {tool.tags.slice(0, 6).map((tag, index) => (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', marginTop: '0.4rem' }}>
+                                {tool.tags.slice(0, 5).map((tag, index) => (
                                   <span
                                     key={`${tool.id}-tag-${index}`}
                                     style={{
-                                      fontSize: '0.7rem',
-                                      padding: '0.15rem 0.45rem',
-                                      borderRadius: '999px',
+                                      fontSize: '0.68rem',
+                                      padding: '1px 5px',
+                                      borderRadius: '4px',
                                       border: '1px solid var(--border)',
                                       color: 'var(--muted-foreground)',
                                       background: 'var(--muted)',
@@ -2583,16 +2704,11 @@ function Learningplayground() {
                               </div>
                             )}
                           </div>
-                          <div style={{ display: 'flex', gap: '0.4rem', marginLeft: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <div style={{ display: 'flex', gap: '0.35rem', marginLeft: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                             {tool.is_published && (
-                              <div style={{ fontSize: '0.7rem', background: 'rgba(34, 197, 94, 0.14)', color: '#16a34a', border: '1px solid rgba(34, 197, 94, 0.35)', padding: '0.25rem 0.5rem', borderRadius: '0.25rem', whiteSpace: 'nowrap' }}>
+                              <span style={{ fontSize: '0.68rem', background: 'rgba(34, 197, 94, 0.12)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.3)', padding: '0.2rem 0.45rem', borderRadius: '4px', whiteSpace: 'nowrap' }}>
                                 Published
-                              </div>
-                            )}
-                            {tool.forked_from_tool_id && (
-                              <div style={{ fontSize: '0.7rem', background: 'var(--muted)', padding: '0.25rem 0.5rem', borderRadius: '0.25rem', whiteSpace: 'nowrap' }}>
-                                From Marketplace
-                              </div>
+                              </span>
                             )}
                             <span
                               role="button"
@@ -2611,20 +2727,20 @@ function Learningplayground() {
                                 }
                               }}
                               style={{
-                                fontSize: '0.7rem',
-                                background: 'rgba(59, 130, 246, 0.12)',
-                                color: '#2563eb',
-                                border: '1px solid rgba(59, 130, 246, 0.35)',
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: '0.25rem',
+                                fontSize: '0.68rem',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                color: 'var(--foreground)',
+                                border: '1px solid var(--border)',
+                                padding: '0.2rem 0.45rem',
+                                borderRadius: '4px',
                                 whiteSpace: 'nowrap',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '0.25rem'
+                                gap: '3px'
                               }}
                             >
-                              <Share2 size={12} />
+                              <Share2 size={11} />
                               Share
                             </span>
                             {!tool.forked_from_tool_id && (
@@ -2643,19 +2759,19 @@ function Learningplayground() {
                                   }
                                 }}
                                 style={{
-                                  fontSize: '0.7rem',
-                                  background: tool.is_published ? 'rgba(239, 68, 68, 0.12)' : 'rgba(59, 130, 246, 0.12)',
-                                  color: tool.is_published ? '#dc2626' : '#2563eb',
-                                  border: `1px solid ${tool.is_published ? 'rgba(239, 68, 68, 0.35)' : 'rgba(59, 130, 246, 0.35)'}`,
-                                  padding: '0.25rem 0.5rem',
-                                  borderRadius: '0.25rem',
+                                  fontSize: '0.68rem',
+                                  background: tool.is_published ? 'rgba(239, 68, 68, 0.1)' : 'rgba(90, 125, 153, 0.15)',
+                                  color: tool.is_published ? '#f87171' : 'var(--foreground)',
+                                  border: `1px solid ${tool.is_published ? 'rgba(239, 68, 68, 0.3)' : 'var(--border)'}`,
+                                  padding: '0.2rem 0.45rem',
+                                  borderRadius: '4px',
                                   whiteSpace: 'nowrap',
                                   cursor: publishingToolId === tool.id ? 'not-allowed' : 'pointer',
                                   opacity: publishingToolId === tool.id ? 0.6 : 1,
                                 }}
                               >
                                 {publishingToolId === tool.id
-                                  ? (tool.is_published ? 'Unpublishing...' : 'Publishing...')
+                                  ? 'Updating...'
                                   : (tool.is_published ? 'Unpublish' : 'Publish')}
                               </span>
                             )}
@@ -2667,18 +2783,18 @@ function Learningplayground() {
                 )}
               </>
             )}
+
             {/* Shared with me Tab Content */}
             {sessionModalMode === 'playground' && savedToolsTab === 'shared' && (
               <>
                 {isLoadingSharedTools ? (
                   renderSessionSkeletons({ variant: 'shared' })
                 ) : sharedTools.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)' }}>
-                    <p>No shared tools found.</p>
-                    <p style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>Tools shared with you by others will appear here.</p>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
+                    <p>No tools shared with you yet.</p>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                     {sharedTools.map(tool => (
                       <button
                         key={tool.id}
@@ -2695,18 +2811,18 @@ function Learningplayground() {
                           }
                         }}
                         style={{
-                          padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border)',
+                          padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)',
                           background: 'var(--card)', textAlign: 'left', cursor: 'pointer',
-                          transition: 'all 0.2s'
+                          transition: 'all 0.15s ease'
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--primary)'}
                         onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
                       >
-                        <div style={{ fontWeight: 600, color: 'var(--foreground)' }}>{tool.title || 'Untitled Tool'}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.25rem' }}>
-                          Shared by: <span style={{ color: 'var(--primary)' }}>{tool.sender_email}</span>
+                        <div style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.88rem' }}>{tool.title || 'Untitled Tool'}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.2rem' }}>
+                          Shared by: <strong style={{ color: 'var(--foreground)' }}>{tool.sender_email}</strong>
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--muted-foreground)', marginTop: '0.15rem' }}>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--muted-foreground)', marginTop: '0.15rem', fontFamily: 'var(--font-mono)' }}>
                           {tool.tool_type} · {new Date(tool.shared_at).toLocaleDateString()}
                         </div>
                       </button>
@@ -2719,14 +2835,15 @@ function Learningplayground() {
         </div>
       )}
 
+      {/* Share to Marketplace Metadata Modal */}
       {showMarketplaceMetadataModal && (
         <div
           style={{
             position: 'fixed',
             inset: 0,
             zIndex: 2100,
-            background: 'rgba(0,0,0,0.55)',
-            backdropFilter: 'blur(4px)',
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(6px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -2741,10 +2858,10 @@ function Learningplayground() {
             style={{
               background: 'var(--background)',
               border: '1px solid var(--border)',
-              borderRadius: '1rem',
+              borderRadius: '0.75rem',
               width: '100%',
-              maxWidth: '560px',
-              boxShadow: '0 18px 50px rgba(0,0,0,0.35)',
+              maxWidth: '520px',
+              boxShadow: '0 18px 50px rgba(0,0,0,0.4)',
               overflow: 'hidden',
             }}
             onClick={(e) => e.stopPropagation()}
@@ -2752,23 +2869,23 @@ function Learningplayground() {
             ref={marketplaceMetadataModalRef}
           >
             <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h3 id="learningplayground-marketplace-modal-title" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                Share Tool to Marketplace
+              <h3 id="learningplayground-marketplace-modal-title" style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                Publish to Marketplace
               </h3>
               <button
                 type="button"
                 onClick={() => closeMarketplaceMetadataModal(null)}
                 aria-label="Close marketplace sharing"
-                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)', fontSize: '1.25rem', lineHeight: 1 }}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--muted-foreground)', padding: '0.25rem', display: 'flex', alignItems: 'center' }}
               >
-                ×
+                <X size={16} />
               </button>
             </div>
 
-            <div style={{ padding: '1rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.35rem', color: 'var(--muted-foreground)' }}>
-                  Tool Name
+                <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.35rem', color: 'var(--muted-foreground)' }}>
+                  Tool Title
                 </label>
                 <input
                   type="text"
@@ -2777,20 +2894,20 @@ function Learningplayground() {
                   onChange={(e) => setMarketplaceMetadataForm(prev => ({ ...prev, title: e.target.value }))}
                   style={{
                     width: '100%',
-                    borderRadius: '0.5rem',
+                    borderRadius: '0.4rem',
                     border: '1px solid var(--border)',
                     background: 'var(--card)',
                     color: 'var(--foreground)',
-                    padding: '0.65rem 0.75rem',
-                    fontSize: '0.9rem',
+                    padding: '0.55rem 0.75rem',
+                    fontSize: '0.88rem',
                     outline: 'none',
                   }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.35rem', color: 'var(--muted-foreground)' }}>
-                  One-Sentence Description
+                <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.35rem', color: 'var(--muted-foreground)' }}>
+                  Summary / Overview
                 </label>
                 <textarea
                   maxLength={500}
@@ -2799,60 +2916,60 @@ function Learningplayground() {
                   onChange={(e) => setMarketplaceMetadataForm(prev => ({ ...prev, description: e.target.value }))}
                   style={{
                     width: '100%',
-                    borderRadius: '0.5rem',
+                    borderRadius: '0.4rem',
                     border: '1px solid var(--border)',
                     background: 'var(--card)',
                     color: 'var(--foreground)',
-                    padding: '0.65rem 0.75rem',
-                    fontSize: '0.9rem',
+                    padding: '0.55rem 0.75rem',
+                    fontSize: '0.88rem',
                     resize: 'vertical',
-                    minHeight: '88px',
+                    minHeight: '80px',
                     outline: 'none',
                   }}
                 />
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', marginBottom: '0.35rem', color: 'var(--muted-foreground)' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.35rem', color: 'var(--muted-foreground)' }}>
                   Tags (comma-separated)
                 </label>
                 <input
                   type="text"
                   value={marketplaceMetadataForm.tags}
                   onChange={(e) => setMarketplaceMetadataForm(prev => ({ ...prev, tags: e.target.value }))}
-                  placeholder="exam-prep, biology, active-recall"
+                  placeholder="biology, active-recall, photosynthesis"
                   style={{
                     width: '100%',
-                    borderRadius: '0.5rem',
+                    borderRadius: '0.4rem',
                     border: '1px solid var(--border)',
                     background: 'var(--card)',
                     color: 'var(--foreground)',
-                    padding: '0.65rem 0.75rem',
-                    fontSize: '0.9rem',
+                    padding: '0.55rem 0.75rem',
+                    fontSize: '0.88rem',
                     outline: 'none',
                   }}
                 />
               </div>
 
               {marketplaceMetadataError && (
-                <div style={{ color: 'var(--destructive)', fontSize: '0.82rem' }}>
+                <div style={{ color: 'var(--destructive)', fontSize: '0.8rem' }}>
                   {marketplaceMetadataError}
                 </div>
               )}
             </div>
 
-            <div style={{ borderTop: '1px solid var(--border)', padding: '0.9rem 1.25rem', display: 'flex', justifyContent: 'flex-end', gap: '0.6rem' }}>
+            <div style={{ borderTop: '1px solid var(--border)', padding: '0.85rem 1.25rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
               <button
                 type="button"
                 onClick={() => closeMarketplaceMetadataModal(null)}
                 style={{
-                  borderRadius: '0.45rem',
+                  borderRadius: '0.4rem',
                   border: '1px solid var(--border)',
-                  background: 'var(--card)',
+                  background: 'transparent',
                   color: 'var(--foreground)',
-                  padding: '0.5rem 0.8rem',
+                  padding: '0.45rem 0.75rem',
                   cursor: 'pointer',
-                  fontSize: '0.85rem',
+                  fontSize: '0.82rem',
                 }}
               >
                 Cancel
@@ -2880,27 +2997,28 @@ function Learningplayground() {
                   })
                 }}
                 style={{
-                  borderRadius: '0.45rem',
+                  borderRadius: '0.4rem',
                   border: 'none',
                   background: 'var(--primary)',
-                  color: '#fff',
-                  padding: '0.5rem 0.95rem',
+                  color: 'var(--primary-foreground)',
+                  padding: '0.45rem 0.9rem',
                   cursor: 'pointer',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  fontWeight: 500,
                 }}
               >
-                Continue to Publish
+                Publish Tool
               </button>
             </div>
           </div>
         </div>
       )}
+
       {/* Share Tool Modal */}
       {showShareModal && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 2100,
-          background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
         }} onClick={() => setShowShareModal(false)}>
           <div
@@ -2909,26 +3027,30 @@ function Learningplayground() {
             aria-labelledby="learningplayground-share-modal-title"
             style={{
               background: 'var(--background)', border: '1px solid var(--border)',
-              borderRadius: '1rem', width: '90%', maxWidth: '450px',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)'
+              borderRadius: '0.75rem', width: '100%', maxWidth: '440px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)'
             }}
             onClick={(e) => e.stopPropagation()}
             tabIndex={-1}
             ref={shareToolModalRef}
           >
-            <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 id="learningplayground-share-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Share Learning Tool</h3>
-              <button aria-label="Close share tool modal" onClick={() => setShowShareModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer' }}><X size={20} /></button>
+            <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 id="learningplayground-share-modal-title" style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                Share Learning Tool
+              </h3>
+              <button aria-label="Close share tool modal" onClick={() => setShowShareModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--muted-foreground)', cursor: 'pointer', padding: '0.25rem', display: 'flex', alignItems: 'center' }}>
+                <X size={16} />
+              </button>
             </div>
 
-            <div style={{ padding: '1.5rem' }}>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--foreground)' }}>
-                  Option 1: Share to Marketplace
+            <div style={{ padding: '1.25rem' }}>
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--foreground)' }}>
+                  Marketplace Publication
                 </label>
-                <div style={{ background: 'var(--muted)', padding: '1rem', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--muted-foreground)', marginBottom: '0.75rem', marginTop: 0 }}>
-                    Publish this tool to the public marketplace so anyone can learn from it.
+                <div style={{ background: 'var(--card)', padding: '0.85rem', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--muted-foreground)', marginBottom: '0.65rem', marginTop: 0 }}>
+                    Make this tool discoverable on the community marketplace.
                   </p>
                   <button
                     onClick={() => {
@@ -2936,11 +3058,11 @@ function Learningplayground() {
                       toggleToolPublish(sharingTool, !sharingTool.is_published)
                     }}
                     style={{
-                      width: '100%', padding: '0.6rem', borderRadius: '0.4rem',
+                      width: '100%', padding: '0.5rem', borderRadius: '0.4rem',
                       background: sharingTool?.is_published ? 'rgba(239, 68, 68, 0.1)' : 'var(--primary)',
-                      color: sharingTool?.is_published ? '#ef4444' : '#fff',
+                      color: sharingTool?.is_published ? '#f87171' : 'var(--primary-foreground)',
                       border: sharingTool?.is_published ? '1px solid rgba(239, 68, 68, 0.3)' : 'none',
-                      fontWeight: 600, cursor: 'pointer', fontSize: '0.9rem'
+                      fontWeight: 500, cursor: 'pointer', fontSize: '0.82rem'
                     }}
                   >
                     {sharingTool?.is_published ? 'Unpublish from Marketplace' : 'Publish to Marketplace'}
@@ -2948,36 +3070,36 @@ function Learningplayground() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: '0.5rem' }}>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--foreground)' }}>
-                  Option 2: Share via Email
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--foreground)' }}>
+                  Share Directly via Email
                 </label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
                   <input
                     type="email"
-                    placeholder="Enter friend's email..."
+                    placeholder="student@example.com"
                     value={shareEmail}
                     onChange={(e) => setShareEmail(e.target.value)}
                     style={{
-                      flex: 1, padding: '0.6rem', borderRadius: '0.4rem',
-                      border: '1px solid var(--border)', background: 'var(--background)',
-                      color: 'var(--foreground)', fontSize: '0.9rem', outline: 'none'
+                      flex: 1, padding: '0.55rem 0.75rem', borderRadius: '0.4rem',
+                      border: '1px solid var(--border)', background: 'var(--card)',
+                      color: 'var(--foreground)', fontSize: '0.85rem', outline: 'none'
                     }}
                   />
                   <button
                     onClick={handleShareToUser}
                     disabled={!shareEmail.trim() || shareLoading}
                     style={{
-                      padding: '0.6rem 1rem', borderRadius: '0.4rem',
-                      background: 'var(--primary)', color: '#fff', border: 'none',
-                      fontWeight: 600, cursor: shareLoading ? 'not-allowed' : 'pointer',
-                      opacity: shareLoading ? 0.7 : 1, fontSize: '0.9rem'
+                      padding: '0.55rem 0.9rem', borderRadius: '0.4rem',
+                      background: 'var(--primary)', color: 'var(--primary-foreground)', border: 'none',
+                      fontWeight: 500, cursor: shareLoading ? 'not-allowed' : 'pointer',
+                      opacity: shareLoading ? 0.7 : 1, fontSize: '0.82rem'
                     }}
                   >
-                    {shareLoading ? 'Sharing...' : 'Share'}
+                    {shareLoading ? 'Sharing...' : 'Send'}
                   </button>
                 </div>
-                {shareError && <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.5rem' }}>{shareError}</p>}
+                {shareError && <p style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '0.35rem' }}>{shareError}</p>}
               </div>
             </div>
           </div>
@@ -2992,7 +3114,7 @@ function Learningplayground() {
           right: 0,
           bottom: 0,
           width: '100%',
-          maxWidth: '460px',
+          maxWidth: '440px',
           background: 'var(--background)',
           borderLeft: '1px solid var(--border)',
           zIndex: 2200,
@@ -3002,7 +3124,7 @@ function Learningplayground() {
         }}>
           {/* Header */}
           <div style={{
-            padding: '1.25rem 1.5rem',
+            padding: '1.1rem 1.25rem',
             borderBottom: '1px solid var(--border)',
             display: 'flex',
             alignItems: 'center',
@@ -3010,12 +3132,12 @@ function Learningplayground() {
             background: 'var(--card)'
           }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <BookOpen size={18} color="var(--primary)" />
-                <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--foreground)' }}>Source Citations</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <BookOpen size={16} color="var(--primary)" />
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 600, color: 'var(--foreground)' }}>Source Verification</h3>
               </div>
-              <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: 'var(--muted-foreground)' }}>
-                {inspectorDocTitle || 'Quiz Source Document'}
+              <p style={{ margin: '0.15rem 0 0', fontSize: '0.75rem', color: 'var(--muted-foreground)' }}>
+                {inspectorDocTitle || 'Source Document'}
               </p>
             </div>
             <button
@@ -3025,12 +3147,12 @@ function Learningplayground() {
                 border: 'none',
                 color: 'var(--muted-foreground)',
                 cursor: 'pointer',
-                fontSize: '1.25rem',
-                lineHeight: 1,
-                padding: '0.25rem'
+                padding: '0.25rem',
+                display: 'flex',
+                alignItems: 'center'
               }}
             >
-              ✕
+              <X size={16} />
             </button>
           </div>
 
@@ -3043,15 +3165,15 @@ function Learningplayground() {
               padding: '1.25rem',
               display: 'flex',
               flexDirection: 'column',
-              gap: '1rem'
+              gap: '0.85rem'
             }}
           >
             {isLoadingParagraphs ? (
-              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)', fontSize: '0.9rem' }}>
-                Loading source paragraphs...
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
+                Loading source passages...
               </div>
             ) : inspectorParagraphs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)', fontSize: '0.85rem' }}>
+              <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted-foreground)', fontSize: '0.82rem' }}>
                 No paragraph content found for this document.
               </div>
             ) : (
@@ -3061,38 +3183,39 @@ function Learningplayground() {
                   <div
                     key={para.id || para.paragraph_index}
                     style={{
-                      padding: '1rem',
-                      borderRadius: '0.6rem',
-                      border: isTarget ? '2px solid var(--primary)' : '1px solid var(--border)',
-                      background: isTarget ? 'rgba(59, 130, 246, 0.08)' : 'var(--card)',
-                      transition: 'all 0.2s'
+                      padding: '0.85rem 1rem',
+                      borderRadius: '0.5rem',
+                      border: isTarget ? '1px solid var(--primary)' : '1px solid var(--border)',
+                      background: isTarget ? 'rgba(90, 125, 153, 0.12)' : 'var(--card)',
+                      transition: 'all 0.15s ease'
                     }}
                   >
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      marginBottom: '0.5rem',
-                      fontSize: '0.75rem',
-                      color: isTarget ? 'var(--primary)' : 'var(--muted-foreground)',
-                      fontWeight: 600
+                      marginBottom: '0.4rem',
+                      fontSize: '0.72rem',
+                      color: isTarget ? 'var(--foreground)' : 'var(--muted-foreground)',
+                      fontWeight: 600,
+                      fontFamily: 'var(--font-mono)'
                     }}>
                       <span>Paragraph {para.paragraph_index}</span>
                       {isTarget && (
                         <span style={{
                           background: 'var(--primary)',
-                          color: '#fff',
-                          padding: '1px 6px',
-                          borderRadius: '4px',
-                          fontSize: '0.7rem'
+                          color: 'var(--primary-foreground)',
+                          padding: '1px 5px',
+                          borderRadius: '3px',
+                          fontSize: '0.65rem'
                         }}>
-                          Cited Chunk
+                          Cited In Chat
                         </span>
                       )}
                     </div>
                     <p style={{
                       margin: 0,
-                      fontSize: '0.85rem',
+                      fontSize: '0.82rem',
                       lineHeight: 1.5,
                       color: 'var(--foreground)'
                     }}>
@@ -3110,3 +3233,4 @@ function Learningplayground() {
 }
 
 export default Learningplayground
+
