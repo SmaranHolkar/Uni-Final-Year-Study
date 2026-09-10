@@ -129,20 +129,26 @@ export function generateDynamicAcademicCards(rawTopic, toolType = 'flashcards') 
     }));
   }
 
-  // Quiz shape: diagnostic self-assessment prompts
-  return shape.map(([front, backTemplate], idx) => ({
-    id: String(idx + 1),
-    question: `${front} — ${fill(backTemplate, topic)}`,
-    choices: [
-      'I can answer this confidently',
-      'I can partially answer this',
-      "I don't know this yet — needs review",
-      'Not applicable to this topic'
-    ],
-    answer: 'A',
-    answerText: 'I can answer this confidently',
-    explanation: `This is a self-assessment prompt for "${topic}" — review any concept you could not answer confidently. Regenerate when live AI connectivity is active for full fact-based multiple choice questions.`
-  }));
+  // Quiz shape: Domain-specific multiple choice questions (never survey/confidence options)
+  return shape.map(([front, backTemplate], idx) => {
+    const qText = `In the study of ${topic}, how is the role of "${front}" correctly defined?`;
+    const correctVal = fill(backTemplate, topic);
+    const distractors = [
+      `It acts as an independent external factor with no functional role in ${topic}`,
+      `It is superseded by baseline ambient conditions without standard notation`,
+      `It represents an obsolete historical theory that has been fully replaced in modern practice`
+    ];
+    return {
+      id: String(idx + 1),
+      question: qText,
+      choices: [correctVal, ...distractors],
+      answer: 'A',
+      answerText: correctVal,
+      explanation: `In ${topic}, understanding ${front.toLowerCase()} is essential for mastering how this concept functions and is applied.`,
+      front: qText,
+      back: correctVal
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -104,18 +104,21 @@ export function normalizeToolItems(toolType, rawItems) {
           `Question ${idx + 1}`
       ).trim();
 
+      const isSurveyChoice = (str) =>
+        /^(i can answer this|i don't know this|not applicable|needs review|i can partially)/i.test(String(str).trim());
+
       let choices = Array.isArray(item.choices)
         ? item.choices
             .map((c) => (typeof c === 'string' ? c : c.text || c.choice || c.value || String(c)))
             .map((s) => String(s).trim())
-            .filter(Boolean)
+            .filter((s) => s && !isSurveyChoice(s))
         : [];
 
       if (choices.length < 2 && Array.isArray(item.options)) {
         choices = item.options
           .map((o) => (typeof o === 'string' ? o : o.text || o.choice || o.value || String(o)))
           .map((s) => String(s).trim())
-          .filter(Boolean);
+          .filter((s) => s && !isSurveyChoice(s));
       }
 
       const rawAnswer = String(
@@ -282,32 +285,54 @@ export function normalizeToolItems(toolType, rawItems) {
       return { id, text, position, detail, front: text, back: detail };
     }
 
-    // ── 6. CROSSWORD ────────────────────────────────────────────────────────
-    if (canonical === 'crossword') {
-      const rawWord = String(
-        item.word || item.front || item.term || item.concept || item.title || `TERM${idx + 1}`
-      );
-      const word = rawWord.toUpperCase().replace(/[^A-Z]/g, '') || `WORD${idx + 1}`;
-      const clue = String(
-        item.clue ||
-          item.back ||
-          item.definition ||
-          item.explanation ||
-          item.detail ||
-          item.content ||
-          item.hint ||
-          `Clue for ${word}`
-      ).trim();
-      return { id, word, clue, front: word, back: clue };
-    }
+    // ── 6. CROSSWORD & WORD SEARCH ─────────────────────────────────────────
+    if (canonical === 'crossword' || canonical === 'wordsearch') {
+      const f = String(item.front || item.question || item.title || item.concept || item.left || '').trim();
+      const b = String(item.back || item.answerText || item.answer || item.definition || item.explanation || item.right || '').trim();
+      const directWord = String(item.word || item.term || '').trim();
+      const directClue = String(item.clue || item.hint || '').trim();
 
-    // ── 7. WORD SEARCH ──────────────────────────────────────────────────────
-    if (canonical === 'wordsearch') {
-      const rawWord = String(
-        item.word || item.front || item.term || item.concept || item.title || `TERM${idx + 1}`
-      );
-      const word = rawWord.toUpperCase().replace(/[^A-Z]/g, '') || `WORD${idx + 1}`;
-      const clue = String(item.clue || item.back || item.definition || `Find: ${word}`).trim();
+      let wordCandidate = '';
+      let clueCandidate = '';
+
+      if (directWord && directWord.replace(/[^A-Za-z]/g, '').length >= 3) {
+        wordCandidate = directWord;
+        clueCandidate = directClue || b || f;
+      } else if (f && b) {
+        const fWords = f.split(/\s+/).length;
+        const bWords = b.split(/\s+/).length;
+        if (fWords <= 2 && f.replace(/[^A-Za-z]/g, '').length <= 12 && bWords > fWords) {
+          wordCandidate = f;
+          clueCandidate = b;
+        } else if (bWords <= 2 && b.replace(/[^A-Za-z]/g, '').length <= 12 && fWords > bWords) {
+          wordCandidate = b;
+          clueCandidate = f;
+        } else if (f.length <= b.length) {
+          wordCandidate = f;
+          clueCandidate = b;
+        } else {
+          wordCandidate = b;
+          clueCandidate = f;
+        }
+      } else {
+        wordCandidate = directWord || f || b || `TERM${idx + 1}`;
+        clueCandidate = directClue || b || f || `Key concept definition for term ${idx + 1}`;
+      }
+
+      let word = wordCandidate.toUpperCase().replace(/[^A-Z]/g, '');
+      if (word.length > 12) {
+        const firstWordOnly = wordCandidate.split(/[\s\-_]+/)[0]?.toUpperCase().replace(/[^A-Z]/g, '') || '';
+        word = firstWordOnly.length >= 3 && firstWordOnly.length <= 12 ? firstWordOnly : word.slice(0, 10);
+      }
+      if (word.length < 3) {
+        word = `ITEM${idx + 1}`;
+      }
+
+      let clue = clueCandidate.trim();
+      if (!clue || clue.toUpperCase().replace(/[^A-Z]/g, '') === word) {
+        clue = `Key concept definition and application for ${word}.`;
+      }
+
       return { id, word, clue, front: word, back: clue };
     }
 

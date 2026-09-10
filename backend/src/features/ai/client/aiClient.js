@@ -31,7 +31,7 @@ export async function getEmbedding(text) {
 /**
  * Retry helper with capped backoff to prevent network timeouts.
  */
-export async function retryWithBackoff(fn, maxRetries = 2, initialDelay = 1000) {
+export async function retryWithBackoff(fn, maxRetries = 2, initialDelay = 1200) {
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await fn();
@@ -41,11 +41,17 @@ export async function retryWithBackoff(fn, maxRetries = 2, initialDelay = 1000) 
         error.response?.status === 429 ||
         errorStr.includes('rate_limit') ||
         errorStr.includes('Rate limit') ||
-        errorStr.includes('rate_limit_exceeded');
+        errorStr.includes('rate_limit_exceeded') ||
+        errorStr.includes('429');
 
       if (isRateLimited && i < maxRetries - 1) {
-        console.log(`Rate limited by GROQ. Retrying once in ${initialDelay}ms...`);
-        await new Promise((resolve) => setTimeout(resolve, initialDelay));
+        // Parse "try again in X.Xs" from Groq error message if present
+        const delayMatch = errorStr.match(/try again in ([\d.]+)s/i);
+        const waitMs = delayMatch && delayMatch[1]
+          ? Math.min(Math.ceil(parseFloat(delayMatch[1]) * 1000) + 200, 4000)
+          : initialDelay;
+        console.log(`[ML ENGINE] Rate limited by GROQ. Retrying in ${waitMs}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
       } else {
         throw error;
       }
@@ -54,14 +60,14 @@ export async function retryWithBackoff(fn, maxRetries = 2, initialDelay = 1000) 
 }
 
 /**
- * Chat completion orchestrator with key rotation, model fallbacks,
- * and token-budget enforcement.
+ * Chat completion orchestrator with key rotation, active model support,
+ * and strict token-budget enforcement to prevent OTPM 429 errors.
  */
 export async function getChatCompletion(
   prompt,
   model = DEFAULT_AI_MODEL,
-  temperature = 0.7,
-  maxTokens = 2000,
+  temperature = 0.3,
+  maxTokens = 450,
   options = {}
 ) {
   const keys = [
@@ -74,22 +80,21 @@ export async function getChatCompletion(
     throw new Error('GROQ_API is not set in the server environment');
   }
 
-  const targetModel = model || DEFAULT_AI_MODEL;
   const { forceJson = false } = options;
 
-  const modelsToTry = [
-    targetModel,
+  const candidateModels = [
+    model,
     process.env.GROQ_MODEL,
     'qwen/qwen3.6-27b',
-  ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i);
+  ].filter(Boolean);
+  const modelsToTry = Array.from(new Set(candidateModels));
   let lastError = null;
 
   for (const currentModel of modelsToTry) {
     for (let kIdx = 0; kIdx < keys.length; kIdx++) {
       const activeKey = keys[kIdx];
-      const modelMaxTokens = currentModel.includes('qwen')
-        ? Math.min(maxTokens || 480, 480)
-        : Math.min(maxTokens || 2500, 4096);
+      // Keep output tokens strictly <= 480 to stay safely under the 1000 OTPM limit
+      const modelMaxTokens = Math.min(maxTokens || 450, 480);
 
       try {
         return await retryWithBackoff(async () => {
@@ -106,13 +111,13 @@ export async function getChatCompletion(
                 {
                   role: 'system',
                   content:
-                    'You are Vela, an advanced academic study assistant with deep pedagogical intelligence. Deliver sharp, clear, accurate, and deeply helpful explanations and tools.',
+                    'You are Vela, an elite academic study assistant. Deliver concise, sharp, and factual educational tools in valid JSON.',
                 },
                 { role: 'user', content: prompt },
               ],
               temperature,
               max_tokens: modelMaxTokens,
-              ...(currentModel.includes('qwen') ? { reasoning_effort: 'none' } : {}),
+              reasoning_effort: 'none',
               ...(forceJson ? { response_format: { type: 'json_object' } } : {}),
             }),
           });
@@ -130,7 +135,7 @@ export async function getChatCompletion(
       } catch (err) {
         lastError = err;
         console.warn(
-          `[ML ENGINE] Groq model ${currentModel} key ${kIdx + 1}/${keys.length} error: ${err.message}.`
+          `[ML ENGINE] Groq model ${currentModel} key ${kIdx + 1}/${keys.length} error: ${err.message}. Trying next available key...`
         );
       }
     }
@@ -145,8 +150,8 @@ export async function getChatCompletion(
 export async function toolGenAI(
   prompt,
   model = DEFAULT_AI_MODEL,
-  temperature = 0.7,
-  maxTokens = 2200,
+  temperature = 0.3,
+  maxTokens = 450,
   options = {}
 ) {
   const groqModel = model || DEFAULT_AI_MODEL;

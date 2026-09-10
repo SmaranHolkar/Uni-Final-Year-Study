@@ -2,11 +2,54 @@
 
 function buildClientCrosswordLayout(items) {
   const words = (items || []).map((it, i) => {
-    const rawWord = String(it.word || it.front || it.concept || it.term || `WORD${i + 1}`).toUpperCase().replace(/[^A-Z]/g, '');
-    const cleanWord = rawWord.length >= 3 ? rawWord.slice(0, 12) : `TERM${i + 1}`;
-    const clue = String(it.clue || it.back || it.definition || it.explanation || it.detail || 'Key concept clue and definition');
+    const f = String(it.front || it.question || it.title || it.concept || it.left || '').trim();
+    const b = String(it.back || it.answerText || it.answer || it.definition || it.explanation || it.right || '').trim();
+    const directWord = String(it.word || it.term || '').trim();
+    const directClue = String(it.clue || it.hint || '').trim();
+
+    let wordCandidate = '';
+    let clueCandidate = '';
+
+    if (directWord && directWord.replace(/[^A-Za-z]/g, '').length >= 3) {
+      wordCandidate = directWord;
+      clueCandidate = directClue || b || f;
+    } else if (f && b) {
+      const fWords = f.split(/\s+/).length;
+      const bWords = b.split(/\s+/).length;
+      if (fWords <= 2 && f.replace(/[^A-Za-z]/g, '').length <= 12 && bWords > fWords) {
+        wordCandidate = f;
+        clueCandidate = b;
+      } else if (bWords <= 2 && b.replace(/[^A-Za-z]/g, '').length <= 12 && fWords > bWords) {
+        wordCandidate = b;
+        clueCandidate = f;
+      } else if (f.length <= b.length) {
+        wordCandidate = f;
+        clueCandidate = b;
+      } else {
+        wordCandidate = b;
+        clueCandidate = f;
+      }
+    } else {
+      wordCandidate = directWord || f || b || `TERM${i + 1}`;
+      clueCandidate = directClue || b || f || `Key concept definition for term ${i + 1}`;
+    }
+
+    let cleanWord = wordCandidate.toUpperCase().replace(/[^A-Z]/g, '');
+    if (cleanWord.length > 12) {
+      const firstWordOnly = wordCandidate.split(/[\s\-_]+/)[0]?.toUpperCase().replace(/[^A-Z]/g, '') || '';
+      cleanWord = firstWordOnly.length >= 3 && firstWordOnly.length <= 12 ? firstWordOnly : cleanWord.slice(0, 10);
+    }
+    if (cleanWord.length < 3) {
+      cleanWord = `TERM${i + 1}`;
+    }
+
+    let clue = clueCandidate.trim();
+    if (!clue || clue.toUpperCase().replace(/[^A-Z]/g, '') === cleanWord) {
+      clue = `Key concept definition and application for ${cleanWord}.`;
+    }
+
     return { word: cleanWord, clue, number: i + 1 };
-  }).filter(w => w.word.length >= 3).slice(0, 8);
+  }).filter(w => w.word.length >= 3).slice(0, 12);
 
   if (words.length === 0) return null;
 

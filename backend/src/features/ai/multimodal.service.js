@@ -17,6 +17,198 @@ export function extractYouTubeId(url) {
 }
 
 /**
+ * Fetches YouTube transcript and metadata using Innertube client APIs and direct timedtext.
+ */
+async function fetchYouTubeTranscriptAndMetadata(videoId) {
+  let title = 'YouTube Lecture';
+  let description = '';
+  let author = '';
+  let rawTranscript = '';
+
+  // 1. Try Innertube Android Client (Highest success rate for closed captions & auto-generated ASR)
+  try {
+    const innertubeRes = await fetch('https://www.youtube.com/youtubei/v1/player', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip',
+      },
+      body: JSON.stringify({
+        videoId,
+        context: {
+          client: {
+            clientName: 'ANDROID',
+            clientVersion: '19.09.37',
+            hl: 'en',
+            gl: 'US',
+          },
+        },
+      }),
+    });
+
+    if (innertubeRes.ok) {
+      const playerData = await innertubeRes.json();
+      if (playerData.videoDetails) {
+        title = playerData.videoDetails.title || title;
+        author = playerData.videoDetails.author || '';
+        description = playerData.videoDetails.shortDescription || '';
+      }
+
+      const captionTracks = playerData.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+      if (Array.isArray(captionTracks) && captionTracks.length > 0) {
+        // Prioritize English or auto-generated English track
+        const track =
+          captionTracks.find((t) => t.languageCode === 'en' || t.vssId?.includes('en')) ||
+          captionTracks[0];
+
+        if (track?.baseUrl) {
+          try {
+            // Attempt JSON3 format first
+            const json3Res = await fetch(`${track.baseUrl}&fmt=json3`);
+            if (json3Res.ok) {
+              const json3Data = await json3Res.json();
+              if (Array.isArray(json3Data.events)) {
+                const textSegments = [];
+                for (const ev of json3Data.events) {
+                  if (Array.isArray(ev.segs)) {
+                    const line = ev.segs.map((s) => s.utf8 || '').join('').trim();
+                    if (line && !textSegments.includes(line)) {
+                      textSegments.push(line);
+                    }
+                  }
+                }
+                if (textSegments.length > 0) {
+                  rawTranscript = textSegments.join(' ');
+                }
+              }
+            }
+          } catch {}
+
+          // Fallback to standard XML timedtext
+          if (!rawTranscript) {
+            try {
+              const xmlRes = await fetch(track.baseUrl);
+              if (xmlRes.ok) {
+                const xmlText = await xmlRes.text();
+                const cleaned = xmlText
+                  .replace(/<text[^>]*>/g, ' ')
+                  .replace(/<\/text>/g, '\n')
+                  .replace(/&amp;/g, '&')
+                  .replace(/&lt;/g, '<')
+                  .replace(/&gt;/g, '>')
+                  .replace(/&#39;/g, "'")
+                  .replace(/&quot;/g, '"')
+                  .replace(/<[^>]+>/g, '')
+                  .replace(/\s+/g, ' ')
+                  .trim();
+                if (cleaned.length > 30) {
+                  rawTranscript = cleaned;
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[MULTIMODAL] Innertube Android fetch warning:', err.message);
+  }
+
+  // 2. Fallback: Try Innertube Web Client if transcript not yet found
+  if (!rawTranscript) {
+    try {
+      const webInnertubeRes = await fetch('https://www.youtube.com/youtubei/v1/player', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+        body: JSON.stringify({
+          videoId,
+          context: {
+            client: {
+              clientName: 'WEB',
+              clientVersion: '2.20240313.01.00',
+              hl: 'en',
+              gl: 'US',
+            },
+          },
+        }),
+      });
+
+      if (webInnertubeRes.ok) {
+        const webData = await webInnertubeRes.json();
+        if (webData.videoDetails && title === 'YouTube Lecture') {
+          title = webData.videoDetails.title || title;
+          description = webData.videoDetails.shortDescription || description;
+        }
+
+        const captionTracks = webData.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+        if (Array.isArray(captionTracks) && captionTracks.length > 0) {
+          const track = captionTracks.find((t) => t.languageCode === 'en' || t.vssId?.includes('en')) || captionTracks[0];
+          if (track?.baseUrl) {
+            const trackRes = await fetch(track.baseUrl);
+            if (trackRes.ok) {
+              const xmlText = await trackRes.text();
+              const cleaned = xmlText
+                .replace(/<text[^>]*>/g, ' ')
+                .replace(/<\/text>/g, '\n')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&#39;/g, "'")
+                .replace(/&quot;/g, '"')
+                .replace(/<[^>]+>/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+              if (cleaned.length > 30) {
+                rawTranscript = cleaned;
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[MULTIMODAL] Innertube Web fetch warning:', err.message);
+    }
+  }
+
+  // 3. Fallback: oEmbed metadata if title is still generic
+  if (title === 'YouTube Lecture') {
+    try {
+      const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+      if (oembedRes.ok) {
+        const oembedData = await oembedRes.json();
+        if (oembedData?.title) {
+          title = oembedData.title;
+          author = oembedData.author_name || author;
+        }
+      }
+    } catch (err) {
+      console.warn('[MULTIMODAL] YouTube oEmbed fetch error:', err.message);
+    }
+  }
+
+  // Clean and deduplicate transcript words if present
+  let cleanTranscript = '';
+  if (rawTranscript) {
+    cleanTranscript = rawTranscript
+      .replace(/\[Music\]/gi, '')
+      .replace(/\[Applause\]/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  return {
+    videoId,
+    title,
+    author,
+    description: description.slice(0, 4000),
+    transcript: cleanTranscript,
+  };
+}
+
+/**
  * Ingest YouTube Video: extracts transcript / caption or metadata, then summarizes into study context.
  */
 export async function ingestYouTubeVideo(youtubeUrl) {
@@ -30,78 +222,57 @@ export async function ingestYouTubeVideo(youtubeUrl) {
     throw new Error('Invalid YouTube URL. Please provide a standard YouTube video link (e.g., https://www.youtube.com/watch?v=... or https://youtu.be/...)');
   }
 
+  const { title, author, description, transcript } = await fetchYouTubeTranscriptAndMetadata(videoId);
 
-  let videoTitle = 'YouTube Lecture';
-  let rawTranscript = '';
-
-  // 1. Fetch video metadata via oEmbed (safe, no API key needed)
+  // Build high-yield academic digest with LLM
+  let structuredSummary = '';
   try {
-    const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
-    if (oembedRes.ok) {
-      const oembedData = await oembedRes.json();
-      if (oembedData?.title) {
-        videoTitle = oembedData.title;
-      }
-    }
+    const prompt = transcript
+      ? `You are an elite academic curriculum architect. The student has provided a YouTube lecture titled "${title}"${author ? ` by ${author}` : ''}.
+Here is the VERBATIM TRANSCRIPT of the lecture:
+
+TRANSCRIPT:
+${transcript.slice(0, 24000)}
+
+${description ? `\nVIDEO OUTLINE / DESCRIPTION:\n${description.slice(0, 2000)}\n` : ''}
+
+Your task: Digest this lecture transcript into a comprehensive, high-yield academic study guide and revision knowledge base.
+
+STRUCTURE YOUR OUTPUT EXPLICITLY:
+1. Core Topic Overview & Main Thesis (2-3 sentences)
+2. Stage-by-Step Mechanisms & Processes (Detail every stage, inputs, outputs, catalysts, and conditions explained in the video)
+3. Key Scientific / Academic Terminology (Define every major technical term used by the speaker)
+4. High-Yield Exam Facts & Crucial Distinctions (Specific numbers, formulas, equations, or exam points mentioned)
+5. Summary of Key Takeaways`
+      : `You are an elite academic curriculum architect. The student has provided a YouTube lecture titled "${title}"${author ? ` by ${author}` : ''}.
+${description ? `\nVIDEO OUTLINE & TOPICS:\n${description}\n` : ''}
+
+Provide a comprehensive, syllabus-accurate study guide and revision summary for the academic topic covered in "${title}". Include:
+1. Core Topic Overview & Governing Principles
+2. Stage-by-Stage Mechanisms and Explanations
+3. Key Technical Terminology & Definitions
+4. High-Yield Exam Takeaways and Formulas`;
+
+    structuredSummary = await toolGenAI(prompt, undefined, 0.2, 2500);
   } catch (err) {
-    console.warn('[MULTIMODAL] YouTube oEmbed fetch error:', err.message);
+    console.warn('[MULTIMODAL] YouTube LLM summary warning:', err.message);
+    structuredSummary = transcript || description || `Study notes for ${title}`;
   }
 
-  // 2. Fetch transcript via public timedtext or fallback page scrape
-  try {
-    const videoPageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-    });
-    const pageHtml = await videoPageRes.text();
-
-    // Look for captionTracks JSON in ytInitialPlayerResponse
-    const playerResponseMatch = pageHtml.match(/ytInitialPlayerResponse\s*=\s*({.+?});/);
-    if (playerResponseMatch && playerResponseMatch[1]) {
-      const playerResponse = JSON.parse(playerResponseMatch[1]);
-      const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-      if (Array.isArray(captionTracks) && captionTracks.length > 0) {
-        const englishTrack = captionTracks.find(t => t.languageCode === 'en' || t.vssId?.includes('en')) || captionTracks[0];
-        if (englishTrack?.baseUrl) {
-          const trackRes = await fetch(englishTrack.baseUrl);
-          const xmlText = await trackRes.text();
-          // Extract text from XML nodes <text ...>content</text>
-          const cleanText = xmlText
-            .replace(/<text[^>]*>/g, ' ')
-            .replace(/<\/text>/g, '\n')
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&#39;/g, "'")
-            .replace(/&quot;/g, '"')
-            .replace(/<[^>]+>/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          if (cleanText.length > 50) {
-            rawTranscript = cleanText;
-          }
-        }
-      }
-    }
-  } catch (tErr) {
-    console.warn('[MULTIMODAL] Transcript extraction fallback:', tErr.message);
-  }
-
-  // 3. Process with LLM to build a comprehensive study summary
-  const prompt = rawTranscript
-    ? `You are an expert academic educator. Transform the following transcript from the YouTube lecture "${videoTitle}" into a thorough, comprehensive study guide.\n\nTRANSCRIPT:\n${rawTranscript.slice(0, 20000)}\n\nInclude:\n1. Core Topic & Key Takeaways\n2. Key Definitions & Terminology\n3. Step-by-Step Concepts and Explanations\n4. Critical Exam Facts & Formulas`
-    : `You are an expert academic educator. Provide a comprehensive, in-depth academic study guide and revision summary for the YouTube lecture topic: "${videoTitle}". Include core definitions, step-by-step principles, and key exam concepts.`;
-
-  const structuredSummary = await toolGenAI(prompt, undefined, 0.2, 2200);
+  const combinedContent = [
+    `# ${title}`,
+    author ? `**Presenter/Channel:** ${author}` : '',
+    structuredSummary,
+    transcript ? `\n## Verbatim Lecture Transcript\n${transcript}` : (description ? `\n## Video Outline\n${description}` : ''),
+  ].filter(Boolean).join('\n\n');
 
   return {
     videoId,
-    title: videoTitle,
-    extractedText: structuredSummary || rawTranscript || videoTitle,
+    title,
+    author,
+    extractedText: combinedContent,
     summary: structuredSummary,
+    transcript: transcript || '',
     source: 'youtube',
   };
 }

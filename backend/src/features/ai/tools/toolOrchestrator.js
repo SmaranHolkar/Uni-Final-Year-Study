@@ -16,6 +16,7 @@ import { generateDynamicAcademicCards, generateItemsWithFallback } from './gener
 import { normalizeToolItems, resolveCanonicalType } from './normalizer.js';
 import { generateDeterministicFallbackHtml, renderDiagramToHtml, injectThemeCss } from './templates/templateEngine.js';
 import { generateFluxImage, cacheImageLocally, toDataUrlIfPossible } from '../image/flux.service.js';
+import { ingestYouTubeVideo } from '../multimodal.service.js';
 
 const UTILITY_TOOL_TYPES = [
   'timer', 'pomodoro', 'stopwatch', 'clock',
@@ -62,65 +63,118 @@ async function buildGroundingContext(userId, promptText, options = {}) {
     }
   }
 
-  // RAG Vector Search
+  // 1. Direct In-Prompt, Title, or Chat History YouTube Extraction
+  const allTextForYt = [
+    promptText,
+    targetDocTitle || '',
+    ...(Array.isArray(options.chatHistory) ? options.chatHistory.map((m) => String(m.content || m.text || '')) : []),
+  ].join(' ');
+
+  const ytMatch = allTextForYt.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+  if (ytMatch && ytMatch[0]) {
+    try {
+      const ytResult = await ingestYouTubeVideo(ytMatch[0]);
+      if (ytResult?.summary || ytResult?.extractedText) {
+        const compactYt = (ytResult.summary || ytResult.extractedText).slice(0, 1500);
+        contextString += `\n\n[LECTURE CONTEXT ("${ytResult.title}")]:\n${compactYt}\n`;
+      }
+    } catch (ytErr) {
+      console.warn('[ORCHESTRATOR] YouTube video ingest warning:', ytErr.message);
+    }
+  }
+
+  // 2. Direct In-Memory Document Content
+  if (options.attachedDocument?.extractedText || options.attachedDocument?.content || options.attachedDocument?.summary) {
+    const docBody = options.attachedDocument.summary || options.attachedDocument.extractedText || options.attachedDocument.content;
+    contextString += `\n\n[DOCUMENT CONTENT ("${targetDocTitle || 'Active Document'}")]:\n${String(docBody).slice(0, 1500)}\n`;
+  }
+
+  // 3. Database RAG (Direct Title Match + Semantic Vector Search - High-Density Excerpts)
   if (userId) {
     try {
-      const isUuid =
-        typeof userId === 'string' &&
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+      const client = await pool.connect();
+      try {
+        let rows = [];
 
-      if (isUuid) {
-        const historyText = Array.isArray(options.chatHistory)
-          ? options.chatHistory.slice(-4).map((m) => String(m.content || m.text || '')).join(' ')
-          : '';
-        const searchQueryText = `${promptText} ${historyText} ${options.previousTool?.title || ''} ${targetDocTitle || ''}`.trim();
+        // Direct Title Match first (exact document retrieval)
+        if (targetDocTitle) {
+          const cleanDocTitle = targetDocTitle.replace(/\+/g, ' ');
+          const titleRes = await client.query(
+            `SELECT id, chunk_text, title, COALESCE(paragraph_index, 1) as paragraph_index, COALESCE(page_number, 1) as page_number 
+             FROM public.w_embeddings
+             WHERE (user_id = $1::text OR user_id = $1::uuid OR $1 IS NULL) AND (
+               title = $2 OR 
+               title ILIKE $3 OR
+               REPLACE(title, '+', ' ') ILIKE $3 OR
+               REPLACE(title, ' ', '+') ILIKE $3
+             )
+             ORDER BY paragraph_index ASC LIMIT 5`,
+            [userId, targetDocTitle, `%${cleanDocTitle}%`]
+          ).catch(async () => {
+            return client.query(
+              `SELECT id, chunk_text, title, COALESCE(paragraph_index, 1) as paragraph_index, COALESCE(page_number, 1) as page_number 
+               FROM public.w_embeddings
+               WHERE (title = $1 OR title ILIKE $2 OR REPLACE(title, '+', ' ') ILIKE $2)
+               ORDER BY paragraph_index ASC LIMIT 5`,
+              [targetDocTitle, `%${cleanDocTitle}%`]
+            );
+          });
+          rows = titleRes.rows || [];
+        }
 
-        const queryVec = await Promise.race([
-          getEmbedding(searchQueryText),
-          new Promise((resolve) => setTimeout(() => resolve(null), 1200)),
-        ]);
+        // Semantic Vector Search if needed
+        if (rows.length === 0) {
+          const historyText = Array.isArray(options.chatHistory)
+            ? options.chatHistory.slice(-4).map((m) => String(m.content || m.text || '')).join(' ')
+            : '';
+          const searchQueryText = `${promptText} ${historyText} ${options.previousTool?.title || ''} ${targetDocTitle || ''}`.trim();
 
-        if (queryVec && Array.isArray(queryVec)) {
-          const vecStr = `[${queryVec.join(',')}]`;
-          const client = await pool.connect();
-          try {
-            let rows = [];
-            if (targetDocTitle) {
-              const cleanDocTitle = targetDocTitle.replace(/\+/g, ' ');
-              const titleRes = await client.query(
+          const queryVec = await Promise.race([
+            getEmbedding(searchQueryText),
+            new Promise((resolve) => setTimeout(() => resolve(null), 8000)),
+          ]);
+
+          if (queryVec && Array.isArray(queryVec)) {
+            const vecStr = `[${queryVec.join(',')}]`;
+            const vecRes = await client.query(
+              `SELECT id, chunk_text, title, COALESCE(paragraph_index, 1) as paragraph_index, COALESCE(page_number, 1) as page_number 
+               FROM public.w_embeddings
+               WHERE (user_id = $1::text OR user_id = $1::uuid OR $1 IS NULL)
+               ORDER BY embedding <-> $2::vector LIMIT 5`,
+              [userId, vecStr]
+            ).catch(async () => {
+              return client.query(
                 `SELECT id, chunk_text, title, COALESCE(paragraph_index, 1) as paragraph_index, COALESCE(page_number, 1) as page_number 
                  FROM public.w_embeddings
-                 WHERE user_id = $1 AND (
-                   title = $2 OR 
-                   title ILIKE $3 OR
-                   REPLACE(title, '+', ' ') ILIKE $3 OR
-                   REPLACE(title, ' ', '+') ILIKE $3
-                 )
-                 ORDER BY embedding <-> $4::vector LIMIT 10`,
-                [userId, targetDocTitle, `%${cleanDocTitle}%`, vecStr]
+                 ORDER BY embedding <-> $1::vector LIMIT 5`,
+                [vecStr]
               );
-              rows = titleRes.rows;
-            }
-
-            if (rows.length > 0) {
-              const docTitleUsed = rows[0].title;
-              contextString += `\n\nEXACT RAG GROUNDED CONTEXT FROM ACTIVE SESSION DOCUMENT ("${docTitleUsed}"):\n`;
-              rows.forEach((r, idx) => {
-                contextString += `[Excerpt ${idx + 1} from "${r.title}" (Page ${r.page_number}, Paragraph ${r.paragraph_index})]:\n${r.chunk_text}\n\n`;
-              });
-              contextString += `MANDATORY SESSION CONTINUITY INSTRUCTION: You MUST use the factual context above from "${docTitleUsed}" to create all quiz questions, flashcards, or study guide content for this turn. Every question MUST directly test concepts, facts, and terms from these excerpts!\n`;
-            } else if (targetDocTitle) {
-              contextString += `\n\nACTIVE TOPIC FOR THIS REVISION TOOL: "${targetDocTitle}"\n`;
-              contextString += `MANDATORY TOPIC INSTRUCTION: You MUST generate all quiz questions, flashcards, study guide, or diagram content strictly about "${targetDocTitle}".\n`;
-            }
-          } finally {
-            client.release();
+            });
+            rows = vecRes.rows || [];
           }
         }
+
+        if (rows.length > 0) {
+          const docTitleUsed = rows[0].title;
+          contextString += `\n\n[TOPIC KNOWLEDGE EXCERPTS ("${docTitleUsed}")]:\n`;
+          rows.forEach((r, idx) => {
+            const cleanExcerpt = String(r.chunk_text || '').replace(/\s+/g, ' ').slice(0, 300);
+            contextString += `• (${idx + 1}): ${cleanExcerpt}\n`;
+          });
+        } else if (targetDocTitle) {
+          contextString += `\n\n[TOPIC: "${targetDocTitle}"]\n`;
+        }
+      } finally {
+        client.release();
       }
     } catch (ragErr) {
-      console.warn('[RAG TOOL GEN] Vector search failed:', ragErr.message);
+      console.warn('[RAG TOOL GEN] Vector/Title search warning:', ragErr.message);
     }
+  }
+
+  // Strictly bound total context size to ~1800 chars (approx 450 tokens) to guarantee zero ITPM rate limits
+  if (contextString.length > 1800) {
+    contextString = contextString.slice(0, 1800);
   }
 
   // Previous Tool Continuity
@@ -188,54 +242,26 @@ export async function generateLearningTool(userId, prompt, context, options = {}
   // 2. BUILD GROUNDING CONTEXT
   const contextString = await buildGroundingContext(userId, promptText, { ...options, context });
 
-  // 3. AI PLANNING CALL
+  // 3. AI PLANNING CALL (LIGHTWEIGHT ARCHETYPE & METADATA DECISION)
   const planPrompt = `
-You are Vela, an elite AI educational architect, study coach, and revision tool creator.
-
-YOUR PRIMARY MISSION & BEHAVIORS:
-1. FULL CONVERSATION MEMORY & CONTINUITY:
-   Synthesize the entire conversation thread together. Maintain subject continuity.
-
-2. ACTIVE INQUIRY (ONLY FOR VAGUE REQUESTS WITH NO SUBJECT):
-   If the student gives an open-ended request WITHOUT specifying ANY subject or topic (e.g. "Help me revise"):
-   - Set "toolType": "chat", "ui": "chat".
-   - In "chatResponse", ask 2-3 clarifying questions.
-
-3. TOPIC & CONCEPT LEARNING REQUESTS (ALWAYS BUILD AN INTERACTIVE TOOL ON CANVAS):
-   Whenever the student asks to learn, understand, or study ANY concept or topic:
-   - ALWAYS choose the best interactive tool archetype (flashcards, quiz, cloze-blurting, feynman-grader, revision-kit, matching, timeline, study-notes, svg_diagram).
-   - Populate "items" with 4-6 authentic, syllabus-accurate items for "${promptText}".
-   - In "chatResponse", provide a concise, encouraging educational summary.
-
-4. DIAGRAM & VISUALIZATION REQUESTS:
-   If the student asks to create/draw a diagram, flowchart, schematic:
-   - Set "toolType": "svg_diagram", "ui": "visual".
+You are Vela, an elite AI educational architect and revision tool creator.
 
 USER'S LATEST MESSAGE: "${promptText}"${contextString}
 
-Return ONLY valid JSON (no markdown outside):
+Decide the best interactive tool archetype (e.g. flashcards, quiz, crossword, matching, timeline, cloze-blurting, revision-kit, study-notes, svg_diagram) and a topic-specific title.
+
+Return ONLY valid JSON:
 {
   "toolType": "one of: flashcards | quiz | cloze-blurting | feynman-grader | revision-kit | study-notes | matching | crossword | true-false | ordering | timeline | svg_diagram | chat",
   "title": "Topic-specific title",
-  "description": "Crisp summary of what this tool covers",
-  "chatResponse": "Educational summary for the student",
-  "items": [
-    { "id": "1", "front": "Specific Stage / Core Concept 1", "back": "Accurate mechanism, inputs/outputs, and exam facts 1", "question": "Question 1 on ${promptText}", "choices": ["Correct answer", "Distractor 1", "Distractor 2", "Distractor 3"], "answer": "Correct answer", "explanation": "Exam reasoning 1" },
-    { "id": "2", "front": "Specific Stage / Core Concept 2", "back": "Accurate mechanism, inputs/outputs, and exam facts 2", "question": "Question 2 on ${promptText}", "choices": ["Correct answer", "Distractor 1", "Distractor 2", "Distractor 3"], "answer": "Correct answer", "explanation": "Exam reasoning 2" },
-    { "id": "3", "front": "Specific Stage / Core Concept 3", "back": "Accurate mechanism, inputs/outputs, and exam facts 3", "question": "Question 3 on ${promptText}", "choices": ["Correct answer", "Distractor 1", "Distractor 2", "Distractor 3"], "answer": "Correct answer", "explanation": "Exam reasoning 3" },
-    { "id": "4", "front": "Specific Stage / Core Concept 4", "back": "Accurate mechanism, inputs/outputs, and exam facts 4", "question": "Question 4 on ${promptText}", "choices": ["Correct answer", "Distractor 1", "Distractor 2", "Distractor 3"], "answer": "Correct answer", "explanation": "Exam reasoning 4" },
-    { "id": "5", "front": "Specific Stage / Core Concept 5", "back": "Accurate mechanism, inputs/outputs, and exam facts 5", "question": "Question 5 on ${promptText}", "choices": ["Correct answer", "Distractor 1", "Distractor 2", "Distractor 3"], "answer": "Correct answer", "explanation": "Exam reasoning 5" }
-  ]
+  "description": "Crisp 1-sentence summary of what this revision tool covers",
+  "chatResponse": "Concise, encouraging educational response for the student"
 }
-
-ITEM FORMAT INSTRUCTIONS:
-- CRITICAL: You MUST populate "items" with at least 5 to 6 distinct, syllabus-accurate items covering different stages/mechanisms for "${promptText}".
-- Keep explanations concise (1-2 clear sentences) so all items finish within the JSON payload.
 `;
 
   let plan = null;
   try {
-    const planRaw = await toolGenAI(planPrompt, undefined, 0.3, 2500, { forceJson: false });
+    const planRaw = await toolGenAI(planPrompt, undefined, 0.2, 180, { forceJson: false });
     plan = safeParse(planRaw);
   } catch (err) {
     console.warn('[ML ENGINE] Planner call error:', err.message);
@@ -329,7 +355,7 @@ ITEM FORMAT INSTRUCTIONS:
     let diagramSpec = null;
     try {
       const diagramPrompt = buildSVGDiagramPrompt(promptText, contextString);
-      const diagramRaw = await toolGenAI(diagramPrompt, undefined, 0.3, 2500, { forceJson: false });
+      const diagramRaw = await toolGenAI(diagramPrompt, undefined, 0.2, 450, { forceJson: false });
       diagramSpec = safeParse(diagramRaw);
     } catch (err) {
       console.warn('Failed to parse AI SVG Diagram spec:', err.message);
@@ -398,25 +424,105 @@ ITEM FORMAT INSTRUCTIONS:
   const isUtility = UTILITY_TOOL_TYPES.some((u) => toolType.includes(u));
 
   if (rawItems.length < 4 && !isUtility) {
-    const itemsPrompt = `You are an expert curriculum and exam content generator. Generate at least 5 to 6 authentic, syllabus-accurate study items for: "${promptText}".
-Topic: ${title || promptText}
-Tool Type: ${toolType}
-${contextString ? `Context / Notes:\n${contextString}\n` : ''}
-Return ONLY valid JSON:
-{
-  "items": [
+    const canonicalType = resolveCanonicalType(toolType);
+    const isQuiz = canonicalType === 'quiz';
+    const isMatching = canonicalType === 'matching';
+    const isTimeline = canonicalType === 'timeline';
+    const isCrossword = canonicalType === 'crossword' || canonicalType === 'wordsearch';
+
+    let schemaTemplate = '';
+    if (isQuiz) {
+      schemaTemplate = `[
+    {
+      "id": "1",
+      "question": "Clear, specific exam question testing a key concept, convention, or fact on ${title || promptText}?",
+      "choices": ["Correct technical answer", "Plausible distractor 1", "Plausible distractor 2", "Plausible distractor 3"],
+      "answer": "Correct technical answer",
+      "explanation": "Detailed explanation of why this is correct based on the lecture material."
+    },
+    {
+      "id": "2",
+      "question": "Second specific question testing a different stage, definition, or convention on ${title || promptText}?",
+      "choices": ["Correct technical answer", "Plausible distractor 1", "Plausible distractor 2", "Plausible distractor 3"],
+      "answer": "Correct technical answer",
+      "explanation": "Detailed explanation of why this is correct based on the lecture material."
+    },
+    {
+      "id": "3",
+      "question": "Third specific question testing calculation, interpretation, or distinction on ${title || promptText}?",
+      "choices": ["Correct technical answer", "Plausible distractor 1", "Plausible distractor 2", "Plausible distractor 3"],
+      "answer": "Correct technical answer",
+      "explanation": "Detailed explanation of why this is correct based on the lecture material."
+    },
+    {
+      "id": "4",
+      "question": "Fourth specific question testing practical application or rule on ${title || promptText}?",
+      "choices": ["Correct technical answer", "Plausible distractor 1", "Plausible distractor 2", "Plausible distractor 3"],
+      "answer": "Correct technical answer",
+      "explanation": "Detailed explanation of why this is correct based on the lecture material."
+    },
+    {
+      "id": "5",
+      "question": "Fifth specific question testing critical common misconception or standard on ${title || promptText}?",
+      "choices": ["Correct technical answer", "Plausible distractor 1", "Plausible distractor 2", "Plausible distractor 3"],
+      "answer": "Correct technical answer",
+      "explanation": "Detailed explanation of why this is correct based on the lecture material."
+    }
+  ]`;
+    } else if (isCrossword) {
+      schemaTemplate = `[
+    { "id": "1", "word": "LINEWEIGHT", "clue": "The variation of line thickness used to communicate depth and cuts" },
+    { "id": "2", "word": "ELEVATION", "clue": "An orthographic exterior projection of a building facade" },
+    { "id": "3", "word": "SECTION", "clue": "A vertical cut through a building revealing interior construction assemblies" },
+    { "id": "4", "word": "SCALE", "clue": "The proportional ratio of drawing dimensions to real world measurements" },
+    { "id": "5", "word": "HATCHING", "clue": "Graphic patterns representing distinct materials like concrete or insulation" },
+    { "id": "6", "word": "DIMENSION", "clue": "Numerical measurement shown between reference extension lines" }
+  ]`;
+    } else if (isMatching) {
+      schemaTemplate = `[
+    { "id": "1", "left": "Technical Term 1", "right": "Accurate Definition / Rule 1" },
+    { "id": "2", "left": "Technical Term 2", "right": "Accurate Definition / Rule 2" },
+    { "id": "3", "left": "Technical Term 3", "right": "Accurate Definition / Rule 3" },
+    { "id": "4", "left": "Technical Term 4", "right": "Accurate Definition / Rule 4" },
+    { "id": "5", "left": "Technical Term 5", "right": "Accurate Definition / Rule 5" }
+  ]`;
+    } else if (isTimeline) {
+      schemaTemplate = `[
+    { "id": "1", "position": 1, "text": "Step 1: First Stage / Principle", "detail": "Specific mechanism and requirements 1" },
+    { "id": "2", "position": 2, "text": "Step 2: Second Stage / Action", "detail": "Specific mechanism and requirements 2" },
+    { "id": "3", "position": 3, "text": "Step 3: Third Stage / Action", "detail": "Specific mechanism and requirements 3" },
+    { "id": "4", "position": 4, "text": "Step 4: Fourth Stage / Action", "detail": "Specific mechanism and requirements 4" },
+    { "id": "5", "position": 5, "text": "Step 5: Final Stage / Outcome", "detail": "Specific mechanism and requirements 5" }
+  ]`;
+    } else {
+      schemaTemplate = `[
     { "id": "1", "front": "Specific Stage / Concept 1 on ${promptText}", "back": "Accurate, concise explanation, inputs/outputs and facts 1" },
     { "id": "2", "front": "Specific Stage / Concept 2 on ${promptText}", "back": "Accurate, concise explanation, inputs/outputs and facts 2" },
     { "id": "3", "front": "Specific Stage / Concept 3 on ${promptText}", "back": "Accurate, concise explanation, inputs/outputs and facts 3" },
     { "id": "4", "front": "Specific Stage / Concept 4 on ${promptText}", "back": "Accurate, concise explanation, inputs/outputs and facts 4" },
     { "id": "5", "front": "Specific Stage / Concept 5 on ${promptText}", "back": "Accurate, concise explanation, inputs/outputs and facts 5" }
-  ]
+  ]`;
+    }
+
+    const itemsPrompt = `You are an elite academic curriculum architect and exam writer. Generate at least 5 to 6 authentic, syllabus-accurate study items for: "${promptText}".
+Topic: ${title || promptText}
+Tool Archetype: ${canonicalType}
+${contextString ? `Grounding Material & Lecture Notes:\n${contextString}\n` : ''}
+
+CRITICAL RULES:
+- Every item MUST directly test authentic domain facts, definitions, rules, conventions, and terminology from the topic/lecture.
+- NEVER use generic placeholders or survey choices like "I know this" or "Not applicable".
+- For multiple choice quizzes: Provide 4 distinct options (1 correct answer and 3 believable distractors).
+
+Return ONLY valid JSON:
+{
+  "items": ${schemaTemplate}
 }`;
 
     try {
       const fallbackList = await generateItemsWithFallback(
-        () => toolGenAI(itemsPrompt, undefined, 0.3, 2000, { forceJson: false }),
-        () => toolGenAI(itemsPrompt, 'qwen/qwen3.6-27b', 0.3, 2000, { forceJson: false }),
+        () => toolGenAI(itemsPrompt, undefined, 0.2, 450, { forceJson: false }),
+        () => toolGenAI(itemsPrompt, 'qwen/qwen3.6-27b', 0.2, 450, { forceJson: false }),
         safeParse
       );
 
