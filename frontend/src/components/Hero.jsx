@@ -344,14 +344,19 @@ const VelaScrollShowcase = () => {
       const rect = containerRef.current.getBoundingClientRect();
       const totalScrollable = rect.height - window.innerHeight;
       if (totalScrollable <= 0) return;
+      // Scrolled distance from top of section
       const scrolled = -rect.top;
       const progress = Math.max(0, Math.min(1, scrolled / totalScrollable));
       setScrollProgress(progress);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll, { passive: true });
     handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
   }, []);
 
   // Simulation step timer
@@ -359,17 +364,17 @@ const VelaScrollShowcase = () => {
     if (!isPlaying) return;
     const timer = setInterval(() => {
       setSimStep((prev) => (prev + 1) % 4);
-    }, 2600);
+    }, 2400);
     return () => clearInterval(timer);
   }, [isPlaying]);
 
   // Derived progress transitions
-  // 0.0 -> 0.35 : Vela centered and big, intro title visible
-  // 0.35 -> 0.70 : Vela shrinks and docks to top-left, demo container expands
+  // 0.0 -> 0.40 : Vela centered and big, intro title visible
+  // 0.30 -> 0.75 : Vela shrinks and docks to top-left, demo container expands
   // 0.70 -> 1.0 : Full interactive video/demo simulation running
-  const shrinkFactor = Math.min(1, Math.max(0, (scrollProgress - 0.12) / 0.45));
-  const demoReveal = Math.min(1, Math.max(0, (scrollProgress - 0.22) / 0.4));
-  const introFade = Math.max(0, 1 - scrollProgress * 3.2);
+  const shrinkFactor = Math.min(1, Math.max(0, (scrollProgress - 0.15) / 0.5));
+  const demoReveal = Math.min(1, Math.max(0, (scrollProgress - 0.25) / 0.45));
+  const introFade = Math.max(0, 1 - scrollProgress * 2.8);
 
   const current = velaExamples[activeTab];
 
@@ -412,11 +417,19 @@ const VelaScrollShowcase = () => {
       id="vela-showcase"
       ref={containerRef}
       className="relative w-full border-t border-[#2e2e33]"
-      style={{ height: "230vh" }}
+      style={{ height: "300vh" }}
     >
-      {/* ── STICKY VIEWPORT CONTAINER (Pins while scrolling) ── */}
-      <div className="sticky top-0 h-screen w-full flex flex-col justify-center items-center overflow-hidden px-4 sm:px-8 bg-[#121214]">
+      {/* ── STICKY VIEWPORT CONTAINER (Pins firmly while scrolling through 300vh track) ── */}
+      <div className="sticky top-0 h-screen w-full flex flex-col justify-center items-center overflow-hidden px-4 sm:px-8 bg-[#121214] z-20">
         
+        {/* Pinned Scroll Progress Indicator Bar */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-[#2e2e33] z-40">
+          <div
+            className="h-full bg-blue-500 transition-all duration-75 ease-out"
+            style={{ width: `${scrollProgress * 100}%` }}
+          />
+        </div>
+
         {/* Subtle Background Radial Matrix */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-25">
           <div className="w-[800px] h-[800px] rounded-full border border-[#2e2e33]/60" />
@@ -999,7 +1012,7 @@ export default function LandingPage() {
 
   return (
     <div
-      className="min-h-screen text-[#f0f0ee] selection:bg-[#f0f0ee] selection:text-[#121214] antialiased relative overflow-x-hidden"
+      className="min-h-screen text-[#f0f0ee] selection:bg-[#f0f0ee] selection:text-[#121214] antialiased relative"
       style={{ backgroundColor: "#121214" }}
     >
       <main>
