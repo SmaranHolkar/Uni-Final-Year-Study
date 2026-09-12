@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import Vela from "./Vela";
 import learningPlaygroundImg from "../assets/learningplayground.png";
 import uploadDocsImg from "../assets/uploaddocs.png";
 import mindsMirrorImg from "../assets/mindsmirror.png";
@@ -9,8 +10,8 @@ import mindmapImg from "../assets/mindmap.png";
    SITE CONSTANTS & SEO
    ═══════════════════════════════════════════════════════════════ */
 const SITE_NAME = "HydrusLearn Pro";
-const LANDING_TITLE = "HydrusLearn Pro — Study Smarter & Ace Your Exams";
-const LANDING_DESCRIPTION = "Turn your lecture notes, slides, and PDFs into interactive quizzes, smart flashcards, and mind maps in seconds. Pinpoint your weak spots and study with confidence.";
+const LANDING_TITLE = "HydrusLearn Pro — Your Notes. Your Mistakes. Your Learning System.";
+const LANDING_DESCRIPTION = "Turn lecture slides, PDFs, and notes into grounded practice quizzes, concept maps, and mistake diagnostics with exact citations.";
 const LANDING_PATH = "/";
 
 const getBaseUrl = () =>
@@ -40,11 +41,11 @@ const upsertCanonical = (href) => {
     document.head.appendChild(link);
   }
   link.setAttribute("href", href);
-  return { tag: link, created };
+  return { tag, created };
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   DATA STRUCTURES (Student-Friendly Copy & Clean Obsidian Styling)
+   DATA STRUCTURES (Scannable, High-Signal Student Content)
    ═══════════════════════════════════════════════════════════════ */
 const featureCards = [
   {
@@ -52,7 +53,7 @@ const featureCards = [
     badgeColor: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
     title: "Directly from your lectures & notes",
     summary:
-      "Drop in your lecture slides, research papers, or syllabus notes. Every question and answer links straight back to the exact passage in your material so you know exactly where it came from.",
+      "Drop in slides, papers, or notes. Every question and answer links directly back to the exact passage so you know where it came from.",
     image: uploadDocsImg,
     alt: "Document upload interface with passage citations",
     format: "PDF, Slides, OCR, YouTube",
@@ -62,7 +63,7 @@ const featureCards = [
     badgeColor: "text-amber-400 bg-amber-500/10 border-amber-500/20",
     title: "Interactive tools built from your notes",
     summary:
-      "Turn heavy chapters into interactive flashcards, matching games, mind maps, and practice quizzes tailored specifically to what you are studying.",
+      "Turn dense chapters into active recall flashcards, matching games, and practice quizzes tailored specifically to your syllabus.",
     image: learningPlaygroundImg,
     alt: "Interactive study canvas with study tools",
     format: "Instant Flashcards & Quizzes",
@@ -72,7 +73,7 @@ const featureCards = [
     badgeColor: "text-blue-400 bg-blue-500/10 border-blue-500/20",
     title: "Pinpoint your mistakes before exam day",
     summary:
-      "Mind's Mirror looks at why you missed a question — letting you know whether it was a quick recall slip or a concept you need to review before test day.",
+      "Mind's Mirror analyzes why you missed a question — categorizing errors into simple recall slips vs deep concept gaps.",
     image: mindsMirrorImg,
     alt: "Mind's Mirror error diagnosis interface",
     format: "Personalized Progress Insights",
@@ -82,70 +83,111 @@ const featureCards = [
     badgeColor: "text-sky-400 bg-sky-500/10 border-sky-500/20",
     title: "See the big picture clearly",
     summary:
-      "Automatically connects the dots between complex ideas with interactive concept maps that make big topics easy to navigate and revise.",
+      "Automatically connects the dots between complex ideas into interactive concept maps that make revision intuitive.",
     image: mindmapImg,
     alt: "Visual concept mind map",
     format: "Interactive Visual Graphs",
   },
 ];
 
+const velaExamples = [
+  {
+    id: "cs",
+    tabLabel: "Computer Science",
+    prompt: "Make me an interactive simulation to practice CPU scheduling algorithms (FIFO vs Round Robin).",
+    toolTitle: "OS Kernel: CPU Scheduling Sandbox",
+    badge: "Interactive Node Canvas",
+    accent: "text-blue-400 border-blue-500/30 bg-blue-500/10",
+    stats: "12 Canvas Nodes • Real-time Quantum Engine • Grounded to OS Lecture 4",
+    highlightNode: {
+      title: "Round Robin Quantum Engine",
+      state: "Process P2 Active (Burst Remaining: 4ms)",
+      metric: "Time Slice: 2ms • Context Switch Overhead: 0.4ms",
+      diagnostic: "Why did P1 preempt? Quantum expired; shifted to tail of Ready Queue.",
+    },
+  },
+  {
+    id: "med",
+    tabLabel: "Biochemistry",
+    prompt: "Build me an active-recall matching tool for the 10 steps of Glycolysis with enzyme regulators.",
+    toolTitle: "Biochemistry: Glycolysis Cascade Matcher",
+    badge: "Active Recall Matrix",
+    accent: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10",
+    stats: "10 Reaction Steps • Phosphorylation Tracker • Grounded to Chapter 14",
+    highlightNode: {
+      title: "Phosphofructokinase-1 (PFK-1)",
+      state: "Rate-Limiting Step 3: Fructose-6-P → Fructose-1,6-BP",
+      metric: "Allosteric Inhibitor: ATP • Activator: AMP & F-2,6-BP",
+      diagnostic: "Active Recall Test: High cellular ATP slows glycolysis at Step 3 to conserve glucose.",
+    },
+  },
+  {
+    id: "law",
+    tabLabel: "Law & Case Studies",
+    prompt: "Create a concept tree linking Tort Law duty of care cases to the Caparo three-stage test.",
+    toolTitle: "Law: Duty of Care Case Law Graph",
+    badge: "Visual Precedent Tree",
+    accent: "text-amber-400 border-amber-500/30 bg-amber-500/10",
+    stats: "8 Key Precedents • Multi-tier Test Branching • Grounded to Syllabus Notes",
+    highlightNode: {
+      title: "Caparo v Dickman (1990)",
+      state: "Core Test: Foreseeability + Proximity + Fair/Just/Reasonable",
+      metric: "Precedent Status: Modern application qualified by Robinson (2018)",
+      diagnostic: "Application Rule: Robinson clarifies Caparo applies primarily to novel duty categories.",
+    },
+  },
+];
+
 const dialecticItems = [
   {
     number: "01",
-    title: "Making Cards by Hand",
+    title: "Manual Flashcards",
     subtitle: "Anki & Quizlet",
     description:
-      "Spending hours typing out flashcards one by one leaves you tired before you even start revising, and often misses the bigger conceptual picture.",
-    verdict: "Too much time spent typing",
+      "Typing out flashcards one by one is exhausting and misses the broader conceptual connections between lecture topics.",
+    verdict: "Hours spent typing instead of studying",
+    verdictColor: "text-[#a1a1aa]",
   },
   {
     number: "02",
     title: "Generic AI Chatbots",
     subtitle: "ChatGPT & General LLMs",
     description:
-      "Chatbots can make things up, give answers that aren't on your exam syllabus, and encourage passive reading instead of active testing.",
-    verdict: "Risky & ungrounded answers",
+      "Chatbots can hallucinate, ignore syllabus boundaries, and encourage passive reading instead of verified active recall.",
+    verdict: "Unverified, out-of-syllabus answers",
+    verdictColor: "text-[#a1a1aa]",
   },
   {
     number: "03",
     title: "HydrusLearn Pro",
     subtitle: "Your AI Study Companion",
     description:
-      "Instantly converts your lecture notes and slides into grounded quizzes, concept maps, and smart error diagnostics with direct citations.",
-    verdict: "Source-grounded study confidence",
+      "Converts your lecture notes into grounded quizzes, concept maps, and smart error diagnostics with direct paragraph citations.",
+    verdict: "Source-grounded revision confidence",
+    verdictColor: "text-emerald-400",
   },
 ];
 
 const specificationRows = [
   {
-    feature: "Lecture & Note Uploads",
-    core: "Generate quick study tools on the spot from PDFs, slides, text notes, and YouTube videos",
-    pro: "Permanent cloud document library with fast search and split-screen PDF reader",
+    feature: "Document Library & Uploads",
+    core: "Instant on-the-spot tool generation from PDFs, slides, text & YouTube",
+    pro: "Permanent cloud library with fast search & split-screen citation reader",
   },
   {
-    feature: "Active Recall Quizzes",
+    feature: "Active Recall Quizzing",
     core: "Practice quizzes with instant right/wrong answer feedback",
-    pro: "Detailed explanations with exact paragraph citations linking to your lecture slides",
+    pro: "Detailed explanations with exact paragraph citations linking to slides",
   },
   {
-    feature: "Mistake Analysis",
-    core: "Standard score summary and answer review after each quiz",
-    pro: "Mind's Mirror: categorizes mistakes into concept gaps vs memory slips over time",
+    feature: "Mistake Diagnostics",
+    core: "Standard score summary & correct answer review",
+    pro: "Mind's Mirror: separates memory slips from deep concept gaps over time",
   },
   {
-    feature: "Interactive Study Tools",
-    core: "Create flashcards, matching decks, and mind maps on demand",
-    pro: "Link study sessions to focus your revision directly on topics you struggle with",
-  },
-  {
-    feature: "AI Study Coaching",
-    core: "Direct answer explanations based on your uploaded text",
-    pro: "Socratic step-by-step tutoring that guides you through tricky exam questions",
-  },
-  {
-    feature: "Study Tool Sharing",
-    core: "Browse and use helpful study tools created by fellow students",
-    pro: "Save, organize, and customize your own study collections across semesters",
+    feature: "Interactive Study Studio (Vela)",
+    core: "Generate single interactive study tools on demand",
+    pro: "Personalized revision queues, spaced repetition & Socratic tutoring",
   },
 ];
 
@@ -178,53 +220,52 @@ const inquiries = [
 ];
 
 /* ═══════════════════════════════════════════════════════════════
-   1. HERO SECTION — CLEAN EDITORIAL OBSIDIAN CANVAS
+   1. HERO SECTION — DISTINCT VALUE PROPOSITION
    ═══════════════════════════════════════════════════════════════ */
 const HeroSection = () => {
   return (
-    <header className="relative min-h-[75vh] pt-24 sm:pt-32 pb-20 px-6 sm:px-12 max-w-[1400px] mx-auto flex flex-col justify-center overflow-hidden">
+    <header className="relative min-h-[75vh] pt-24 sm:pt-32 pb-16 px-6 sm:px-12 max-w-[1400px] mx-auto flex flex-col justify-center overflow-hidden">
       {/* ── SUBTLE GEOMETRIC ARCHITECTURAL BACKGROUND ── */}
       <div
-        className="pointer-events-none absolute right-[5%] top-[12%] -z-10 w-[600px] h-[600px] flex items-center justify-center opacity-40"
+        className="pointer-events-none absolute right-[4%] top-[12%] -z-10 w-[560px] h-[560px] flex items-center justify-center opacity-35"
         aria-hidden="true"
       >
-        <div className="absolute w-[560px] h-[560px] rounded-full border border-[#2e2e33]" />
-        <div className="absolute w-[420px] h-[420px] rounded-full border border-[#2e2e33]" />
-        <div className="absolute w-[280px] h-[280px] rounded-full border border-[#2e2e33]" />
-        <div className="w-[180px] h-[180px] rounded-full bg-[#18181b] border border-[#38383f]" />
+        <div className="absolute w-[540px] h-[540px] rounded-full border border-[#2e2e33]" />
+        <div className="absolute w-[390px] h-[390px] rounded-full border border-[#2e2e33]" />
+        <div className="absolute w-[240px] h-[240px] rounded-full border border-[#2e2e33]" />
+        <div className="w-[140px] h-[140px] rounded-full bg-[#18181b] border border-[#38383f]" />
       </div>
 
-      {/* ── DISPLAY HEADLINE (Clean Editorial Typography) ── */}
-      <div className="max-w-[900px] z-10 pb-8">
+      {/* ── DISPLAY HEADLINE (Unique Positioning) ── */}
+      <div className="max-w-[950px] z-10 pb-4">
         <h1
-          className="text-[#f0f0ee] text-4xl sm:text-6xl md:text-7xl font-normal tracking-tight leading-[1.08] select-none"
+          className="text-[#f0f0ee] text-4xl sm:text-6xl md:text-7xl font-normal tracking-tight leading-[1.06] select-none"
           style={{ fontFeatureSettings: '"cv01", "ss03"' }}
         >
-          <span className="block">Study smarter.</span>
-          <span className="block text-[#a1a1aa]">Revise faster.</span>
-          <span className="block text-[#f0f0ee]">Ace your exams.</span>
+          <span className="block">Your notes. Your mistakes.</span>
+          <span className="block text-[#a1a1aa]">Your learning system.</span>
         </h1>
 
-        <p className="mt-6 text-lg sm:text-xl text-[#a1a1aa] max-w-[48ch] leading-relaxed">
-          Turn your lecture slides, notes, and textbooks into grounded practice quizzes, concept maps, and mistake diagnostics in seconds.
+        <p className="mt-6 text-lg sm:text-xl text-[#d4d4d8] max-w-[50ch] leading-relaxed">
+          Drop in your lecture slides, papers, and notes. HydrusLearn constructs grounded practice quizzes, concept maps, and smart error diagnostics with exact citations.
         </p>
 
         {/* ── HERO ACTION BUTTONS ── */}
         <div className="flex flex-wrap items-center gap-4 mt-8">
           <Link
             to="/signup"
-            className="inline-flex items-center gap-2.5 px-6 py-3 bg-[#f0f0ee] text-[#121214] hover:bg-white font-semibold text-sm transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#f0f0ee] text-[#121214] hover:bg-white font-semibold text-sm transition-colors"
             style={{ borderRadius: "10px" }}
           >
             <span>Start studying for free</span>
             <span>→</span>
           </Link>
           <a
-            href="#capabilities"
+            href="#vela-showcase"
             className="inline-flex items-center gap-2 px-5 py-3 bg-[#18181b] border border-[#2e2e33] hover:border-[#404047] text-[#f0f0ee] text-sm font-medium transition-colors"
             style={{ borderRadius: "10px" }}
           >
-            <span>Explore study tools</span>
+            <span>See Vela in action</span>
           </a>
         </div>
       </div>
@@ -233,20 +274,20 @@ const HeroSection = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   2. SYSTEM CAPABILITIES — CLEAN SOLID TILES
+   2. SYSTEM CAPABILITIES — CLEAN SOLID TILES (Short Copy)
    ═══════════════════════════════════════════════════════════════ */
 const CapabilitiesSection = () => (
   <section id="capabilities" className="py-20 px-6 sm:px-12 max-w-[1400px] mx-auto border-t border-[#2e2e33]">
-    <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 mb-14">
+    <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 mb-12">
       <div>
-        <div className="text-xs text-[#a1a1aa] font-mono uppercase tracking-wider mb-3">
-          ✦ Study Tools
+        <div className="text-xs text-[#a1a1aa] font-mono uppercase tracking-wider mb-2">
+          ✦ Core Capabilities
         </div>
         <h2 className="text-3xl sm:text-4xl md:text-5xl font-normal text-[#f0f0ee] tracking-tight leading-tight max-w-[20ch]">
           Everything you need to master tough topics.
         </h2>
       </div>
-      <div className="text-base sm:text-lg text-[#a1a1aa] max-w-[36ch] leading-relaxed">
+      <div className="text-sm sm:text-base text-[#a1a1aa] max-w-[36ch] leading-relaxed">
         Turn heavy slide decks and textbooks into interactive, enjoyable study tools in seconds.
       </div>
     </div>
@@ -256,11 +297,11 @@ const CapabilitiesSection = () => (
       {featureCards.map((card) => (
         <div
           key={card.title}
-          className="bg-[#18181b] p-7 sm:p-9 border border-[#2e2e33] flex flex-col justify-between space-y-6 transition-colors duration-200 overflow-hidden"
+          className="bg-[#18181b] p-6 sm:p-8 border border-[#2e2e33] flex flex-col justify-between space-y-5 overflow-hidden"
           style={{ borderRadius: "12px" }}
         >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between text-xs sm:text-sm font-mono pb-3 border-b border-[#2e2e33]">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs font-mono pb-2.5 border-b border-[#2e2e33]">
               <span className={`px-2.5 py-0.5 rounded-full border ${card.badgeColor}`}>
                 {card.label}
               </span>
@@ -269,12 +310,12 @@ const CapabilitiesSection = () => (
             <h3 className="text-xl sm:text-2xl font-normal text-[#f0f0ee] tracking-tight leading-snug">
               {card.title}
             </h3>
-            <p className="text-sm sm:text-base text-[#a1a1aa] leading-relaxed max-w-[50ch]">
+            <p className="text-sm sm:text-base text-[#a1a1aa] leading-relaxed max-w-[48ch]">
               {card.summary}
             </p>
           </div>
 
-          <div className="border border-[#2e2e33] bg-[#121214] overflow-hidden mt-4 rounded-lg">
+          <div className="border border-[#2e2e33] bg-[#121214] overflow-hidden mt-3 rounded-lg">
             <img
               src={card.image}
               alt={card.alt}
@@ -288,12 +329,144 @@ const CapabilitiesSection = () => (
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   3. CRITICAL COMPARISON (Clean Multi-Method Breakdown)
+   3. VELA STUDIO SHOWCASE — “TELL VELA WHAT TO BUILD” (Killer Moment)
+   ═══════════════════════════════════════════════════════════════ */
+const VelaShowcaseSection = () => {
+  const [activeTab, setActiveTab] = useState(0);
+  const current = velaExamples[activeTab];
+
+  return (
+    <section id="vela-showcase" className="py-20 px-6 sm:px-12 max-w-[1400px] mx-auto border-t border-[#2e2e33]">
+      <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 mb-12">
+        <div>
+          <div className="flex items-center gap-2 text-xs text-blue-400 font-mono uppercase tracking-wider mb-2">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            <span>Adaptive Tool Synthesis</span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-normal text-[#f0f0ee] tracking-tight leading-tight max-w-[20ch]">
+            Tell Vela what to build.
+          </h2>
+        </div>
+        <div className="text-sm sm:text-base text-[#a1a1aa] max-w-[42ch] leading-relaxed">
+          Vela doesn't just answer questions — it compiles customized interactive study sandboxes, simulations, and active-recall games directly from your syllabus.
+        </div>
+      </div>
+
+      {/* Vela Interactive Demo Container */}
+      <div
+        className="bg-[#18181b] border border-[#2e2e33] overflow-hidden shadow-2xl"
+        style={{ borderRadius: "14px" }}
+      >
+        {/* Top Subject Switcher Tabs */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#2e2e33] bg-[#141417]">
+          <div className="flex items-center gap-3">
+            <Vela size={32} color="#60a5fa" />
+            <div>
+              <div className="text-xs font-semibold text-[#f0f0ee] flex items-center gap-1.5">
+                <span>Vela AI Engine</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                  Ready
+                </span>
+              </div>
+              <div className="text-[11px] text-[#a1a1aa]">Autonomous Study Tool Compiler</div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {velaExamples.map((ex, idx) => (
+              <button
+                key={ex.id}
+                onClick={() => setActiveTab(idx)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  activeTab === idx
+                    ? "bg-[#27272a] text-[#f0f0ee] border border-[#3f3f46]"
+                    : "text-[#a1a1aa] hover:text-[#f0f0ee] hover:bg-[#1f1f23]"
+                }`}
+              >
+                {ex.tabLabel}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Interactive Showcase Body */}
+        <div className="p-6 sm:p-8 space-y-6">
+          {/* User Prompt Box */}
+          <div className="space-y-2">
+            <div className="text-xs font-mono text-[#a1a1aa] uppercase tracking-wider flex items-center gap-1.5">
+              <span>Student Prompt:</span>
+            </div>
+            <div className="p-4 rounded-xl bg-[#131519] border border-[#2e2e33] flex items-start gap-3">
+              <span className="text-base">💬</span>
+              <p className="text-sm sm:text-base font-medium text-[#f0f0ee] italic leading-relaxed">
+                "{current.prompt}"
+              </p>
+            </div>
+          </div>
+
+          {/* Generated Sandbox Preview */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                <span>✨</span> Compiled Interactive Sandbox
+              </span>
+              <span className="text-[#a1a1aa]">{current.stats}</span>
+            </div>
+
+            {/* Simulated Live Canvas Node Card */}
+            <div className="p-5 sm:p-6 rounded-xl bg-[#111317] border border-[#38383f] space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#27272a]">
+                <div>
+                  <div className="text-base font-semibold text-[#f0f0ee]">{current.toolTitle}</div>
+                  <div className="text-xs text-[#a1a1aa] mt-0.5">{current.highlightNode.state}</div>
+                </div>
+                <span className={`self-start sm:self-auto px-2.5 py-0.5 rounded-full text-xs font-mono border ${current.accent}`}>
+                  {current.badge}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+                <div className="p-3 rounded-lg bg-[#18181b] border border-[#2e2e33] space-y-1">
+                  <div className="text-[#a1a1aa] uppercase text-[10px]">Real-time State &amp; Metrics</div>
+                  <div className="text-[#f0f0ee] font-medium">{current.highlightNode.metric}</div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-[#18181b] border border-[#2e2e33] space-y-1">
+                  <div className="text-emerald-400 uppercase text-[10px]">Active Recall Socratic Diagnostic</div>
+                  <div className="text-[#d4d4d8] font-normal leading-relaxed">{current.highlightNode.diagnostic}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Action Strip */}
+          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-[#2e2e33]">
+            <p className="text-xs text-[#a1a1aa]">
+              Build your own custom interactive modules in the free standalone sandbox.
+            </p>
+            <a
+              href="http://localhost:5174"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#f0f0ee] text-[#121214] hover:bg-white text-xs font-semibold rounded-lg transition-colors self-start sm:self-auto"
+            >
+              <span>Launch Free Sandbox</span>
+              <span>→</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   4. CRITICAL COMPARISON (Scannable Multi-Method Contrast)
    ═══════════════════════════════════════════════════════════════ */
 const ComparisonSection = () => (
   <section className="py-20 px-6 sm:px-12 max-w-[1400px] mx-auto border-t border-[#2e2e33]">
-    <div className="mb-14">
-      <div className="text-xs text-[#a1a1aa] font-mono uppercase tracking-wider mb-3">
+    <div className="mb-12">
+      <div className="text-xs text-[#a1a1aa] font-mono uppercase tracking-wider mb-2">
         ✦ Why It Works
       </div>
       <h2 className="text-3xl sm:text-4xl md:text-5xl font-normal text-[#f0f0ee] tracking-tight leading-tight max-w-[22ch]">
@@ -301,19 +474,19 @@ const ComparisonSection = () => (
       </h2>
     </div>
 
-    {/* 3-Column Comparison with Solid Highlight */}
+    {/* 3-Column Comparison */}
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-[#2e2e33] border-y border-[#2e2e33]">
       {dialecticItems.map((item, index) => {
         const isHydrus = index === 2;
         return (
           <div
             key={item.title}
-            className={`p-7 sm:p-9 flex flex-col justify-between space-y-6 ${
+            className={`p-6 sm:p-8 flex flex-col justify-between space-y-6 ${
               isHydrus ? "bg-[#18181b] relative border-l lg:border-l-0 border-[#3b82f6]/40" : "bg-transparent"
             }`}
           >
-            <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs sm:text-sm font-mono">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs font-mono">
                 <span className={isHydrus ? "text-blue-400 font-semibold" : "text-[#a1a1aa]"}>
                   Method {item.number} • {item.subtitle}
                 </span>
@@ -326,16 +499,14 @@ const ComparisonSection = () => (
               <h3 className="text-xl sm:text-2xl font-normal text-[#f0f0ee] tracking-tight">
                 {item.title}
               </h3>
-              <p className="text-sm sm:text-base text-[#a1a1aa] leading-relaxed max-w-[36ch]">
+              <p className="text-sm text-[#a1a1aa] leading-relaxed max-w-[36ch]">
                 {item.description}
               </p>
             </div>
 
-            <div className={`pt-4 text-sm font-mono border-t border-[#2e2e33] flex items-center justify-between ${
-              isHydrus ? "text-emerald-400 font-medium" : "text-[#a1a1aa]"
-            }`}>
+            <div className={`pt-3.5 text-xs sm:text-sm font-mono border-t border-[#2e2e33] flex items-center justify-between ${item.verdictColor}`}>
               <span>Result:</span>
-              <span>{item.verdict}</span>
+              <span className="text-right">{item.verdict}</span>
             </div>
           </div>
         );
@@ -345,12 +516,12 @@ const ComparisonSection = () => (
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   4. TWO EDITIONS & SPECIFICATION MATRIX (Solid Clean Plan Cards)
+   5. TWO EDITIONS & SCANNABLE SPECIFICATION MATRIX
    ═══════════════════════════════════════════════════════════════ */
 const EditionsSection = () => (
   <section id="compare-editions" className="py-20 px-6 sm:px-12 max-w-[1400px] mx-auto border-t border-[#2e2e33]">
-    <div className="mb-14">
-      <div className="text-xs text-[#a1a1aa] font-mono uppercase tracking-wider mb-3">
+    <div className="mb-12">
+      <div className="text-xs text-[#a1a1aa] font-mono uppercase tracking-wider mb-2">
         ✦ Simple Plans
       </div>
       <h2 className="text-3xl sm:text-4xl md:text-5xl font-normal text-[#f0f0ee] tracking-tight leading-tight max-w-[20ch]">
@@ -359,39 +530,35 @@ const EditionsSection = () => (
     </div>
 
     {/* Side-by-Side Edition Tiles */}
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-16">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-14">
       {/* Core Sandbox */}
       <div
-        className="bg-[#18181b] p-7 sm:p-10 border border-[#2e2e33] flex flex-col justify-between space-y-6"
+        className="bg-[#18181b] p-6 sm:p-8 border border-[#2e2e33] flex flex-col justify-between space-y-6"
         style={{ borderRadius: "12px" }}
       >
-        <div className="space-y-5">
-          <div className="flex items-center justify-between pb-4 border-b border-[#2e2e33]">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between pb-3.5 border-b border-[#2e2e33]">
             <h3 className="text-2xl font-normal text-[#f0f0ee]">Hydruslearn Core</h3>
             <span className="text-xs font-mono text-[#a1a1aa] px-2.5 py-1 border border-[#2e2e33] rounded-full">
               Free Forever
             </span>
           </div>
-          <p className="text-sm sm:text-base text-[#a1a1aa] leading-relaxed max-w-[44ch]">
-            Perfect for quick revision sessions. Paste your notes and generate flashcards, mind maps, and practice quizzes right away.
+          <p className="text-sm text-[#a1a1aa] leading-relaxed max-w-[44ch]">
+            Instant study tool generator. Drop in notes and build flashcards, mind maps, and practice quizzes on the spot.
           </p>
 
-          <ul className="space-y-3 pt-2 text-sm sm:text-base text-[#f0f0ee]">
-            <li className="flex items-center gap-3">
-              <span className="text-[#a1a1aa] font-mono text-sm">■</span>
-              <span>Instant study tool generator from text or prompts</span>
+          <ul className="space-y-2.5 pt-1 text-sm text-[#f0f0ee]">
+            <li className="flex items-center gap-2.5">
+              <span className="text-[#a1a1aa] font-mono text-xs">■</span>
+              <span>Instant tool generator from text, PDFs, or YouTube links</span>
             </li>
-            <li className="flex items-center gap-3">
-              <span className="text-[#a1a1aa] font-mono text-sm">■</span>
-              <span>Supports PDFs, notes, OCR images &amp; YouTube links</span>
+            <li className="flex items-center gap-2.5">
+              <span className="text-[#a1a1aa] font-mono text-xs">■</span>
+              <span>Side-by-side document reader with citations</span>
             </li>
-            <li className="flex items-center gap-3">
-              <span className="text-[#a1a1aa] font-mono text-sm">■</span>
-              <span>Side-by-side document split reader with citations</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <span className="text-[#a1a1aa] font-mono text-sm">■</span>
-              <span>Explore and use community-created study tools</span>
+            <li className="flex items-center gap-2.5">
+              <span className="text-[#a1a1aa] font-mono text-xs">■</span>
+              <span>Access to community study tool marketplace</span>
             </li>
           </ul>
         </div>
@@ -410,36 +577,32 @@ const EditionsSection = () => (
 
       {/* Pro Platform */}
       <div
-        className="bg-[#18181b] p-7 sm:p-10 border border-[#3b82f6]/40 flex flex-col justify-between space-y-6"
+        className="bg-[#18181b] p-6 sm:p-8 border border-[#3b82f6]/40 flex flex-col justify-between space-y-6"
         style={{ borderRadius: "12px" }}
       >
-        <div className="space-y-5">
-          <div className="flex items-center justify-between pb-4 border-b border-[#2e2e33]">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between pb-3.5 border-b border-[#2e2e33]">
             <h3 className="text-2xl font-normal text-[#f0f0ee]">Hydruslearn Pro</h3>
             <span className="text-xs font-mono text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2.5 py-1 font-medium rounded-full">
               ★ Student Favorite
             </span>
           </div>
-          <p className="text-sm sm:text-base text-[#cbd5e1] leading-relaxed max-w-[44ch]">
-            Your complete study suite. Saves all your documents in one place, tracks your progress over time, and coaches you through difficult concepts.
+          <p className="text-sm text-[#cbd5e1] leading-relaxed max-w-[44ch]">
+            Your persistent study hub. Saves your document library, diagnoses weak spots with Mind's Mirror, and guides you with Socratic tutoring.
           </p>
 
-          <ul className="space-y-3 pt-2 text-sm sm:text-base text-[#f0f0ee]">
-            <li className="flex items-center gap-3">
-              <span className="text-emerald-400 font-mono text-sm">✓</span>
-              <span>Unlimited cloud document storage &amp; in-app PDF reader</span>
+          <ul className="space-y-2.5 pt-1 text-sm text-[#f0f0ee]">
+            <li className="flex items-center gap-2.5">
+              <span className="text-emerald-400 font-mono text-xs">✓</span>
+              <span>Unlimited cloud document library &amp; citation split viewer</span>
             </li>
-            <li className="flex items-center gap-3">
-              <span className="text-blue-400 font-mono text-sm">✓</span>
-              <span>Mind's Mirror: reveals your exact concept gaps</span>
+            <li className="flex items-center gap-2.5">
+              <span className="text-blue-400 font-mono text-xs">✓</span>
+              <span>Mind's Mirror: separates recall slips from concept gaps</span>
             </li>
-            <li className="flex items-center gap-3">
-              <span className="text-amber-400 font-mono text-sm">✓</span>
-              <span>Socratic step-by-step tutoring on tough questions</span>
-            </li>
-            <li className="flex items-center gap-3">
-              <span className="text-emerald-400 font-mono text-sm">✓</span>
-              <span>Save quiz history &amp; revision sessions across devices</span>
+            <li className="flex items-center gap-2.5">
+              <span className="text-emerald-400 font-mono text-xs">✓</span>
+              <span>Socratic step-by-step guidance &amp; spaced repetition history</span>
             </li>
           </ul>
         </div>
@@ -455,10 +618,10 @@ const EditionsSection = () => (
       </div>
     </div>
 
-    {/* Architectural Specification Table */}
+    {/* Architectural Specification Table (Scannable 4-Row Matrix) */}
     <div className="border-t border-b border-[#2e2e33]">
-      <div className="py-5 flex items-center justify-between">
-        <h3 className="text-xl font-normal text-[#f0f0ee]">
+      <div className="py-4 flex items-center justify-between">
+        <h3 className="text-lg font-normal text-[#f0f0ee]">
           Feature Breakdown
         </h3>
         <span className="text-xs font-mono text-[#a1a1aa]">
@@ -470,19 +633,19 @@ const EditionsSection = () => (
         {specificationRows.map((row) => (
           <div
             key={row.feature}
-            className="grid grid-cols-1 lg:grid-cols-12 py-5 gap-4 items-start"
+            className="grid grid-cols-1 lg:grid-cols-12 py-4 gap-3 items-start"
           >
-            <div className="lg:col-span-4 text-sm sm:text-base font-medium text-[#f0f0ee] max-w-[28ch]">
+            <div className="lg:col-span-4 text-sm font-medium text-[#f0f0ee] max-w-[28ch]">
               {row.feature}
             </div>
-            <div className="lg:col-span-4 text-sm text-[#a1a1aa] leading-relaxed max-w-[36ch]">
-              <span className="text-xs font-mono text-[#a1a1aa] block mb-1 font-medium">
+            <div className="lg:col-span-4 text-xs sm:text-sm text-[#a1a1aa] leading-relaxed max-w-[36ch]">
+              <span className="text-xs font-mono text-[#a1a1aa] block mb-0.5 font-medium">
                 Core Sandbox
               </span>
               {row.core}
             </div>
-            <div className="lg:col-span-4 text-sm text-[#f0f0ee] leading-relaxed max-w-[36ch]">
-              <span className="text-xs font-mono text-blue-400 block mb-1 font-semibold">
+            <div className="lg:col-span-4 text-xs sm:text-sm text-[#f0f0ee] leading-relaxed max-w-[36ch]">
+              <span className="text-xs font-mono text-blue-400 block mb-0.5 font-semibold">
                 Pro Platform
               </span>
               {row.pro}
@@ -495,7 +658,7 @@ const EditionsSection = () => (
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   5. INQUIRIES (FAQ) (Clean Editorial Accordion)
+   6. INQUIRIES (FAQ) (Clean Editorial Accordion)
    ═══════════════════════════════════════════════════════════════ */
 const InquiriesSection = () => {
   const [openIndex, setOpenIndex] = useState(null);
@@ -514,7 +677,7 @@ const InquiriesSection = () => {
           <h2 className="text-3xl sm:text-4xl font-normal text-[#f0f0ee] tracking-tight leading-tight max-w-[18ch]">
             Frequently Asked Questions
           </h2>
-          <p className="text-sm sm:text-base text-[#a1a1aa] leading-relaxed max-w-[32ch]">
+          <p className="text-sm text-[#a1a1aa] leading-relaxed max-w-[32ch]">
             Quick answers about uploading notes, privacy, and how it helps you study.
           </p>
         </div>
@@ -523,7 +686,7 @@ const InquiriesSection = () => {
           {inquiries.map((item, idx) => {
             const isOpen = openIndex === idx;
             return (
-              <div key={idx} className="py-5">
+              <div key={idx} className="py-4">
                 <button
                   onClick={() => toggle(idx)}
                   className="w-full flex items-center justify-between text-left group py-1"
@@ -537,7 +700,7 @@ const InquiriesSection = () => {
                 </button>
 
                 {isOpen && (
-                  <p className="pt-3 pb-2 text-sm sm:text-base text-[#a1a1aa] leading-relaxed font-normal max-w-[58ch]">
+                  <p className="pt-2.5 pb-1 text-sm text-[#a1a1aa] leading-relaxed font-normal max-w-[58ch]">
                     {item.answer}
                   </p>
                 )}
@@ -551,7 +714,7 @@ const InquiriesSection = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   6. EPILOGUE & FOOTER (Clean Solid Finish)
+   7. EPILOGUE & FOOTER (Clean Solid Finish)
    ═══════════════════════════════════════════════════════════════ */
 const EpilogueSection = () => (
   <section className="py-20 px-6 sm:px-12 max-w-[1400px] mx-auto border-t border-[#2e2e33]">
@@ -566,7 +729,7 @@ const EpilogueSection = () => (
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-normal text-[#f0f0ee] tracking-tight leading-tight">
           Make your next study session your best one.
         </h2>
-        <p className="text-sm sm:text-base text-[#a1a1aa] leading-relaxed">
+        <p className="text-sm text-[#a1a1aa] leading-relaxed">
           Drop in your lecture notes and see how easy revision can be.
         </p>
       </div>
@@ -654,6 +817,7 @@ export default function LandingPage() {
       <main>
         <HeroSection />
         <CapabilitiesSection />
+        <VelaShowcaseSection />
         <ComparisonSection />
         <EditionsSection />
         <InquiriesSection />
