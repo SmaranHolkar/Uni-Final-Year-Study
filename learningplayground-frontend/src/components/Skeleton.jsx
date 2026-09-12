@@ -13,7 +13,7 @@ export function Skeleton({ className = '', style = {}, rounded = '0.5rem' }) {
   )
 }
 
-export function FullscreenSkeleton({ message = 'Loading Learning Playground...' }) {
+export function FullscreenSkeleton({ message = 'Loading Hydruslearn...' }) {
   return (
     <div
       className="flex h-screen items-center justify-center bg-[#131519] text-[#CDD1D6]"

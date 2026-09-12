@@ -1,4 +1,4 @@
-import { saveQuizMindmap as saveQuizMindmapService, getUserQuizzesMindmaps, getQuizById, shareQuizMindmap, getSharedWithMe } from './quiz.service.js';
+import { saveQuizMindmap as saveQuizMindmapService, getUserQuizzesMindmaps, getQuizById, updateQuizMindmap as updateQuizMindmapService, shareQuizMindmap, getSharedWithMe } from './quiz.service.js';
 import { generateMetacognitiveAnalysis } from '../ai/ml.engine.js';
 import { recordQuizOutcome } from '../../shared/services/tier.service.js';
 
@@ -116,6 +116,55 @@ export async function shareMindmapController(req, res) {
     if (error.code === 'SELF_SHARE') return res.status(400).json({ success: false, message: 'You cannot share with yourself' });
     console.error('Error sharing mindmap:', error);
     return res.status(500).json({ success: false, message: 'Failed to share mindmap' });
+  }
+}
+
+// Get a single quiz by ID for the authenticated user
+export async function getQuizByIdController(req, res) {
+  try {
+    const { quizId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User not authenticated' });
+    }
+
+    const quizData = await getQuizById(quizId, userId);
+    if (!quizData) {
+      return res.status(404).json({ success: false, error: 'Quiz not found' });
+    }
+
+    return res.json({ success: true, quiz: quizData });
+  } catch (error) {
+    console.error('Error fetching quiz by ID:', error);
+    return res.status(500).json({ success: false, error: 'Failed to fetch quiz details' });
+  }
+}
+
+// Update the mindmap of an existing quiz
+export async function updateQuizMindmapController(req, res) {
+  try {
+    const { quizId } = req.params;
+    const userId = req.user?.id;
+    const { mindmapNodes } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User not authenticated' });
+    }
+
+    if (!mindmapNodes) {
+      return res.status(400).json({ success: false, error: 'mindmapNodes is required' });
+    }
+
+    const updated = await updateQuizMindmapService({ quizId, userId, mindmapNodes });
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'Quiz not found or not owned by you' });
+    }
+
+    return res.json({ success: true, quiz: updated });
+  } catch (error) {
+    console.error('Error updating quiz mindmap:', error);
+    return res.status(500).json({ success: false, error: 'Failed to update mindmap' });
   }
 }
 

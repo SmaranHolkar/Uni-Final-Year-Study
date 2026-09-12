@@ -543,7 +543,7 @@ export default function GroundedChatHub() {
                         <button
                           style={styles.exportBtn}
                           onClick={() => handleExportToPlayground(m.text)}
-                          title="Generate Mindmap or Quiz in Learning Playground"
+                          title="Generate Mindmap or Quiz in Interactive Studio"
                         >
                           <Zap size={13} /> Convert to Interactive Study Tool
                         </button>

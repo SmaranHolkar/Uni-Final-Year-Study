@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 import { useSEO } from "../hooks/useSEO";
+import PublicPageBackground from "../components/PublicPageBackground";
 
 const sections = [
   {
     title: "1. Who We Are",
-    content: `HydrusLearn ("we", "us", "our") operates the HydrusLearn platform — an AI-powered study tool available at hydruslearn.com. This Privacy Policy explains how we collect, use, store, and protect your personal information when you use our Service.\n\nIf you have any questions about this policy, you can contact us at support@hydruslearn.com.`,
+    content: `HydrusLearn ("we", "us", "our") operates the HydrusLearn platform — an advanced AI-powered study tool available at hydruslearn.com. This Privacy Policy explains how we collect, use, store, and protect your personal information when you use our Service.\n\nIf you have any questions about this policy, you can contact us at support@hydruslearn.com.`,
   },
   {
     title: "2. Information We Collect",
@@ -32,7 +33,7 @@ const sections = [
   },
   {
     title: "8. Cookies and Tracking",
-    content: `HydrusLearn uses minimal cookies and local storage to maintain your session and remember your preferences (such as light/dark mode). We do not use third-party advertising cookies or tracking pixels.\n\nWe use Google Search Console for website performance insights in Google Search. Search Console reporting is based on aggregated search data and does not give us direct access to private Google account information.\n\nYou can disable cookies in your browser settings, but this may affect your ability to log in and use core features of the Service.`,
+    content: `HydrusLearn uses minimal cookies and local storage to maintain your session and remember your preferences. We do not use third-party advertising cookies or tracking pixels.\n\nWe use Google Search Console for website performance insights in Google Search. Search Console reporting is based on aggregated search data and does not give us direct access to private Google account information.\n\nYou can disable cookies in your browser settings, but this may affect your ability to log in and use core features of the Service.`,
   },
   {
     title: "9. Your Rights",
@@ -60,51 +61,52 @@ const sections = [
   },
 ];
 
-// Handles PrivacyPolicy logic.
 export default function PrivacyPolicy() {
   useSEO({
     title: "Privacy Policy | HydrusLearn",
     description: "Read the HydrusLearn Privacy Policy. We explain what data we collect, why we collect it, and how we keep your uploaded content and personal information secure.",
     path: "/privacy",
   });
+
   return (
-    <div className="min-h-screen px-4 py-16">
-      <div className="mx-auto max-w-3xl">
+    <div className="relative min-h-screen bg-[#121214] text-[#f0f0ee] px-4 py-16 selection:bg-[#f0f0ee] selection:text-[#121214]">
+      <PublicPageBackground />
+      <div className="relative z-10 mx-auto max-w-3xl">
         {/* Header */}
         <div className="mb-10">
           <Link
             to="/"
-            className="mb-6 inline-flex items-center gap-1 text-sm text-[var(--muted-foreground)] transition-opacity hover:opacity-80"
+            className="mb-6 inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-[#a1a1a6] hover:text-[#f0f0ee] transition-colors"
           >
             ← Back to home
           </Link>
-          <h1 className="mt-4 text-4xl font-bold text-[var(--foreground)]">
+          <h1 className="mt-4 text-3xl sm:text-4xl font-semibold tracking-tight text-[#f0f0ee]">
             Privacy Policy
           </h1>
-          <p className="mt-2 text-sm text-[var(--muted-foreground)]">
+          <p className="mt-2 text-xs text-[#a1a1a6]">
             Last updated: May 24, 2026
           </p>
-          <p className="mt-4 text-[var(--muted-foreground)]">
+          <p className="mt-4 text-sm leading-relaxed text-[#a1a1a6]">
             At HydrusLearn, we take your privacy seriously. This policy explains
             what data we collect, why we collect it, and how we protect it.
           </p>
         </div>
 
         {/* Sections */}
-        <div className="space-y-8">
+        <div className="space-y-6">
           {sections.map((section) => (
             <div
               key={section.title}
-              className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm"
+              className="card-standard"
             >
-              <h2 className="mb-3 text-lg font-semibold text-[var(--foreground)]">
+              <h2 className="mb-3 text-base font-semibold text-[#f0f0ee] tracking-tight">
                 {section.title}
               </h2>
               <div className="space-y-2">
                 {section.content.split("\n\n").map((paragraph, i) => (
                   <p
                     key={i}
-                    className="text-sm leading-relaxed text-[var(--muted-foreground)] whitespace-pre-line"
+                    className="text-sm leading-relaxed text-[#a1a1a6] whitespace-pre-line"
                   >
                     {paragraph}
                   </p>
@@ -115,28 +117,28 @@ export default function PrivacyPolicy() {
         </div>
 
         {/* Footer note */}
-        <div className="mt-10 rounded-xl border border-[var(--border)] bg-[var(--primary)]/10 p-5 text-center">
-          <p className="text-sm text-[var(--foreground)]">
+        <div className="mt-10 card-standard text-center">
+          <p className="text-sm text-[#a1a1a6]">
             By using HydrusLearn, you agree to this Privacy Policy. You can
             also review our{" "}
             <Link
               to="/terms"
-              className="font-medium text-[var(--primary)] transition-opacity hover:opacity-80"
+              className="font-medium text-[#f0f0ee] hover:underline"
             >
               Terms &amp; Conditions
             </Link>
             .
           </p>
-          <div className="mt-4 flex justify-center gap-4">
+          <div className="mt-6 flex justify-center gap-3">
             <Link
               to="/signup"
-              className="rounded-md bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              className="btn-primary inline-flex items-center justify-center px-5 py-2.5"
             >
               Create account
             </Link>
             <Link
               to="/login"
-              className="rounded-md border border-[var(--border)] bg-[var(--card)] px-5 py-2 text-sm font-medium text-[var(--foreground)] transition-opacity hover:opacity-80"
+              className="btn-secondary inline-flex items-center justify-center px-5 py-2.5"
             >
               Log in
             </Link>
@@ -146,3 +148,4 @@ export default function PrivacyPolicy() {
     </div>
   );
 }
+

@@ -86,6 +86,27 @@ export async function getQuizById(quizId, userId) {
   }
 }
 
+// Updates the mindmap for an existing quiz record
+export async function updateQuizMindmap({ quizId, userId, mindmapNodes }) {
+  const client = await pool.connect();
+  try {
+    const query = `
+      UPDATE public.quizzes_mindmaps
+      SET mindmap = $1, updated_at = NOW()
+      WHERE id = $2 AND user_id = $3
+      RETURNING id, title, quiz, mindmap;
+    `;
+    const result = await client.query(query, [
+      JSON.stringify(mindmapNodes),
+      quizId,
+      userId
+    ]);
+    return result.rows[0] || null;
+  } finally {
+    client.release();
+  }
+}
+
 // Share a quiz+mindmap with another registered user by their email
 export async function shareQuizMindmap({ senderId, recipientEmail, quizMindmapId }) {
   const client = await pool.connect();

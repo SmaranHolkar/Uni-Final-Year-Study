@@ -646,7 +646,7 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
       .quiz-card { width: 100%; max-width: 680px; margin: 1rem 0; background: var(--card); border: 1.5px solid var(--border); border-radius: 8px; padding: 2rem; }
       .choice-btn { width: 100%; text-align: left; padding: 0.95rem 1.25rem; margin-bottom: 0.65rem; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1.5px solid var(--border); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 0.95rem; line-height: 1.5; transition: all 0.15s; }
       .choice-btn:hover { border-color: var(--primary); background: rgba(90,125,153,0.15); }
-      .choice-btn.correct { background: rgba(16,185,129,0.15)!important; border-color: #10b981!important; color: #34d399!important; box-shadow: 0 0 15px rgba(16,185,129,0.2); }
+      .choice-btn.correct { background: rgba(16,185,129,0.18)!important; border-color: #10b981!important; color: #34d399!important; }
       .choice-btn.wrong { background: rgba(239,68,68,0.15)!important; border-color: #ef4444!important; color: #f87171!important; }
       .key-badge { font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px; background: #21262E; color: #94a3b8; font-family: var(--font-ui); border: 1px solid var(--border); }
       .exp-drawer { margin-top: 1.25rem; padding: 1.25rem; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); font-size: 0.9rem; line-height: 1.6; }
@@ -809,7 +809,7 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
       .matching-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; width: 100%; max-width: 780px; margin: 1.25rem 0; }
       .match-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 6px; padding: 1rem 1.25rem; cursor: pointer; transition: all 0.15s; font-size: 0.9rem; line-height: 1.5; color: #fff; user-select: none; display: flex; align-items: center; justify-content: space-between; min-height: 60px; }
       .match-card:hover { border-color: var(--primary); background: rgba(90,125,153,0.12); }
-      .match-card.selected { border-color: #38bdf8; background: rgba(56,189,248,0.15); box-shadow: 0 0 12px rgba(56,189,248,0.3); }
+      .match-card.selected { border-color: #38bdf8; background: rgba(56,189,248,0.18); }
       .match-card.matched { border-color: #10b981; background: rgba(16,185,129,0.15); color: #34d399; cursor: default; opacity: 0.7; pointer-events: none; }
       .match-card.error { border-color: #ef4444; background: rgba(239,68,68,0.15); color: #f87171; }
       @media (max-width: 640px) { .matching-grid { grid-template-columns: 1fr; gap: 1rem; } }

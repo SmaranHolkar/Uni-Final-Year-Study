@@ -3,14 +3,37 @@
    Disciplined Radii, Clean Elevation, High Contrast Typography
    ========================================================= */
 
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 .app-container {
   height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
+  max-width: 100vw;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background-color: #1e293b;
   color: #f8fafc;
+}
+
+.app-content-area {
+  flex: 1 1 0%;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .gradient-text {

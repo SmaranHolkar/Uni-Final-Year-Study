@@ -4,15 +4,15 @@ import { Link } from "react-router-dom";
 const sections = [
   {
     title: "1. Acceptance of Terms",
-    content: `By accessing or using Learning Playground ("the Service"), you confirm that you are at least 13 years of age and agree to be bound by these Terms and Conditions ("Terms"). If you do not agree to these Terms, please do not use the Service.`,
+    content: `By accessing or using Hydruslearn ("the Service"), you confirm that you are at least 13 years of age and agree to be bound by these Terms and Conditions ("Terms"). If you do not agree to these Terms, please do not use the Service.`,
   },
   {
     title: "2. Description of Service",
-    content: `Learning Playground is an AI-powered interactive study environment allowing users to generate custom revision tools — such as flashcards, Q&A sets, mindmaps, notes, and study guides — from plain-English prompts. Features may be updated or extended at any time without prior notice for educational and personal use only.`,
+    content: `Hydruslearn is an AI-powered interactive study environment allowing users to generate custom revision tools — such as flashcards, Q&A sets, mindmaps, notes, and study guides — from plain-English prompts. Features may be updated or extended at any time without prior notice for educational and personal use only.`,
   },
   {
     title: "3. User Accounts & Access",
-    content: `You may access Learning Playground as a guest or by creating an account. You are responsible for maintaining the confidentiality of your account credentials and for all activity occurring under your account.`,
+    content: `You may access Hydruslearn as a guest or by creating an account. You are responsible for maintaining the confidentiality of your account credentials and for all activity occurring under your account.`,
   },
   {
     title: "4. Acceptable Use",
@@ -20,7 +20,7 @@ const sections = [
   },
   {
     title: "5. AI-Generated Content",
-    content: `Learning Playground uses artificial intelligence to compile study widgets. AI-generated content is provided for educational assistance only and may contain errors. You should independently verify any output before relying on it for academic submissions.`,
+    content: `Hydruslearn uses artificial intelligence to compile study widgets. AI-generated content is provided for educational assistance only and may contain errors. You should independently verify any output before relying on it for academic submissions.`,
   },
   {
     title: "6. User Data & Storage",
@@ -28,11 +28,11 @@ const sections = [
   },
   {
     title: "7. Intellectual Property & Marketplace Sharing",
-    content: `When you choose to publish a tool to the public Marketplace, you grant Learning Playground a non-exclusive license to display and share the tool with the community. All platform software and branding remain the property of Learning Playground.`,
+    content: `When you choose to publish a tool to the public Marketplace, you grant Hydruslearn a non-exclusive license to display and share the tool with the community. All platform software and branding remain the property of Hydruslearn.`,
   },
   {
     title: "8. Contact Us",
-    content: `For any legal inquiries regarding Learning Playground, contact support@learningplayground.com.`,
+    content: `For any legal inquiries regarding Hydruslearn, contact support@hydruslearn.com.`,
   },
 ];
 
@@ -44,7 +44,7 @@ export default function TermsAndConditions() {
           to="/"
           className="mb-6 inline-flex items-center gap-1 text-sm text-[#6E7580] hover:text-[#CDD1D6] transition-colors"
         >
-          ← Back to Learning Playground
+          ← Back to Hydruslearn
         </Link>
         <h1 className="mt-2 text-3xl sm:text-4xl font-serif font-bold text-white mb-2">
           Terms &amp; Conditions

@@ -182,294 +182,131 @@ export default function StepOne({ onNext }) {
   };
 
   const renderUploadingSkeleton = () => (
-    <div style={styles.container} aria-hidden>
+    <div className="w-full max-w-2xl mx-auto p-4 sm:p-6" aria-hidden>
       <Skeleton style={{ height: '1.55rem', width: '13.5rem' }} />
       <Skeleton className="mt-2" style={{ height: '0.9rem', width: '22rem' }} />
 
-      <div style={{ marginTop: '26px', marginBottom: '16px' }}>
+      <div className="mt-6 mb-4">
         <Skeleton style={{ height: '0.78rem', width: '8rem' }} />
-        <Skeleton className="mt-2" rounded="6px" style={{ height: '2.7rem', width: '100%' }} />
+        <Skeleton className="mt-2" rounded="10px" style={{ height: '2.7rem', width: '100%' }} />
       </div>
 
-      <div style={{ border: '2px dashed var(--border)', borderRadius: '12px', padding: '42px 20px', marginBottom: '20px' }}>
+      <div className="border border-dashed border-[#2e2e33] bg-[#18181b] rounded-[12px] p-10 mb-5 text-center">
         <Skeleton rounded="999px" style={{ height: '3rem', width: '3rem', margin: '0 auto' }} />
         <Skeleton className="mt-3" style={{ height: '0.8rem', width: '42%', margin: '0.75rem auto 0' }} />
         <Skeleton className="mt-2" style={{ height: '0.72rem', width: '55%', margin: '0.5rem auto 0' }} />
       </div>
 
-      <Skeleton rounded="6px" style={{ height: '2.8rem', width: '100%' }} />
+      <Skeleton rounded="10px" style={{ height: '2.8rem', width: '100%' }} />
     </div>
-  )
+  );
 
   return (
-    <>
-    {uploading && renderUploadingSkeleton()}
-    {!uploading && (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h2 style={styles.title}>Upload Your Study Material</h2>
-        <p style={styles.subtitle}>
-          Upload a document to generate personalized questions and learning materials
-        </p>
+    <div className="w-full max-w-2xl mx-auto p-4 sm:p-6">
+      {uploading && renderUploadingSkeleton()}
+      {!uploading && (
+        <div className="card-standard p-6 sm:p-8 space-y-6">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#f0f0ee]">
+              Upload Study Material
+            </h2>
+            <p className="text-xs text-[#a1a1a6] mt-1.5 leading-relaxed">
+              Upload a lecture document, textbook extract, or notes to generate grounded quizzes and canvas tools.
+            </p>
+          </div>
 
-        <div style={styles.quotaCard}>
-          <span style={styles.quotaLabel}>Study Sessions</span>
-          <span style={styles.quotaValue}>
-            {isLoadingTierStatus ? "Loading..." : `${studySessionsRemaining ?? 0} left`}
-          </span>
-        </div>
+          <div className="flex items-center justify-between p-3 rounded-[10px] bg-[#131519] border border-[#2e2e33]">
+            <span className="text-xs font-medium uppercase tracking-wider text-[#a1a1a6]">Study Quota</span>
+            <span className="badge-standard">
+              {isLoadingTierStatus ? "Loading..." : `${studySessionsRemaining ?? 0} sessions remaining`}
+            </span>
+          </div>
 
-        <div style={styles.inputGroup}>
-          <label style={styles.label}>Document Title *</label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g., Chapter 5: Data Structures"
-            style={styles.input}
-            disabled={uploading}
-          />
-        </div>
+          <div className="space-y-2">
+            <label className="block text-xs font-medium uppercase tracking-wider text-[#a1a1a6]">
+              Document Title *
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. CS302: Distributed Systems Lecture 4"
+              className="input-standard w-full"
+              disabled={uploading}
+            />
+          </div>
 
-        <div
-          style={{
-            ...styles.dropzone,
-            ...(dragActive ? styles.dropzoneActive : {}),
-          }}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-        >
-          {!file ? (
-            <>
-              <div style={styles.uploadIcon}>📄</div>
-              <p style={styles.dropzoneText}>
-                Drag and drop your file here, or
-              </p>
-              <label style={styles.browseButton}>
-                Browse Files
-                <input
-                  type="file"
-                  accept=".pdf,.txt"
-                  onChange={handleFileChange}
-                  style={styles.fileInput}
-                />
-              </label>
-              <p style={styles.helpText}>
-                Supported formats: PDF, TXT (Max 50MB)
-              </p>
-            </>
-          ) : (
-            <div style={styles.filePreview}>
-              <div style={styles.fileIcon}></div>
-              <div style={styles.fileInfo}>
-                <p style={styles.fileName}>{file.name}</p>
-                <p style={styles.fileSize}>
-                  {(file.size / 1024).toFixed(2)} KB
+          <div
+            className={`border-2 border-dashed rounded-[12px] p-8 text-center transition-all cursor-pointer ${
+              dragActive
+                ? "border-[#f0f0ee] bg-[#18181b]"
+                : "border-[#2e2e33] hover:border-[#404047] bg-[#131519]/50"
+            }`}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+          >
+            {!file ? (
+              <div className="space-y-3">
+                <div className="w-12 h-12 mx-auto rounded-[10px] bg-[#18181b] border border-[#2e2e33] flex items-center justify-center text-xl text-[#f0f0ee]">
+                  📄
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-[#f0f0ee]">
+                    Drag and drop your file here, or
+                  </p>
+                  <label className="btn-secondary inline-block mt-2 px-4 py-1.5 text-xs cursor-pointer font-medium">
+                    Browse File
+                    <input
+                      type="file"
+                      accept=".pdf,.txt"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+                <p className="text-xs text-[#a1a1aa]">
+                  Supported formats: PDF, TXT (Max 10MB)
                 </p>
               </div>
-              <button
-                onClick={removeFile}
-                style={styles.removeButton}
-                disabled={uploading}
-              >
-                ✕
-              </button>
+            ) : (
+              <div className="flex items-center justify-between p-4 rounded-[10px] bg-[#18181b] border border-[#2e2e33]">
+                <div className="flex items-center gap-3 text-left">
+                  <div className="text-2xl">📄</div>
+                  <div>
+                    <p className="text-sm font-medium text-[#f0f0ee] truncate max-w-xs">{file.name}</p>
+                    <p className="text-xs text-[#a1a1a6]">{(file.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={removeFile}
+                  disabled={uploading}
+                  className="btn-ghost p-1 text-[#f87171] hover:text-[#ef4444]"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div className="p-3 rounded-[10px] bg-[#ef4444]/10 border border-[#ef4444]/30 text-xs text-[#f87171]">
+              {error}
             </div>
           )}
+
+          <button
+            onClick={handleUpload}
+            disabled={!file || uploading}
+            className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {uploading ? "Uploading & Vectorizing..." : "Start Study Session →"}
+          </button>
         </div>
-
-        {error && <div style={styles.error}>{error}</div>}
-
-        <button
-          onClick={handleUpload}
-          disabled={!file || uploading}
-          style={{
-            ...styles.uploadButton,
-            ...((!file || uploading) ? styles.uploadButtonDisabled : {}),
-          }}
-        >
-          {uploading ? "Uploading..." : "Upload and Continue"}
-        </button>
-      </div>
+      )}
     </div>
-    )}
-    </>
   );
 }
 
-const styles = {
-  container: {
-    width: "100%",
-    maxWidth: "700px",
-    margin: "0 auto",
-    padding: "24px 16px",
-  },
-  card: {
-    width: "100%",
-    background: "linear-gradient(160deg, color-mix(in srgb, var(--card) 42%, transparent), color-mix(in srgb, var(--background) 32%, transparent))",
-    backdropFilter: "blur(8px)",
-    WebkitBackdropFilter: "blur(8px)",
-    border: "1px solid var(--border)",
-    borderRadius: "14px",
-    boxShadow: "var(--shadow, 0 10px 30px rgba(0,0,0,0.15))",
-    padding: "28px 24px",
-  },
-  inputGroup: {
-    marginBottom: "25px",
-  },
-  label: {
-    display: "block",
-    fontSize: "14px",
-    fontWeight: "600",
-    marginBottom: "8px",
-    color: "var(--card-foreground)",
-  },
-  input: {
-    width: "100%",
-    padding: "12px",
-    fontSize: "16px",
-    border: "1px solid var(--border, #ccc)",
-    borderRadius: "6px",
-    backgroundColor: "var(--background, #fff)",
-    color: "var(--card-foreground)",
-    outline: "none",
-    transition: "border-color 0.2s ease",
-  },
-  title: {
-    fontSize: "28px",
-    fontWeight: "600",
-    marginBottom: "10px",
-    color: "var(--card-foreground)",
-  },
-  subtitle: {
-    fontSize: "16px",
-    color: "var(--muted-foreground, #666)",
-    marginBottom: "30px",
-  },
-  quotaCard: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "0.75rem",
-    border: "1px solid var(--border)",
-    borderRadius: "10px",
-    background: "color-mix(in srgb, var(--card) 45%, transparent)",
-    padding: "10px 12px",
-    marginBottom: "20px",
-  },
-  quotaLabel: {
-    fontSize: "12px",
-    fontWeight: "700",
-    letterSpacing: "0.04em",
-    color: "var(--muted-foreground)",
-    textTransform: "uppercase",
-  },
-  quotaValue: {
-    fontSize: "14px",
-    fontWeight: "700",
-    color: "var(--card-foreground)",
-  },
-  dropzone: {
-    border: "2px dashed var(--border, #ccc)",
-    borderRadius: "12px",
-    padding: "60px 20px",
-    textAlign: "center",
-    backgroundColor: "color-mix(in srgb, var(--background, #fafafa) 55%, transparent)",
-    transition: "all 0.3s ease",
-    cursor: "pointer",
-    marginBottom: "20px",
-  },
-  dropzoneActive: {
-    borderColor: "var(--primary, #007bff)",
-    backgroundColor: "var(--accent, #e3f2fd)",
-  },
-  uploadIcon: {
-    fontSize: "48px",
-    marginBottom: "20px",
-  },
-  dropzoneText: {
-    fontSize: "16px",
-    color: "var(--card-foreground)",
-    marginBottom: "15px",
-  },
-  browseButton: {
-    display: "inline-block",
-    padding: "10px 24px",
-    backgroundColor: "var(--primary, #007bff)",
-    color: "white",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "14px",
-    fontWeight: "500",
-    transition: "background-color 0.2s ease",
-  },
-  fileInput: {
-    display: "none",
-  },
-  helpText: {
-    fontSize: "13px",
-    color: "var(--muted-foreground, #999)",
-    marginTop: "15px",
-  },
-  filePreview: {
-    display: "flex",
-    alignItems: "center",
-    padding: "20px",
-    backgroundColor: "color-mix(in srgb, var(--card, #fff) 55%, transparent)",
-    borderRadius: "8px",
-    gap: "15px",
-  },
-  fileIcon: {
-    fontSize: "32px",
-  },
-  fileInfo: {
-    flex: 1,
-    textAlign: "left",
-  },
-  fileName: {
-    fontSize: "16px",
-    fontWeight: "500",
-    color: "var(--card-foreground)",
-    marginBottom: "5px",
-  },
-  fileSize: {
-    fontSize: "14px",
-    color: "var(--muted-foreground, #666)",
-  },
-  removeButton: {
-    background: "none",
-    border: "none",
-    fontSize: "24px",
-    color: "var(--destructive, #dc3545)",
-    cursor: "pointer",
-    padding: "5px",
-    lineHeight: 1,
-  },
-  error: {
-    padding: "12px",
-    backgroundColor: "var(--destructive, #fee)",
-    color: "var(--destructive-foreground, #c00)",
-    borderRadius: "6px",
-    marginBottom: "20px",
-    fontSize: "14px",
-  },
-  uploadButton: {
-    width: "100%",
-    padding: "14px",
-    fontSize: "16px",
-    fontWeight: "600",
-    color: "white",
-    backgroundColor: "var(--primary, #007bff)",
-    border: "none",
-    borderRadius: "8px",
-    cursor: "pointer",
-    transition: "background-color 0.2s ease",
-  },
-  uploadButtonDisabled: {
-    backgroundColor: "var(--muted, #ccc)",
-    cursor: "not-allowed",
-    opacity: 0.6,
-  },
-};

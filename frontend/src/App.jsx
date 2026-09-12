@@ -3,7 +3,7 @@
 import { useAuth } from './AuthContext';
 import Sidebar from './components/sidebar.jsx';
 import './App.css';
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from './AuthContext';
 import Navbar from './components/navbar.jsx';
 import HeroSection from './components/Hero.jsx';

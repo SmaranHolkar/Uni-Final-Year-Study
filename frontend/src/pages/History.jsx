@@ -200,9 +200,9 @@ function History() {
   }
 
   const renderQuizCardSkeletons = ({ count = 6 }) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" aria-hidden>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5" aria-hidden>
       {Array.from({ length: count }).map((_, index) => (
-        <div key={`history-skeleton-${index}`} className="rounded-xl overflow-hidden" style={{ background: solidCardBg, border: '1px solid var(--border)' }}>
+        <div key={`history-skeleton-${index}`} className="card-standard p-0 overflow-hidden">
           <div className="px-5 py-4">
             <Skeleton style={{ height: '0.95rem', width: '78%' }} />
             <Skeleton className="mt-2" style={{ height: '0.7rem', width: '42%' }} />
@@ -211,54 +211,46 @@ function History() {
               <Skeleton style={{ height: '0.75rem', width: '54%' }} />
             </div>
           </div>
-          <div className="px-5 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
+          <div className="px-5 py-3 border-t border-[#2e2e33] bg-[#131519]/50">
             <div className="flex gap-2">
-              <Skeleton rounded="0.4rem" style={{ height: '1.8rem', width: '100%' }} />
-              <Skeleton rounded="0.4rem" style={{ height: '1.8rem', width: '100%' }} />
+              <Skeleton rounded="8px" style={{ height: '1.8rem', width: '100%' }} />
+              <Skeleton rounded="8px" style={{ height: '1.8rem', width: '100%' }} />
             </div>
           </div>
         </div>
       ))}
     </div>
-  )
+  );
 
   return (
-    <div className="main-content min-h-screen relative" style={{ background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'var(--font-sans)' }}>
+    <div className="main-content min-h-screen relative bg-[#121214] text-[#f0f0ee] font-sans">
       <DotGrid />
 
       {/* Live notification toast */}
       {notification && (
-        <div className="fixed top-6 right-6 z-50 bg-blue-600 text-white px-5 py-3 rounded-xl shadow-xl text-sm font-medium">
+        <div className="fixed top-6 right-6 z-50 bg-[#18181b] border border-[#2e2e33] text-[#f0f0ee] px-4 py-3 rounded-[10px] shadow-xl text-xs font-medium">
           {notification}
         </div>
       )}
 
-      <header
-        className="sticky top-0 z-20 backdrop-blur-lg border-b"
-        style={{
-          background: 'color-mix(in srgb, var(--background) 80%, transparent)',
-          borderColor: 'var(--border)',
-          boxShadow: 'var(--shadow-sm)'
-        }}
-      >
+      <header className="sticky top-0 z-20 backdrop-blur-lg border-b border-[#2e2e33] bg-[#121214]/80">
         <div className="px-8 sm:px-10 lg:px-12 py-6">
           <Reveal>
-            <h2 className="text-3xl font-bold mb-4" style={{ color: 'var(--foreground)' }}>Quiz History</h2>
+            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f0f0ee] mb-4">Quiz History</h2>
           </Reveal>
           {/* Tab switcher */}
-          <div role="tablist" aria-label="History sections" className="flex gap-1 border-b" style={{ borderColor: 'var(--border)' }}>
+          <div role="tablist" aria-label="History sections" className="flex gap-2 border-b border-[#2e2e33]">
             <button
               id="history-tab-mine"
               role="tab"
               aria-selected={activeSection === 'mine'}
               aria-controls="history-panel-mine"
               onClick={() => setActiveSection('mine')}
-              className={`px-5 py-2 text-sm font-medium transition-colors ${
+              className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 ${
                 activeSection === 'mine'
-                  ? 'border-b-2 text-[var(--primary)]'
-                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  ? 'border-blue-500 text-blue-400 font-semibold'
+                  : 'border-transparent text-[#a1a1a6] hover:text-[#f0f0ee]'
               }`}
-              style={activeSection === 'mine' ? { borderBottomColor: 'var(--primary)' } : {}}
             >
               My Quizzes
             </button>
@@ -268,16 +260,15 @@ function History() {
               aria-selected={activeSection === 'shared'}
               aria-controls="history-panel-shared"
               onClick={() => setActiveSection('shared')}
-              className={`px-5 py-2 text-sm font-medium transition-colors flex items-center gap-2 ${
+              className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 flex items-center gap-2 ${
                 activeSection === 'shared'
-                  ? 'border-b-2 text-[var(--primary)]'
-                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  ? 'border-blue-500 text-blue-400 font-semibold'
+                  : 'border-transparent text-[#a1a1a6] hover:text-[#f0f0ee]'
               }`}
-              style={activeSection === 'shared' ? { borderBottomColor: 'var(--primary)' } : {}}
             >
               Shared with me
               {sharedQuizzes.length > 0 && (
-                <span className="bg-blue-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{sharedQuizzes.length}</span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-blue-500/15 text-blue-400 border border-blue-500/30">{sharedQuizzes.length}</span>
               )}
             </button>
           </div>
@@ -292,88 +283,72 @@ function History() {
             {loading && renderQuizCardSkeletons({ count: 6 })}
 
             {error && (
-              <div className="p-4 rounded" style={{ background: 'var(--destructive)', color: 'var(--destructive-foreground)' }}>
+              <div className="p-4 rounded-[10px] bg-[#ef4444]/10 border border-[#ef4444]/30 text-xs text-[#f87171]">
                 Error: {error}
               </div>
             )}
 
             {!loading && quizzes.length === 0 && (
               <Reveal>
-                <div className="border p-6 rounded-xl text-center" style={{ background: solidCardBg, borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
+                <div className="card-standard text-center py-10 text-xs text-[#a1a1a6]">
                   No quiz history yet. Start taking quizzes to see them here!
                 </div>
               </Reveal>
             )}
 
             {!loading && quizzes.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {quizzes.map((quiz, i) => {
-                  const quizQuestions = parseQuizData(quiz.quiz)
-                  const correctCount = quizQuestions.filter(q => q.isCorrect).length
-                  const totalCount = quizQuestions.length
-                  const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0
+                  const quizQuestions = parseQuizData(quiz.quiz);
+                  const correctCount = quizQuestions.filter(q => q.isCorrect).length;
+                  const totalCount = quizQuestions.length;
+                  const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+                  const cardColorClass = score >= 80 ? 'card-emerald' : score >= 60 ? 'card-amber' : 'card-red';
 
                   return (
                     <Reveal key={quiz.id} delay={i * 0.05}>
-                      <div className="rounded-xl overflow-hidden h-full flex flex-col" style={{ background: solidCardBg, borderColor: 'var(--border)', boxShadow: 'var(--shadow)', border: '1px solid var(--border)' }}>
+                      <div className={`card-standard ${cardColorClass} p-0 overflow-hidden h-full flex flex-col justify-between transition-all`}>
                         <button
                           onClick={() => toggleExpand(quiz.id)}
-                          className="flex-1 px-5 py-4 flex flex-col justify-between transition-colors cursor-pointer"
-                          style={{ 
-                            background: solidCardBg,
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = solidCardHoverBg}
-                          onMouseLeave={e => e.currentTarget.style.background = solidCardBg}
+                          className="flex-1 px-5 py-4 flex flex-col justify-between text-left transition-colors hover:bg-[#131519]/50 cursor-pointer"
                         >
-                          <div className="text-left">
-                            <h3 className="font-semibold text-base line-clamp-2" style={{ color: 'var(--foreground)' }}>{quiz.title}</h3>
-                            <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>
+                          <div>
+                            <h3 className="font-semibold text-sm line-clamp-2 text-[#f0f0ee]">{quiz.title}</h3>
+                            <p className="text-[11px] mt-1.5 text-[#a1a1a6]">
                               {new Date(quiz.created_at).toLocaleDateString()}
                             </p>
                           </div>
                           
-                          <div className="mt-3 space-y-2">
+                          <div className="mt-4 space-y-2">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Score:</span>
-                              <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                score >= 80 ? 'bg-green-500/20 text-green-500' : 
-                                score >= 60 ? 'bg-yellow-500/20 text-yellow-500' : 
-                                'bg-red-500/20 text-red-500'
+                              <span className="text-xs text-[#a1a1a6]">Score:</span>
+                              <span className={`px-2 py-0.5 rounded-md text-xs font-mono font-medium ${
+                                score >= 80 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' : 
+                                score >= 60 ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' : 
+                                'bg-red-500/15 text-red-400 border border-red-500/30'
                               }`}>
                                 {score}%
                               </span>
                             </div>
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Questions:</span>
-                              <span className="text-xs font-semibold" style={{ color: 'var(--foreground)' }}>{correctCount}/{totalCount}</span>
+                              <span className="text-xs text-[#a1a1a6]">Questions:</span>
+                              <span className="text-xs font-mono text-[#f0f0ee]">{correctCount}/{totalCount}</span>
                             </div>
                           </div>
                         </button>
 
-                        <div className="px-5 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleViewQuiz(quiz)}
-                              className="flex-1 px-2 py-1.5 rounded text-xs flex items-center justify-center gap-1 font-medium transition-all hover:scale-105"
-                              style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
-                            >
-                              <Eye className="w-3 h-3" />
-                              View
-                            </button>
-                            <button
-                              onClick={() => openModal(quiz)}
-                              className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors"
-                              style={{ background: 'var(--muted)', color: 'var(--foreground)' }}
-                              onMouseEnter={e => e.currentTarget.style.background = 'var(--border)'}
-                              onMouseLeave={e => e.currentTarget.style.background = 'var(--muted)'}
-                            >
-                              Details
-                            </button>
-                          </div>
+                        <div className="px-5 py-3 border-t border-[#2e2e33] bg-[#131519]/70">
+                          <button
+                            onClick={() => handleViewQuiz(quiz)}
+                            className="btn-primary w-full py-1.5 text-xs flex items-center justify-center gap-1.5 font-medium"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            View
+                          </button>
                         </div>
                       </div>
                     </Reveal>
-                  )
+                  );
                 })}
               </div>
             )}
@@ -387,33 +362,32 @@ function History() {
 
             {!sharedLoading && sharedQuizzes.length === 0 && (
               <Reveal>
-                <div className="border p-6 rounded-xl text-center" style={{ background: solidCardBg, borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
+                <div className="card-standard text-center py-10 text-xs text-[#a1a1a6]">
                   Nobody has shared a mindmap with you yet.
                 </div>
               </Reveal>
             )}
 
             {!sharedLoading && sharedQuizzes.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {sharedQuizzes.map((shared, i) => (
                   <Reveal key={shared.share_id} delay={i * 0.05}>
-                    <div className="rounded-xl overflow-hidden" style={{ background: solidCardBg, borderColor: 'var(--border)', boxShadow: 'var(--shadow)', border: '1px solid var(--border)' }}>
+                    <div className="card-standard p-0 overflow-hidden">
                       <div className="px-5 py-4">
-                        <h3 className="font-semibold text-base line-clamp-2 mb-2" style={{ color: 'var(--foreground)' }}>{shared.title}</h3>
-                        <p className="text-xs mb-3" style={{ color: 'var(--muted-foreground)' }}>
-                          From <span className="font-medium">{shared.sender_email}</span>
+                        <h3 className="font-semibold text-sm line-clamp-2 mb-1.5 text-[#f0f0ee]">{shared.title}</h3>
+                        <p className="text-xs mb-2 text-[#a1a1a6]">
+                          From <span className="font-medium text-[#f0f0ee]">{shared.sender_email}</span>
                         </p>
-                        <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                        <p className="text-xs text-[#a1a1aa]">
                           {new Date(shared.shared_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <div className="px-5 py-3 border-t" style={{ borderColor: 'var(--border)' }}>
+                      <div className="px-5 py-3 border-t border-[#2e2e33] bg-[#131519]/60">
                         <button
                           onClick={() => handleViewShared(shared)}
-                          className="w-full px-3 py-2 rounded text-sm flex items-center justify-center gap-2 font-medium transition-all hover:scale-105"
-                          style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
+                          className="btn-primary w-full py-1.5 text-xs flex items-center justify-center gap-2 font-medium"
                         >
-                          <Eye className="w-4 h-4" />
+                          <Eye className="w-3.5 h-3.5" />
                           View
                         </button>
                       </div>
@@ -429,62 +403,61 @@ function History() {
 
       {/* Details Modal */}
       {modalQuiz && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: '#000000' }} onClick={closeModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#121214]/80 backdrop-blur-md" onClick={closeModal}>
           <div 
             role="dialog"
             aria-modal="true"
             aria-labelledby="history-modal-title"
-            className="bg-card rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto"
-            style={{ background: solidCardBg, color: 'var(--foreground)' }}
+            className="card-standard max-w-2xl w-full max-h-[80vh] overflow-y-auto p-0"
             onClick={e => e.stopPropagation()}
             tabIndex={-1}
             ref={modalShellRef}
           >
             {/* Header with close button */}
-            <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b" style={{ background: solidCardBg, borderColor: 'var(--border)' }}>
-              <h3 id="history-modal-title" className="text-xl font-bold">{modalQuiz.title}</h3>
+            <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-[#2e2e33] bg-[#18181b]">
+              <h3 id="history-modal-title" className="text-base font-semibold text-[#f0f0ee]">{modalQuiz.title}</h3>
               <button
                 onClick={closeModal}
                 aria-label="Close quiz details"
-                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                className="btn-ghost p-1"
               >
-                <X className="w-6 h-6" style={{ color: 'var(--foreground)' }} />
+                <X className="w-5 h-5 text-[#a1a1a6]" />
               </button>
             </div>
 
             {/* Modal content */}
-            <div className="px-6 py-6 space-y-6">
+            <div className="p-6 space-y-5">
               {/* Quiz metadata */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg" style={{ background: 'var(--muted)' }}>
-                  <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Date Taken</p>
-                  <p className="text-lg font-semibold mt-2">{new Date(modalQuiz.created_at).toLocaleDateString()}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-[10px] bg-[#131519] border border-[#2e2e33]">
+                  <p className="text-xs text-[#a1a1a6]">Date Taken</p>
+                  <p className="text-sm font-semibold text-[#f0f0ee] mt-1">{new Date(modalQuiz.created_at).toLocaleDateString()}</p>
                 </div>
-                <div className="p-4 rounded-lg" style={{ background: 'var(--muted)' }}>
-                  <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>Time</p>
-                  <p className="text-lg font-semibold mt-2">{new Date(modalQuiz.created_at).toLocaleTimeString()}</p>
+                <div className="p-3.5 rounded-[10px] bg-[#131519] border border-[#2e2e33]">
+                  <p className="text-xs text-[#a1a1a6]">Time</p>
+                  <p className="text-sm font-semibold text-[#f0f0ee] mt-1">{new Date(modalQuiz.created_at).toLocaleTimeString()}</p>
                 </div>
               </div>
 
               {/* Questions & Answers */}
               {parseQuizData(modalQuiz.quiz).length > 0 && (
                 <div>
-                  <h4 className="font-semibold text-lg mb-4" style={{ color: 'var(--foreground)' }}>Questions & Answers</h4>
-                  <div className="space-y-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-[#a1a1a6] mb-3">Questions &amp; Answers</h4>
+                  <div className="space-y-3">
                     {parseQuizData(modalQuiz.quiz).map((q, idx) => (
-                      <div key={idx} className="p-4 rounded-lg" style={{ background: 'var(--muted)' }}>
-                        <p className="font-medium mb-3" style={{ color: 'var(--foreground)' }}>Q{idx + 1}: {q.prompt}</p>
-                        <div className="space-y-2 text-sm">
+                      <div key={idx} className="p-4 rounded-[10px] bg-[#131519] border border-[#2e2e33]">
+                        <p className="font-medium text-xs text-[#f0f0ee] mb-2">Q{idx + 1}: {q.prompt}</p>
+                        <div className="space-y-1.5 text-xs">
                           <div>
-                            <span style={{ color: 'var(--muted-foreground)' }}>Your Answer:</span>
-                            <span style={{ color: q.isCorrect ? '#10b981' : '#ef4444', fontWeight: 'bold', marginLeft: '0.5rem' }}>
+                            <span className="text-[#a1a1a6]">Your Answer:</span>
+                            <span className={`font-medium ml-2 ${q.isCorrect ? 'text-emerald-400' : 'text-[#f87171]'}`}>
                               {q.isCorrect ? '✓' : '✗'} {q.userAnswer}
                             </span>
                           </div>
                           {!q.isCorrect && (
                             <div>
-                              <span style={{ color: 'var(--muted-foreground)' }}>Correct Answer:</span>
-                              <span style={{ color: '#10b981', fontWeight: 'bold', marginLeft: '0.5rem' }}>
+                              <span className="text-[#a1a1a6]">Correct Answer:</span>
+                              <span className="text-emerald-400 font-medium ml-2">
                                 {q.correctAnswer}
                               </span>
                             </div>
@@ -499,13 +472,13 @@ function History() {
               {/* Topics/Mindmap */}
               {parseMindmapData(modalQuiz.mindmap).length > 0 && (
                 <div>
-                  <h4 className="font-semibold text-lg mb-4" style={{ color: 'var(--foreground)' }}>Review Topics</h4>
-                  <div className="space-y-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-[#a1a1a6] mb-3">Review Topics</h4>
+                  <div className="space-y-2">
                     {parseMindmapData(modalQuiz.mindmap).map((node, idx) => (
-                      <div key={idx} className="p-4 rounded-lg" style={{ background: 'var(--muted)' }}>
-                        <p className="font-medium" style={{ color: 'var(--foreground)' }}>{node.label}</p>
+                      <div key={idx} className="p-3.5 rounded-[10px] bg-[#131519] border border-[#2e2e33]">
+                        <p className="font-medium text-xs text-[#f0f0ee]">{node.label}</p>
                         {node.description && (
-                          <p className="text-sm mt-2" style={{ color: 'var(--muted-foreground)' }}>
+                          <p className="text-xs text-[#a1a1a6] mt-1">
                             {node.description}
                           </p>
                         )}
@@ -519,7 +492,8 @@ function History() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
-export default History
+export default History;
+

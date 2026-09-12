@@ -430,10 +430,10 @@ export default function StepThree({ data, onRetake, quizResults }) {
             </button>
           </div>
 
-          <h2 className="font-bold text-lg mb-2">
+          <h2 className="font-bold text-lg mb-2 text-slate-900">
             {selectedNode.data.label}
           </h2>
-          <p className="text-sm text-slate-600 mb-4">
+          <p className="text-sm text-slate-700 mb-4 leading-relaxed">
             {selectedNode.data.description}
           </p>
 
@@ -468,7 +468,7 @@ export default function StepThree({ data, onRetake, quizResults }) {
       {mcq && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl w-[420px]">
-            <h2 className="font-bold mb-4">{mcq.question}</h2>
+            <h2 className="font-bold mb-4 text-slate-900">{mcq.question}</h2>
 
             <div className="space-y-2">
               {mcq.choices.map((c, i) => {
@@ -480,9 +480,9 @@ export default function StepThree({ data, onRetake, quizResults }) {
                 if (selectedAnswer) {
                   if (isCorrect) btnClass += 'bg-green-100 border-green-500 text-green-800 font-semibold';
                   else if (isSelected) btnClass += 'bg-red-100 border-red-400 text-red-700';
-                  else btnClass += 'bg-white text-slate-500';
+                  else btnClass += 'bg-white text-slate-700 border-slate-300';
                 } else {
-                  btnClass += 'hover:bg-slate-100';
+                  btnClass += 'hover:bg-slate-100 text-slate-800 border-slate-200';
                 }
                 return (
                   <button

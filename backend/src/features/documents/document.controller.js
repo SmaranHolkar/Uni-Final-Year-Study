@@ -36,24 +36,36 @@ export async function processAndStoreDocument(req, res) {
       try {
         const fileBuffer = fs.readFileSync(uploadedFilePath);
         const safeFileName = `${userId}/${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-        
-        const { data: uploadData, error: uploadErr } = await storageClient.storage
-          .from('userDocuments')
-          .upload(safeFileName, fileBuffer, {
-            contentType: req.file.mimetype || 'application/pdf',
-            upsert: true,
-          });
+        const targetBuckets = ['userDocuments', 'documents'];
 
-        if (!uploadErr && uploadData) {
-          // Generate 1-year signed access URL
-          const { data: signedData } = await storageClient.storage
-            .from('userDocuments')
-            .createSignedUrl(safeFileName, 60 * 60 * 24 * 365);
-          
-          storageFileUrl = signedData?.signedUrl || storageClient.storage.from('userDocuments').getPublicUrl(safeFileName).data?.publicUrl;
-          console.log(`[STORAGE] Successfully saved raw PDF to userDocuments bucket: ${storageFileUrl}`);
-        } else if (uploadErr) {
-          console.warn('[STORAGE NOTICE] Storage upload returned note:', uploadErr.message);
+        for (const bucketName of targetBuckets) {
+          try {
+            // Attempt auto-creation if bucket doesn't exist yet
+            if (supabaseAdmin?.storage?.createBucket) {
+              await supabaseAdmin.storage.createBucket(bucketName, { public: true }).catch(() => {});
+            }
+
+            const { data: uploadData, error: uploadErr } = await storageClient.storage
+              .from(bucketName)
+              .upload(safeFileName, fileBuffer, {
+                contentType: req.file.mimetype || 'application/pdf',
+                upsert: true,
+              });
+
+            if (!uploadErr && uploadData) {
+              const { data: signedData } = await storageClient.storage
+                .from(bucketName)
+                .createSignedUrl(safeFileName, 60 * 60 * 24 * 365);
+
+              storageFileUrl = signedData?.signedUrl || storageClient.storage.from(bucketName).getPublicUrl(safeFileName).data?.publicUrl;
+              console.log(`[STORAGE] Successfully saved raw PDF to "${bucketName}" bucket: ${storageFileUrl}`);
+              break;
+            } else if (uploadErr) {
+              console.warn(`[STORAGE NOTICE] Bucket "${bucketName}" upload note:`, uploadErr.message);
+            }
+          } catch (bucketErr) {
+            console.warn(`[STORAGE NOTICE] Bucket "${bucketName}" attempt skipped:`, bucketErr.message);
+          }
         }
       } catch (storErr) {
         console.warn('[STORAGE NOTICE] Storage upload skipped:', storErr.message);

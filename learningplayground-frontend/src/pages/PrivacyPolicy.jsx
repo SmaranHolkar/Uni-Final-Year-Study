@@ -4,11 +4,11 @@ import { Link } from "react-router-dom";
 const sections = [
   {
     title: "1. Information We Collect",
-    content: `We collect information you provide directly, such as your email address when signing up, prompt inputs, saved tools, and session activity in Learning Playground. We also collect minimal technical diagnostic data (browser type, IP address, performance metrics).`,
+    content: `We collect information you provide directly, such as your email address when signing up, prompt inputs, saved tools, and session activity in Hydruslearn. We also collect minimal technical diagnostic data (browser type, IP address, performance metrics).`,
   },
   {
     title: "2. How We Use Your Information",
-    content: `We use your information exclusively to provide, maintain, and optimize Learning Playground, deliver user authentication, save interactive tools, and process AI study generation requests. We do NOT sell your personal data or use your private notes to train external AI models.`,
+    content: `We use your information exclusively to provide, maintain, and optimize Hydruslearn, deliver user authentication, save interactive tools, and process AI study generation requests. We do NOT sell your personal data or use your private notes to train external AI models.`,
   },
   {
     title: "3. Information Sharing",
@@ -20,7 +20,7 @@ const sections = [
   },
   {
     title: "5. Your Rights & Data Deletion",
-    content: `You have the right to access, export, or delete your personal data and saved playground tools at any time by contacting support@learningplayground.com or utilizing in-app account deletion.`,
+    content: `You have the right to access, export, or delete your personal data and saved playground tools at any time by contacting support@hydruslearn.com or utilizing in-app account deletion.`,
   },
   {
     title: "6. Updates to This Policy",
@@ -36,7 +36,7 @@ export default function PrivacyPolicy() {
           to="/"
           className="mb-6 inline-flex items-center gap-1 text-sm text-[#6E7580] hover:text-[#CDD1D6] transition-colors"
         >
-          ← Back to Learning Playground
+          ← Back to Hydruslearn
         </Link>
         <h1 className="mt-2 text-3xl sm:text-4xl font-serif font-bold text-white mb-2">
           Privacy Policy

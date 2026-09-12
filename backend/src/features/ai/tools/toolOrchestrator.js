@@ -210,6 +210,24 @@ async function buildGroundingContext(userId, promptText, options = {}) {
     contextString += `\nINSTRUCTION: Target and correct these mistakes in the generated content.`;
   }
 
+  // Metacognitive Calibration & Misconception Insights
+  const meta = options.metacognitiveAnalysis || options.metacognitiveContext;
+  if (meta && typeof meta === 'object') {
+    const perfSummary = meta.performanceSummary || '';
+    const pattern = meta.patternSpecificity || '';
+    const gaps = meta.knowledgeGaps || '';
+    const confMismatch = meta.confidenceMismatch || '';
+    const calScore = meta.algorithmicMetrics?.confidenceAnalysis?.calibrationScore ?? meta.calibrationScore;
+
+    contextString += `\n\n═══════════════════════════════════════════════════════════════\nSTUDENT'S METACOGNITIVE PROFILE & CONFIDENCE CALIBRATION:\n`;
+    if (calScore != null) contextString += `- Calibration Accuracy: ${calScore}%\n`;
+    if (perfSummary) contextString += `- Performance Summary: ${perfSummary}\n`;
+    if (pattern) contextString += `- Concrete Mistake Pattern: ${pattern}\n`;
+    if (confMismatch) contextString += `- Confidence Calibration Mismatch: ${confMismatch}\n`;
+    if (gaps) contextString += `- Identified Knowledge Gaps: ${gaps}\n`;
+    contextString += `INSTRUCTION: Prioritize these identified cognitive blindspots, overconfident errors, and misconceptions in your explanation and study tool design.\n═══════════════════════════════════════════════════════════════\n`;
+  }
+
   return contextString;
 }
 

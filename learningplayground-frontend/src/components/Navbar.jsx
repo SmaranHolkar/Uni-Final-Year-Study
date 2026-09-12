@@ -27,7 +27,7 @@ export default function Navbar({ onOpenSessions, toolsQuota }) {
               <use href="#small-star" x="70" y="70"/>
               <use href="#star" x="100" y="65"/>
             </g>
-            <text x="75" y="34" fontFamily="DM Serif Display, serif" fontSize="22" fontWeight="600" fill="#f8fafc">Learning Playground</text>
+            <text x="75" y="34" fontFamily="DM Serif Display, serif" fontSize="22" fontWeight="600" fill="#f8fafc">Hydruslearn</text>
           </svg>
         </Link>
 

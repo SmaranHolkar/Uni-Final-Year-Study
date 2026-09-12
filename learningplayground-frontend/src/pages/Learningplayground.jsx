@@ -5251,7 +5251,7 @@ export default function Learningplayground() {
     return meta.title.toLowerCase().includes(searchQuery.toLowerCase())
   })
   return (
-    <div className="flex-1 h-0 w-full relative bg-slate-900 text-slate-100 flex overflow-hidden font-sans">
+    <div className="w-full h-full flex-1 min-h-0 relative bg-slate-900 text-slate-100 flex overflow-hidden font-sans">
 
       {/* Left Sidebar */}
       <aside
@@ -5265,7 +5265,7 @@ export default function Learningplayground() {
           <div className="flex items-center gap-2.5 min-w-0">
             <Vela size={22} className="flex-shrink-0" />
             <span className={`font-bold text-xs sm:text-sm text-white tracking-tight truncate transition-all duration-200 ${isSidebarExpanded ? 'opacity-100 max-w-[180px]' : 'lg:max-w-0 lg:opacity-0'}`}>
-              Learning Playground
+              Hydruslearn
             </span>
           </div>
 
@@ -5556,12 +5556,12 @@ export default function Learningplayground() {
       {/* Floating Left Chat Panel (Collapsible - Only on Chat/Playground Page) */}
       {activeCanvasView === 'playground' && (
         <div
-          className={`relative z-20 flex flex-col bg-[#10151f]/95 backdrop-blur-xl transition-[transform,margin,opacity] ${
+          className={`relative z-20 flex flex-col bg-[#10151f]/95 backdrop-blur-xl transition-[transform,opacity] ${
             isChatPanelResizing ? 'transition-none select-none' : 'duration-300'
           } flex-shrink-0 overflow-hidden ${
             isChatPanelOpen
-              ? 'translate-x-0 m-2 sm:my-3 sm:ml-3 sm:mr-1.5 h-[calc(100%-1rem)] sm:h-[calc(100%-1.5rem)] rounded-2xl border border-[#223247] shadow-2xl shadow-black/40'
-              : 'w-0 m-0 -translate-x-full h-full border-0 pointer-events-none'
+              ? 'translate-x-0 opacity-100 m-2 sm:my-3 sm:ml-3 sm:mr-1.5 h-[calc(100%-1rem)] sm:h-[calc(100%-1.5rem)] rounded-2xl border border-[#223247] shadow-2xl shadow-black/40'
+              : 'w-0 -translate-x-full opacity-0 h-full border-0 pointer-events-none'
           }`}
           style={isChatPanelOpen ? { width: `min(${chatPanelWidth}px, calc(100vw - 1rem))` } : undefined}
         >

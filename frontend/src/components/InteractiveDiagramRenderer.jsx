@@ -467,8 +467,8 @@ export default function InteractiveDiagramRenderer({ diagram, onComplete, onTogg
 
             {/* FLOW / TRAVERSAL PATH */}
             {currentStep.flowDirection && (
-              <div className="text-[11px] font-mono text-zinc-400 bg-zinc-900/60 px-3 py-1.5 rounded-lg border border-zinc-800">
-                <span className="text-zinc-500 font-sans font-semibold">Flow Sequence: </span>
+              <div className="text-xs font-mono text-zinc-300 bg-zinc-900/60 px-3 py-1.5 rounded-lg border border-zinc-800">
+                <span className="text-zinc-400 font-sans font-semibold">Flow Sequence: </span>
                 <span className="text-indigo-300">{currentStep.flowDirection}</span>
               </div>
             )}

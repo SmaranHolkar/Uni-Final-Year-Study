@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useSEO } from "../hooks/useSEO";
+import PublicPageBackground from "../components/PublicPageBackground";
 
 const sections = [
   {
@@ -8,7 +9,7 @@ const sections = [
   },
   {
     title: "2. Description of Service",
-    content: `HydrusLearn is an AI-powered learning platform that allows users to upload study documents, generate quizzes, explore interactive mind maps, and track learning progress. The Learning Playground lets users create revision tools — such as flashcards, Q&A sets, and study guides — from plain-English prompts; the AI selects the most appropriate format for each request. Features may be updated, extended, or discontinued at any time without prior notice. The service is provided for educational and personal use only.`,
+    content: `HydrusLearn is an advanced AI-powered learning platform that allows users to upload study documents, generate quizzes with metacognitive confidence calibration, explore grounded research, and track learning progress across history. Features may be updated, extended, or discontinued at any time without prior notice. The service is provided for educational and personal use only.`,
   },
   {
     title: "3. User Accounts",
@@ -20,7 +21,7 @@ const sections = [
   },
   {
     title: "5. User-Uploaded Content",
-    content: `You retain ownership of all documents and materials you upload to HydrusLearn. By uploading content, you grant HydrusLearn a limited, non-exclusive licence to process that content solely for the purpose of delivering the Service to you (e.g. generating quizzes and summaries). We do not sell or share your uploaded content with third parties. You are solely responsible for ensuring you have the right to upload any material and that doing so does not infringe third-party copyright or other rights.`,
+    content: `You retain ownership of all documents and materials you upload to HydrusLearn. By uploading content, you grant HydrusLearn a limited, non-exclusive licence to process that content solely for the purpose of delivering the Service to you (e.g. generating quizzes, grounded insights, and summaries). We do not sell or share your uploaded content with third parties. You are solely responsible for ensuring you have the right to upload any material and that doing so does not infringe third-party copyright or other rights.`,
   },
   {
     title: "6. AI-Generated Content",
@@ -45,7 +46,7 @@ const sections = [
   },
   {
     title: "11. Service Availability and Limitations",
-    content: `While we strive to keep HydrusLearn up and running 100% of the time, we cannot guarantee uninterrupted access. The platform relies on complex infrastructure and third-party AI models, meaning the Service may occasionally be unavailable due to maintenance, network issues, or API limits. We are not liable for any lost study time or academic setbacks caused by system downtime.`,
+    content: `While we strive to keep HydrusLearn reliably available at all times, we cannot guarantee uninterrupted access. The platform relies on complex infrastructure and third-party AI models, meaning the Service may occasionally be unavailable due to maintenance, network issues, or API limits. We are not liable for any lost study time or academic setbacks caused by system downtime.`,
   },
   {
     title: "12. Disclaimers",
@@ -77,31 +78,32 @@ const sections = [
   },
 ];
 
-// Handles TermsAndConditions logic.
 export default function TermsAndConditions() {
   useSEO({
     title: "Terms and Conditions | HydrusLearn",
     description: "Read the HydrusLearn Terms and Conditions. These terms govern your use of our AI-powered study platform, including acceptable use, content ownership, and account rules.",
     path: "/terms",
   });
+
   return (
-    <div className="min-h-screen px-4 py-16">
-      <div className="mx-auto max-w-3xl">
+    <div className="relative min-h-screen bg-[#121214] text-[#f0f0ee] px-4 py-16 selection:bg-[#f0f0ee] selection:text-[#121214]">
+      <PublicPageBackground />
+      <div className="relative z-10 mx-auto max-w-3xl">
         {/* Header */}
         <div className="mb-10">
           <Link
             to="/"
-            className="mb-6 inline-flex items-center gap-1 text-sm text-[var(--muted-foreground)] transition-opacity hover:opacity-80"
+            className="mb-6 inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-[#a1a1a6] hover:text-[#f0f0ee] transition-colors"
           >
             ← Back to home
           </Link>
-          <h1 className="mt-4 text-4xl font-bold text-[var(--foreground)]">
+          <h1 className="mt-4 text-3xl sm:text-4xl font-semibold tracking-tight text-[#f0f0ee]">
             Terms &amp; Conditions
           </h1>
-          <p className="mt-2 text-sm text-[var(--muted-foreground)]">
+          <p className="mt-2 text-xs text-[#a1a1a6]">
             Last updated: May 24, 2026
           </p>
-          <p className="mt-4 text-[var(--muted-foreground)]">
+          <p className="mt-4 text-sm leading-relaxed text-[#a1a1a6]">
             Please read these Terms and Conditions carefully before using
             HydrusLearn. By creating an account or using the Service, you agree
             to be bound by the terms below.
@@ -109,29 +111,29 @@ export default function TermsAndConditions() {
         </div>
 
         {/* Sections */}
-        <div className="space-y-8">
+        <div className="space-y-6">
           {sections.map((section) => (
             <div
               key={section.title}
-              className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-6 shadow-sm"
+              className="card-standard"
             >
-              <h2 className="mb-3 text-lg font-semibold text-[var(--foreground)]">
+              <h2 className="mb-3 text-base font-semibold text-[#f0f0ee] tracking-tight">
                 {section.title}
               </h2>
               <div className="space-y-2">
                 {section.content.split("\n\n").map((paragraph, i) => (
                   <p
                     key={i}
-                    className="text-sm leading-relaxed text-[var(--muted-foreground)] whitespace-pre-line"
+                    className="text-sm leading-relaxed text-[#a1a1a6] whitespace-pre-line"
                   >
                     {paragraph}
                   </p>
                 ))}
                 {section.privacyLink && (
-                  <p className="text-sm text-[var(--muted-foreground)]">
+                  <p className="pt-2 text-sm text-[#a1a1a6]">
                     <Link
                       to="/privacy"
-                      className="font-medium text-[var(--primary)] transition-opacity hover:opacity-80"
+                      className="font-medium text-[#f0f0ee] hover:underline"
                     >
                       Read our full Privacy Policy →
                     </Link>
@@ -143,28 +145,28 @@ export default function TermsAndConditions() {
         </div>
 
         {/* Footer note */}
-        <div className="mt-10 rounded-xl border border-[var(--border)] bg-[var(--primary)]/10 p-5 text-center">
-          <p className="text-sm text-[var(--foreground)]">
+        <div className="mt-10 card-standard text-center">
+          <p className="text-sm text-[#a1a1a6]">
             By signing up for HydrusLearn, you confirm that you have read and
             agree to these Terms and Conditions. You can also review our{" "}
             <Link
               to="/privacy"
-              className="font-medium text-[var(--primary)] transition-opacity hover:opacity-80"
+              className="font-medium text-[#f0f0ee] hover:underline"
             >
               Privacy Policy
             </Link>
             .
           </p>
-          <div className="mt-4 flex justify-center gap-4">
+          <div className="mt-6 flex justify-center gap-3">
             <Link
               to="/signup"
-              className="rounded-md bg-[var(--primary)] px-5 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              className="btn-primary inline-flex items-center justify-center px-5 py-2.5"
             >
               Create account
             </Link>
             <Link
               to="/login"
-              className="rounded-md border border-[var(--border)] bg-[var(--card)] px-5 py-2 text-sm font-medium text-[var(--foreground)] transition-opacity hover:opacity-80"
+              className="btn-secondary inline-flex items-center justify-center px-5 py-2.5"
             >
               Log in
             </Link>
@@ -174,3 +176,4 @@ export default function TermsAndConditions() {
     </div>
   );
 }
+

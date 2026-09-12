@@ -1,4 +1,4 @@
-// Shows a friendly 404 page with a link back to the home route.
+// Shows a clean 404 page with a link back to the home route.
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useSEO } from '../../hooks/useSEO';
@@ -7,23 +7,24 @@ import { useSEO } from '../../hooks/useSEO';
 const NotFound = () => {
   useSEO({
     title: "Page Not Found | HydrusLearn",
-    description: "The page you're looking for doesn't exist. Head back to HydrusLearn to start studying smarter.",
+    description: "The page you're looking for doesn't exist. Head back to HydrusLearn to continue your study sessions.",
     noIndex: true,
   });
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-4">
-      <div className="text-center">
-        <h1 className="mb-4 text-8xl font-bold text-[var(--foreground)]">404</h1>
-        <h2 className="mb-4 text-3xl text-[var(--foreground)]">Page Not Found</h2>
-        <p className="mb-8 text-lg text-[var(--muted-foreground)]">
-          Oops! The page you're looking for doesn't exist.
+    <div className="flex min-h-[90vh] items-center justify-center p-4 bg-[#121214] text-[#f0f0ee]">
+      <div className="card-standard max-w-md w-full text-center py-12 px-8">
+        <span className="text-sm font-mono text-[#a1a1a6] block mb-2">Error 404</span>
+        <h1 className="mb-3 text-4xl font-normal text-[#f0f0ee] tracking-tight">Page not found</h1>
+        <p className="mb-8 text-sm text-[#a1a1a6] leading-relaxed">
+          The page you're looking for doesn't exist or may have been moved.
         </p>
         <Link
           to="/"
-          className="inline-block rounded-lg bg-[var(--primary)] px-6 py-3 font-semibold text-[var(--primary-foreground)] no-underline"
+          className="btn-primary"
         >
-          Go Back Home
+          <span>Go back home</span>
+          <span>→</span>
         </Link>
       </div>
     </div>

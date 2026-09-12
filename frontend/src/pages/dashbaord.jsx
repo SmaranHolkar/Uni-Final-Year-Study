@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,15 +13,27 @@ import {
 import { Line } from 'react-chartjs-2';
 import { useAuth } from '../AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { Compass, Bell } from 'lucide-react';
+import {
+  Flame,
+  Award,
+  Target,
+  Sparkles,
+  ArrowUpRight,
+  Plus,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  RotateCcw,
+  BookOpen,
+  Calendar,
+  Layers
+} from 'lucide-react';
 import Vela from '../components/Vela.jsx';
-import { Reveal, DotGrid } from '../components/Reveal.jsx';
 import { Skeleton } from '../components/Skeleton.jsx';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler);
 
 const SUGGESTIONS_CACHE_TTL_MS = 15 * 60 * 1000;
-
 const getSuggestionsCacheKey = (userId) => `dashboard_suggestions_${userId}`;
 
 const readSuggestionsCache = (cacheKey) => {
@@ -50,11 +62,10 @@ const writeSuggestionsCache = (cacheKey, data) => {
       })
     );
   } catch {
-    // Ignore storage write failures to avoid blocking UI updates.
+    // Ignore storage write failures
   }
 };
 
-// Handles Dashboard logic.
 export default function Dashboard() {
   const { user, session } = useAuth();
   const navigate = useNavigate();
@@ -69,78 +80,74 @@ export default function Dashboard() {
   const [tierStatus, setTierStatus] = useState(null);
   const [dueRepetitionItems, setDueRepetitionItems] = useState([]);
 
-useEffect(() => {
-    if (!user?.id || !session?.access_token) return
+  useEffect(() => {
+    if (!user?.id || !session?.access_token) return;
 
-    const cacheKey = getSuggestionsCacheKey(user.id)
-    const cachedSuggestions = readSuggestionsCache(cacheKey)
+    const cacheKey = getSuggestionsCacheKey(user.id);
+    const cachedSuggestions = readSuggestionsCache(cacheKey);
     const cacheIsFresh = Boolean(
       cachedSuggestions && Date.now() - cachedSuggestions.fetchedAt < SUGGESTIONS_CACHE_TTL_MS
-    )
+    );
 
     if (cachedSuggestions?.data) {
-      setSuggestions(cachedSuggestions.data)
+      setSuggestions(cachedSuggestions.data);
     }
-    
-    // Fetch quiz history from backend API using access token for authentication
+
     const fetchQuizHistory = async () => {
-      setLoading(true)
-      setError(null)
+      setLoading(true);
+      setError(null);
       try {
-        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000"
-        
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const response = await fetch(`${API_BASE}/api/quiz-history`, {
-          method: "GET",
+          method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`
+            Authorization: `Bearer ${session.access_token}`,
           },
-          credentials: 'include'
-        })
+          credentials: 'include',
+        });
 
         if (!response.ok) {
-          throw new Error('Failed to fetch quiz history')
+          throw new Error('Failed to fetch quiz history');
         }
 
-        const data = await response.json()
-        setQuizzes(data.data || [])
+        const data = await response.json();
+        setQuizzes(data.data || []);
       } catch (err) {
-        console.error("Error fetching quiz history:", err)
-        setError("Unable to load quiz history. Please try again")
+        console.error('Error fetching quiz history:', err);
+        setError('Unable to load quiz history.');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    // Handles fetchSuggestions logic.
     const fetchSuggestions = async () => {
-      setIsLoadingSuggestions(true)
+      setIsLoadingSuggestions(true);
       try {
-        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const res = await fetch(`${API_BASE}/api/suggestions`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
-          credentials: 'include'
+          credentials: 'include',
         });
-        
+
         if (!res.ok) {
-          console.warn(`Suggestions API returned ${res.status}:`, await res.text());
           return;
         }
-        
+
         const data = await res.json();
         setSuggestions(data);
         writeSuggestionsCache(cacheKey, data);
       } catch (err) {
-        console.error("Failed to fetch suggestions:", err);
+        console.error('Failed to fetch suggestions:', err);
       } finally {
-        setIsLoadingSuggestions(false)
+        setIsLoadingSuggestions(false);
       }
     };
 
     const fetchTierStatus = async () => {
-      setIsLoadingTierStatus(true)
+      setIsLoadingTierStatus(true);
       try {
-        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000"
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const response = await fetch(`${API_BASE}/api/tier-status`, {
           method: 'GET',
           headers: {
@@ -148,25 +155,22 @@ useEffect(() => {
             Authorization: `Bearer ${session.access_token}`,
           },
           credentials: 'include',
-        })
+        });
 
-        if (!response.ok) {
-          return
-        }
-
-        const data = await response.json()
-        setTierStatus(data?.data || null)
+        if (!response.ok) return;
+        const data = await response.json();
+        setTierStatus(data?.data || null);
       } catch {
-        setTierStatus(null)
+        setTierStatus(null);
       } finally {
-        setIsLoadingTierStatus(false)
+        setIsLoadingTierStatus(false);
       }
-    }
+    };
 
     const fetchDueRepetition = async () => {
-      setIsLoadingRepetition(true)
+      setIsLoadingRepetition(true);
       try {
-        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000"
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         const response = await fetch(`${API_BASE}/api/spaced-repetition/due?limit=5`, {
           method: 'GET',
           headers: {
@@ -174,35 +178,32 @@ useEffect(() => {
             Authorization: `Bearer ${session.access_token}`,
           },
           credentials: 'include',
-        })
+        });
 
-        if (!response.ok) {
-          return
-        }
-
-        const data = await response.json()
-        setDueRepetitionItems(Array.isArray(data?.data) ? data.data : [])
+        if (!response.ok) return;
+        const data = await response.json();
+        setDueRepetitionItems(Array.isArray(data?.data) ? data.data : []);
       } catch {
-        setDueRepetitionItems([])
+        setDueRepetitionItems([]);
       } finally {
-        setIsLoadingRepetition(false)
+        setIsLoadingRepetition(false);
       }
-    }
-    
+    };
+
     fetchQuizHistory();
     fetchTierStatus();
     fetchDueRepetition();
     if (!cacheIsFresh) {
       fetchSuggestions();
     }
-  }, [user?.id, session?.access_token])
+  }, [user?.id, session?.access_token]);
 
   const handleMarkReviewed = async (itemId) => {
-    if (!session?.access_token || !itemId) return
-    setReviewingQueueIds((prev) => ({ ...prev, [itemId]: true }))
+    if (!session?.access_token || !itemId) return;
+    setReviewingQueueIds((prev) => ({ ...prev, [itemId]: true }));
 
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000"
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       const response = await fetch(`${API_BASE}/api/spaced-repetition/${itemId}/reviewed`, {
         method: 'POST',
         headers: {
@@ -210,112 +211,184 @@ useEffect(() => {
           Authorization: `Bearer ${session.access_token}`,
         },
         credentials: 'include',
-      })
+      });
 
-      if (!response.ok) return
-
-      setDueRepetitionItems((prev) => prev.filter((item) => item.id !== itemId))
+      if (!response.ok) return;
+      setDueRepetitionItems((prev) => prev.filter((item) => item.id !== itemId));
     } catch {
-      // No-op: keep UI stable without noisy errors for this quick action.
+      // Keep UI stable
     } finally {
       setReviewingQueueIds((prev) => {
-        const copy = { ...prev }
-        delete copy[itemId]
-        return copy
-      })
+        const copy = { ...prev };
+        delete copy[itemId];
+        return copy;
+      });
     }
-  }
+  };
 
-  // Handles handleViewQuiz logic.
   const handleViewQuiz = (quiz) => {
-    // Store quiz data in sessionStorage to pass to detail page
-    sessionStorage.setItem(`quiz_${quiz.id}`, JSON.stringify(quiz))
-    navigate(`/quiz/${quiz.id}`)
-  }
+    sessionStorage.setItem(`quiz_${quiz.id}`, JSON.stringify(quiz));
+    navigate(`/quiz/${quiz.id}`);
+  };
 
-  // Calculate topics mastered (100% score = fully mastered)
-  const calculateTopicsMastered = () => {
-    const topicScores = {}
+  // Metric Computations
+  const { masteredCount, totalTopics, masteryRate } = useMemo(() => {
+    const topicScores = {};
     quizzes.forEach((quiz) => {
-      const quizTitle = quiz.title || 'Unknown Topic'
-      const correctCount = Array.isArray(quiz.quiz) ? quiz.quiz.filter(q => q.isCorrect).length : 0
-      const totalCount = Array.isArray(quiz.quiz) ? quiz.quiz.length : 0
-      const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0
+      const quizTitle = quiz.title || 'General Topic';
+      const correctCount = Array.isArray(quiz.quiz) ? quiz.quiz.filter((q) => q.isCorrect).length : 0;
+      const totalCount = Array.isArray(quiz.quiz) ? quiz.quiz.length : 0;
+      const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
       if (!topicScores[quizTitle] || topicScores[quizTitle] < score) {
-        topicScores[quizTitle] = score
+        topicScores[quizTitle] = score;
       }
-    })
-    const masteredCount = Object.values(topicScores).filter(score => score === 100).length
-    const totalTopics = Object.keys(topicScores).length
-    return { masteredCount, totalTopics }
-  }
+    });
+    const mastered = Object.values(topicScores).filter((score) => score === 100).length;
+    const total = Object.keys(topicScores).length;
+    const rate = total > 0 ? Math.round((mastered / total) * 100) : 0;
+    return { masteredCount: mastered, totalTopics: total, masteryRate: rate };
+  }, [quizzes]);
 
-  // Calculate current study streak (consecutive days with ≥1 quiz)
-  const calculateStreak = () => {
-    if (!quizzes.length) return 0
-
-    // Handles toLocalDayKey logic.
+  const streak = useMemo(() => {
+    if (!quizzes.length) return 0;
     const toLocalDayKey = (value) => {
-      const d = new Date(value)
-      const y = d.getFullYear()
-      const m = String(d.getMonth() + 1).padStart(2, '0')
-      const day = String(d.getDate()).padStart(2, '0')
-      return `${y}-${m}-${day}`
-    }
+      const d = new Date(value);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
 
-    const quizDays = new Set(
-      quizzes.map(q => toLocalDayKey(q.created_at))
-    )
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const todayStr = toLocalDayKey(today)
-    const checkDate = new Date(today)
-    // If no quiz today, start checking from yesterday
+    const quizDays = new Set(quizzes.map((q) => toLocalDayKey(q.created_at)));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = toLocalDayKey(today);
+    const checkDate = new Date(today);
     if (!quizDays.has(todayStr)) {
-      checkDate.setDate(checkDate.getDate() - 1)
+      checkDate.setDate(checkDate.getDate() - 1);
     }
-    let streak = 0
+    let currentStreak = 0;
     while (quizDays.has(toLocalDayKey(checkDate))) {
-      streak++
-      checkDate.setDate(checkDate.getDate() - 1)
+      currentStreak++;
+      checkDate.setDate(checkDate.getDate() - 1);
     }
-    return streak
-  }
+    return currentStreak;
+  }, [quizzes]);
 
-  // Calculate average score across all quizzes
-  const calculateAverageScore = () => {
-    if (!quizzes.length) return 0
-    const scores = quizzes.map(q => {
-      const correct = Array.isArray(q.quiz) ? q.quiz.filter(x => x.isCorrect).length : 0
-      const total = Array.isArray(q.quiz) ? q.quiz.length : 0
-      return total > 0 ? Math.round((correct / total) * 100) : 0
-    })
-    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-  }
+  const averageScore = useMemo(() => {
+    if (!quizzes.length) return 0;
+    const scores = quizzes.map((q) => {
+      const correct = Array.isArray(q.quiz) ? q.quiz.filter((x) => x.isCorrect).length : 0;
+      const total = Array.isArray(q.quiz) ? q.quiz.length : 0;
+      return total > 0 ? Math.round((correct / total) * 100) : 0;
+    });
+    return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  }, [quizzes]);
 
-  const { masteredCount, totalTopics } = calculateTopicsMastered()
-  const streak = calculateStreak()
-  const averageScore = calculateAverageScore()
-  const isLoadingQuizData = loading && quizzes.length === 0
-  const solidCardBg = 'color-mix(in srgb, var(--background) 90%, var(--foreground) 10%)'
-  const quotas = Array.isArray(tierStatus?.quotas) ? tierStatus.quotas : []
-  const isUnlimited = Boolean(tierStatus?.isUnlimited)
+  const { chartLabels, chartCounts, totalWeeklyQuizzes } = useMemo(() => {
+    const weeks = Array.from({ length: 6 }, (_, i) => {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const dayOfWeek = (start.getDay() + 6) % 7;
+      start.setDate(start.getDate() - dayOfWeek - (5 - i) * 7);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 7);
+      return { start, end };
+    });
 
+    const counts = weeks.map(
+      ({ start, end }) =>
+        quizzes.filter((q) => {
+          const d = new Date(q.created_at);
+          return d >= start && d < end;
+        }).length
+    );
+
+    const labels = weeks.map(({ start }) =>
+      start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    );
+
+    const totalThisWeek = counts[counts.length - 1] || 0;
+    return { chartLabels: labels, chartCounts: counts, totalWeeklyQuizzes: totalThisWeek };
+  }, [quizzes]);
+
+  const quotas = Array.isArray(tierStatus?.quotas) ? tierStatus.quotas : [];
+  const isUnlimited = Boolean(tierStatus?.isUnlimited);
+
+  const chartData = {
+    labels: chartLabels,
+    datasets: [
+      {
+        label: 'Completed Quizzes',
+        data: chartCounts,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+        fill: true,
+        tension: 0.35,
+        borderWidth: 2,
+        pointBackgroundColor: '#3b82f6',
+        pointBorderColor: '#121214',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+      },
+    ],
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#18181b',
+        titleColor: '#f0f0ee',
+        bodyColor: '#a1a1a6',
+        borderColor: '#2e2e33',
+        borderWidth: 1,
+        padding: 10,
+        displayColors: false,
+        callbacks: {
+          label: (context) => `${context.parsed.y} quiz${context.parsed.y === 1 ? '' : 'zes'} completed`,
+        },
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          color: '#a1a1a6',
+          font: { size: 11, family: 'monospace' },
+          stepSize: 1,
+          precision: 0,
+        },
+        grid: {
+          color: 'rgba(255, 255, 255, 0.05)',
+          drawBorder: false,
+        },
+        border: { display: false },
+      },
+      x: {
+        grid: { display: false },
+        ticks: {
+          color: '#a1a1a6',
+          font: { size: 11 },
+        },
+        border: { display: false },
+      },
+    },
+  };
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4" style={{ color: 'var(--foreground)' }}>
-            Please log in
-          </h1>
+      <div className="min-h-screen flex items-center justify-center bg-[#121214] text-[#f0f0ee]">
+        <div className="card-standard p-8 text-center max-w-sm">
+          <AlertCircle className="w-8 h-8 text-amber-400 mx-auto mb-3" />
+          <h1 className="text-lg font-semibold text-[#f0f0ee] mb-2">Session Required</h1>
+          <p className="text-xs text-[#a1a1a6] mb-5">Please sign in to access your dashboard and study analytics.</p>
           <button
             onClick={() => navigate('/login')}
-            className="px-6 py-2 rounded-lg transition-all hover:scale-105 font-medium"
-            style={{ 
-              background: 'var(--primary)',
-              color: 'var(--primary-foreground)'
-            }}
+            className="btn-primary w-full"
           >
             Go to Login
           </button>
@@ -324,478 +397,380 @@ useEffect(() => {
     );
   }
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      title: { display: false },
-      tooltip: {
-        backgroundColor: '#1e1c30',
-        titleColor: '#ede8d8',
-        bodyColor: '#9090b0',
-        borderColor: '#3a3858',
-        borderWidth: 1,
-        padding: 12,
-        displayColors: false,
-        callbacks: {
-          label: function(context) {
-            const v = context.parsed.y;
-            return v === 1 ? '1 quiz' : v + ' quizzes';
-          }
-        }
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: {
-          color: '#9090b0',
-          font: { size: 12 },
-          stepSize: 1,
-          precision: 0
-        },
-        grid: { 
-          color: '#2d2b42',
-          drawBorder: false
-        },
-        border: { display: false }
-      },
-      x: {
-        grid: { display: false },
-        ticks: { 
-          color: '#9090b0',
-          font: { size: 12 }
-        },
-        border: { display: false }
-      }
-    },
-    elements: {
-      line: { tension: 0.4 }
-    },
-    interaction: {
-      intersect: false,
-      mode: 'index'
-    }
-  };
-
-  // Build last-6-weeks quiz count
-  const buildWeeklyData = () => {
-    const weeks = Array.from({ length: 6 }, (_, i) => {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      // week 0 = current week (Mon-based), week 1 = last week, etc.
-      const dayOfWeek = (start.getDay() + 6) % 7; // Mon=0 … Sun=6
-      start.setDate(start.getDate() - dayOfWeek - (5 - i) * 7);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 7);
-      return { start, end };
-    });
-
-    const counts = weeks.map(({ start, end }) =>
-      quizzes.filter(q => {
-        const d = new Date(q.created_at);
-        return d >= start && d < end;
-      }).length
-    );
-
-    const labels = weeks.map(({ start }) =>
-      start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    );
-
-    return { labels, counts };
-  };
-
-  const { labels: chartLabels, counts: chartCounts } = buildWeeklyData();
-
-  const renderRecentQuizSkeletonRows = () => (
-    <div className="overflow-auto max-h-64" aria-hidden>
-      <table className="w-full text-left border-collapse text-xs">
-        <thead className="bg-[var(--muted)] text-[var(--muted-foreground)] uppercase tracking-wider sticky top-0">
-          <tr>
-            <th className="px-3 py-2 font-semibold">Title</th>
-            <th className="px-3 py-2 font-semibold">Date</th>
-            <th className="px-3 py-2 font-semibold text-center">Score</th>
-            <th className="px-3 py-2 font-semibold text-right">Action</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[var(--border)]">
-          {Array.from({ length: 8 }).map((_, index) => (
-            <tr key={`quiz-skeleton-${index}`}>
-              <td className="px-3 py-2"><Skeleton style={{ height: '0.8rem', width: `${90 - index * 4}%` }} /></td>
-              <td className="px-3 py-2"><Skeleton style={{ height: '0.8rem', width: '65%' }} /></td>
-              <td className="px-3 py-2">
-                <div className="flex justify-center">
-                  <Skeleton rounded="999px" style={{ height: '1.25rem', width: '3.4rem' }} />
-                </div>
-              </td>
-              <td className="px-3 py-2">
-                <div className="flex justify-end">
-                  <Skeleton rounded="0.4rem" style={{ height: '1.5rem', width: '2.9rem' }} />
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-
-  const renderSuggestionSkeleton = () => (
-    <div className="rounded-xl p-4 border h-full overflow-auto" style={{ background: 'color-mix(in srgb, var(--primary) 8%, var(--card))', borderColor: 'var(--primary)', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)' }} aria-hidden>
-      <div className="flex items-center gap-2 mb-3">
-        <Skeleton rounded="999px" style={{ width: '1.9rem', height: '1.9rem' }} />
-        <Skeleton style={{ height: '0.9rem', width: '8.8rem' }} />
-      </div>
-      <div className="space-y-3">
-        {Array.from({ length: 3 }).map((_, index) => (
-          <div key={`dashboard-suggestion-skeleton-${index}`} className="border-b border-[var(--border)] pb-2 last:border-0 last:pb-0">
-            <Skeleton style={{ height: '0.82rem', width: `${88 - index * 8}%` }} />
-            <Skeleton className="mt-2" style={{ height: '0.7rem', width: `${95 - index * 6}%` }} />
+  return (
+    <main className="main-content sidebar-page-shell min-h-screen lg:h-screen bg-[#121214] text-[#f0f0ee] flex flex-col font-sans overflow-y-auto lg:overflow-hidden select-none">
+      {/* ── TOP APP HEADER ── */}
+      <header className="shrink-0 h-16 border-b border-[#2e2e33] bg-[#121214]/90 backdrop-blur-md pl-14 sm:pl-16 md:px-6 px-4 flex items-center justify-between z-20">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-[10px] bg-[#18181b] border border-[#2e2e33] flex items-center justify-center text-[#f0f0ee]">
+            <Layers className="w-4 h-4" />
           </div>
-        ))}
-      </div>
-      <div className="flex items-center gap-2 pt-3 mt-3 border-t" style={{ borderColor: 'var(--border)' }}>
-        <Skeleton rounded="999px" style={{ height: '0.4rem', width: '100%' }} />
-        <Skeleton style={{ height: '0.75rem', width: '2rem' }} />
-      </div>
-    </div>
-  )
-
-  const renderRepetitionSkeletonItems = () => (
-    <div className="space-y-2" aria-hidden>
-      {Array.from({ length: 3 }).map((_, index) => (
-        <div key={`repetition-skeleton-${index}`} className="rounded-lg border p-2" style={{ borderColor: 'var(--border)' }}>
-          <Skeleton style={{ height: '0.78rem', width: `${88 - index * 8}%` }} />
-          <Skeleton className="mt-1.5" style={{ height: '0.78rem', width: `${70 - index * 7}%` }} />
-          <div className="mt-2 flex justify-end">
-            <Skeleton rounded="0.4rem" style={{ height: '1.5rem', width: '4.2rem' }} />
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm sm:text-base font-semibold text-[#f0f0ee] tracking-tight">
+                {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}’s Dashboard
+              </h1>
+              <span className="badge-standard hidden sm:inline-block">
+                Active
+              </span>
+            </div>
+            <p className="text-xs text-[#a1a1a6] hidden sm:block">Academic study performance &amp; cognitive diagnostics</p>
           </div>
         </div>
-      ))}
-    </div>
-  )
 
-  const chartData = {
-    labels: chartLabels,
-    datasets: [
-      {
-        label: 'Quizzes',
-        data: chartCounts,
-        borderColor: '#c2844b',
-        backgroundColor: (context) => {
-          const ctx = context.chart.ctx;
-          const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-          gradient.addColorStop(0, 'rgba(194, 132, 75, 0.35)');
-          gradient.addColorStop(1, 'rgba(194, 132, 75, 0)');
-          return gradient;
-        },
-        fill: true,
-        pointBackgroundColor: '#d4a853',
-        pointBorderColor: '#d4a853',
-        pointBorderWidth: 2,
-        pointRadius: 5,
-        pointHoverRadius: 8,
-        pointHoverBorderWidth: 3,
-        pointHoverBackgroundColor: '#d4a853'
-      },
-    ],
-  };
+        <div className="flex items-center gap-3">
+          <Link
+            to="/Learningpage"
+            id="btn-new-study-session"
+            className="btn-primary inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Session</span>
+          </Link>
 
-  const suggestionAverageScore = Number.isFinite(Number(suggestions?.analysisData?.averageScore))
-    ? Number(suggestions.analysisData.averageScore)
-    : null;
-
-
-
-
-  return (
-    <main className="main-content min-h-screen xl:h-screen overflow-x-hidden relative flex flex-col" style={{ background: 'var(--background)', color: 'var(--foreground)', fontFamily: 'var(--font-sans)' }}>
-      <DotGrid />
-
-      <header
-        className="relative z-20 backdrop-blur-lg border-b shrink-0"
-        style={{
-          background: 'color-mix(in srgb, var(--background) 84%, transparent)',
-          borderColor: 'var(--border)',
-          boxShadow: 'var(--shadow-sm)'
-        }}
-      >
-        <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4 max-w-7xl mx-auto">
-          <Reveal>
-            <div>
-              <h1 className="text-2xl font-bold mb-0.5" style={{ color: 'var(--foreground)' }}>
-                {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Your'} Dashboard
-              </h1>
-              <p className="text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
-                One-screen command center
-              </p>
-            </div>
-          </Reveal>
-
-          <div className="flex items-center space-x-3">
-            <Link
-              to="/Learningpage"
-              className="inline-flex items-center gap-2 px-4 py-2 font-mono font-bold text-[12px] transition-all duration-200 uppercase tracking-widest rounded-lg"
-              style={{ background: 'var(--primary)', color: 'var(--primary-foreground)', textDecoration: 'none', border: '1px solid var(--primary)' }}
-            >
-              <span>+</span> New Session
-            </Link>
-            <button
-              className="p-2 rounded-full relative transition-all border"
-              style={{ background: 'var(--accent)', borderColor: 'var(--border)', color: 'var(--foreground)' }}
-            >
-              <Bell size={16} />
-            </button>
-            <div
-              className="h-9 w-9 rounded-full flex items-center justify-center font-bold text-base border-2 transition-all cursor-pointer"
-              style={{
-                background: 'var(--accent)',
-                color: 'var(--foreground)',
-                borderColor: 'var(--primary)'
-              }}
-            >
-              <Link to="/Profile">{user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}</Link>
-            </div>
-          </div>
+          <Link
+            to="/Profile"
+            className="w-8 h-8 rounded-full bg-[#18181b] hover:border-[#f0f0ee]/40 border border-[#2e2e33] text-[#f0f0ee] flex items-center justify-center text-xs font-medium transition-colors"
+            title="Account Profile"
+          >
+            {user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+          </Link>
         </div>
       </header>
 
-      <section className="relative z-10 px-4 sm:px-6 lg:px-8 py-3 max-w-7xl mx-auto w-full flex-1 min-h-0 overflow-y-auto">
-        <div className="grid grid-cols-12 gap-4">
-          <Reveal delay={0.05} className="col-span-12 md:col-span-4 xl:col-span-3">
-            <div className="rounded-xl p-4 border h-full" style={{ background: solidCardBg, borderColor: 'var(--border)', boxShadow: 'var(--shadow)', borderLeft: '4px solid var(--chart-5)' }}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>Study Streak</p>
-              {isLoadingQuizData ? (
-                <div className="mt-2 space-y-2" aria-hidden>
-                  <Skeleton style={{ height: '2rem', width: '55%' }} />
-                  <Skeleton style={{ height: '0.9rem', width: '70%' }} />
-                </div>
-              ) : (
-                <>
-                  <p className="text-3xl font-bold mt-2" style={{ color: 'var(--card-foreground)' }}>{streak} {streak === 1 ? 'Day' : 'Days'}</p>
-                  <p className="text-sm mt-2 font-medium" style={{ color: 'var(--chart-4)' }}>
-                    {streak === 0 ? 'Start your streak today!' : streak >= 7 ? 'On fire!' : 'Keep it up!'}
-                  </p>
-                </>
-              )}
+      {/* ── MAIN ONE-PAGE CONTENT CONTAINER ── */}
+      <div className="flex-1 p-4 sm:p-5 flex flex-col gap-4 min-h-0 max-w-[1600px] w-full mx-auto">
+        {/* ── UNIFIED PERFORMANCE METRIC STRIP (Consolidated, Zero Box Clutter) ── */}
+        <div className="shrink-0 bg-[#18181b] border border-[#2e2e33] rounded-xl p-3 sm:px-6 sm:py-4 grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-0 lg:divide-x divide-[#2e2e33]/70">
+          {/* Metric 1: Streak (Yellow) */}
+          <div className="flex items-center gap-3.5 lg:pr-6">
+            <div className="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center shrink-0">
+              <Flame className={`w-5 h-5 ${streak > 0 ? 'text-amber-400 fill-amber-400/20' : 'text-[#a1a1aa]'}`} />
             </div>
-          </Reveal>
-
-          <Reveal delay={0.08} className="col-span-12 md:col-span-4 xl:col-span-3">
-            <div className="rounded-xl p-4 border h-full" style={{ background: solidCardBg, borderColor: 'var(--border)', boxShadow: 'var(--shadow)', borderLeft: '4px solid var(--chart-4)' }}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>Topics Mastered</p>
-              {isLoadingQuizData ? (
-                <div className="mt-2 space-y-2" aria-hidden>
-                  <Skeleton style={{ height: '2rem', width: '58%' }} />
-                  <Skeleton style={{ height: '0.75rem', width: '50%' }} />
-                </div>
-              ) : (
-                <>
-                  <p className="text-3xl font-bold mt-2" style={{ color: 'var(--card-foreground)' }}>
-                    {masteredCount}<span className="text-lg" style={{ color: 'var(--muted-foreground)' }}>/{totalTopics}</span>
-                  </p>
-                  <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>100% score required</p>
-                </>
-              )}
+            <div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-semibold text-amber-300 tracking-tight">{streak}</span>
+                <span className="text-xs text-[#d4d4d8] font-medium">{streak === 1 ? 'day' : 'days'} streak</span>
+              </div>
+              <p className="text-xs text-[#a1a1aa]">
+                {streak === 0 ? 'Study today to start' : streak >= 5 ? '★ Consistent habit' : 'Active habit'}
+              </p>
             </div>
-          </Reveal>
+          </div>
 
-          <Reveal delay={0.1} className="col-span-12 md:col-span-4 xl:col-span-3">
-            <div className="rounded-xl p-4 border h-full" style={{ background: solidCardBg, borderColor: 'var(--border)', boxShadow: 'var(--shadow)', borderLeft: '4px solid var(--chart-2)' }}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>Average Score</p>
-              {isLoadingQuizData ? (
-                <div className="mt-3 space-y-3" aria-hidden>
-                  <Skeleton style={{ height: '1.9rem', width: '42%' }} />
-                  <Skeleton rounded="999px" style={{ height: '0.5rem', width: '100%' }} />
-                </div>
-              ) : quizzes.length === 0 ? (
-                <p className="text-sm mt-3" style={{ color: 'var(--muted-foreground)' }}>No quizzes yet</p>
-              ) : (
-                <>
-                  <p className="text-3xl font-bold mt-2" style={{ color: 'var(--card-foreground)' }}>{averageScore}%</p>
-                  <div className="relative h-2 rounded-full overflow-hidden mt-3" style={{ background: 'var(--muted)' }}>
-                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${averageScore}%`, background: averageScore >= 80 ? 'var(--chart-4)' : averageScore >= 60 ? '#d4a853' : 'var(--chart-3)' }} />
+          {/* Metric 2: Mastery (Green) */}
+          <div className="flex items-center gap-3.5 lg:px-6">
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+              <Award className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-semibold text-emerald-300 tracking-tight">{masteredCount}</span>
+                <span className="text-xs text-[#d4d4d8] font-medium">/ {totalTopics} mastered</span>
+              </div>
+              <div className="w-full max-w-[120px] bg-[#121214] border border-[#2e2e33] h-2 rounded-full overflow-hidden mt-1.5">
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, masteryRate)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Metric 3: Average Score (Semantic Green/Yellow/Red) */}
+          <div className="flex items-center gap-3.5 lg:px-6">
+            <div className={`w-10 h-10 rounded-lg border flex items-center justify-center shrink-0 ${
+              averageScore >= 80 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+              averageScore >= 60 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+              'bg-red-500/10 text-red-400 border-red-500/20'
+            }`}>
+              <Target className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-baseline gap-1.5">
+                <span className={`text-2xl font-semibold tracking-tight ${
+                  averageScore >= 80 ? 'text-emerald-300' :
+                  averageScore >= 60 ? 'text-amber-300' :
+                  'text-red-300'
+                }`}>
+                  {quizzes.length > 0 ? `${averageScore}%` : '—'}
+                </span>
+                <span className="text-xs text-[#d4d4d8] font-medium">avg score</span>
+              </div>
+              <p className="text-xs text-[#a1a1aa]">
+                {quizzes.length} assessment{quizzes.length === 1 ? '' : 's'} logged
+              </p>
+            </div>
+          </div>
+
+          {/* Metric 4: Allowance (Blue) */}
+          <div className="flex items-center gap-3.5 lg:pl-6">
+            <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-semibold text-blue-300 tracking-tight">
+                  {isUnlimited ? '∞' : quotas[0] ? quotas[0].remaining : 'Active'}
+                </span>
+                <span className="text-xs text-[#d4d4d8] font-mono font-medium">
+                  {isUnlimited ? 'unlimited' : quotas[0] ? `/ ${quotas[0].limit} left` : 'allowance'}
+                </span>
+              </div>
+              <p className="text-xs text-[#a1a1aa]">Daily quota resets 00:00 UTC</p>
+            </div>
+          </div>
+        </div>
+
+        {/* ── ROW 2: 2 COHESIVE MAIN PANELS (Clean Structure, Zero Nested Box Noise) ── */}
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">
+          {/* ── LEFT MASTER PANEL: PROGRESS & RECENT ASSESSMENTS (7 Cols) ── */}
+          <div className="lg:col-span-7 card-standard p-0 flex flex-col min-h-0 overflow-hidden">
+            {/* Upper Stage: Velocity Chart */}
+            <div className="p-4 sm:p-5 border-b border-[#2e2e33] flex flex-col shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    <Calendar className="w-4 h-4" />
                   </div>
-                </>
-              )}
-            </div>
-          </Reveal>
+                  <h2 className="text-sm font-semibold text-[#f0f0ee]">Study Velocity</h2>
+                  <span className="text-xs text-[#a1a1aa]">6-Week Activity Trend</span>
+                </div>
+                <span className="text-xs font-mono font-medium text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                  {totalWeeklyQuizzes} quizzes this week
+                </span>
+              </div>
 
-          <Reveal delay={0.12} className="col-span-12 xl:col-span-3">
-            <div className="rounded-xl p-4 border h-full overflow-auto" style={{ background: solidCardBg, borderColor: 'var(--border)', boxShadow: 'var(--shadow)' }}>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold" style={{ color: 'var(--foreground)' }}>Free Tier</h2>
-                {isUnlimited && (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'var(--chart-2)', color: 'var(--primary-foreground)' }}>
-                    Unlimited
-                  </span>
+              <div className="h-[150px] w-full">
+                {loading && quizzes.length === 0 ? (
+                  <div className="h-full flex items-center justify-center">
+                    <Skeleton style={{ height: '80%', width: '95%' }} />
+                  </div>
+                ) : quizzes.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-xs text-[#a1a1aa]">
+                    <p>No study sessions recorded yet.</p>
+                  </div>
+                ) : (
+                  <Line options={chartOptions} data={chartData} />
                 )}
               </div>
-              {isLoadingTierStatus ? (
-                <div className="space-y-2" aria-hidden>
-                  <Skeleton style={{ height: '2rem', width: '100%' }} rounded="0.65rem" />
-                  <Skeleton style={{ height: '2rem', width: '100%' }} rounded="0.65rem" />
-                </div>
-              ) : quotas.length === 0 ? (
-                <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>No quota data yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {quotas.map((quota) => {
-                    const label = quota.actionType === 'learning_tool_generate' ? 'Tools' : 'Study Sessions'
-                    return (
-                      <div key={quota.actionType} className="rounded-lg border p-2" style={{ borderColor: 'var(--border)' }}>
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-xs font-semibold">{label}</p>
-                          <p className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{quota.used}/{quota.limit}</p>
-                        </div>
-                        <p className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>{quota.remaining} left today</p>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
             </div>
-          </Reveal>
 
-          <Reveal delay={0.15} className="col-span-12 xl:col-span-5">
-            <div className="rounded-xl p-4 border" style={{ background: solidCardBg, borderColor: 'var(--border)', boxShadow: 'var(--shadow)' }}>
-              <h2 className="text-sm font-bold mb-2" style={{ color: 'var(--foreground)' }}>Quizzes per Week</h2>
-              {isLoadingQuizData ? (
-                <div className="relative h-52 w-full" aria-hidden>
-                  <Skeleton rounded="0.75rem" style={{ height: '100%', width: '100%' }} />
+            {/* Lower Stage: Recent Quizzes Table */}
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-[#131519]/40">
+              <div className="px-4 sm:px-5 py-3 border-b border-[#2e2e33] flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-[#f0f0ee]">Recent Assessments</h3>
                 </div>
-              ) : quizzes.length === 0 ? (
-                <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>No quiz data yet. Start a study session to see your trend.</p>
-              ) : (
-                <div className="relative h-52 w-full">
-                  <Line options={chartOptions} data={chartData} />
-                </div>
-              )}
-            </div>
-          </Reveal>
-
-          <Reveal delay={0.2} className="col-span-12 xl:col-span-4">
-            <div className="rounded-xl border overflow-hidden" style={{ background: solidCardBg, borderColor: 'var(--border)', boxShadow: 'var(--shadow)' }}>
-              <div className="px-4 py-3 border-b border-[var(--border)]">
-                <h2 className="text-sm font-bold text-[var(--foreground)]">Recent Quizzes</h2>
+                <span className="text-xs text-[#d4d4d8] font-mono font-medium">
+                  {quizzes.length} total completed
+                </span>
               </div>
-              {loading && renderRecentQuizSkeletonRows()}
-              {error && <p className="text-red-500 px-4 py-3 text-sm">Error: {error}</p>}
-              {!loading && (!quizzes || quizzes.length === 0) && (
-                <p className="text-[var(--muted-foreground)] px-4 py-3 text-xs">No quizzes yet</p>
-              )}
-              {!loading && quizzes.length > 0 && (
-                <div className="overflow-auto max-h-64">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead className="bg-[var(--muted)] text-[var(--muted-foreground)] uppercase tracking-wider sticky top-0">
+
+              <div className="flex-1 overflow-y-auto min-h-0">
+                {loading && quizzes.length === 0 ? (
+                  <div className="p-4 space-y-2">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} style={{ height: '2rem', width: '100%' }} rounded="6px" />
+                    ))}
+                  </div>
+                ) : error ? (
+                  <div className="p-4 text-xs sm:text-sm text-red-400 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    <span>{error}</span>
+                  </div>
+                ) : quizzes.length === 0 ? (
+                  <div className="p-6 text-center text-xs sm:text-sm text-[#a1a1aa]">
+                    <p>No assessment history available.</p>
+                    <Link
+                      to="/Learningpage"
+                      className="mt-2 inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 font-medium text-xs hover:underline"
+                    >
+                      <span>Start a session now</span>
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                ) : (
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                    <thead className="bg-[#121214]/80 text-[#d4d4d8] sticky top-0 z-10 border-b border-[#2e2e33]">
                       <tr>
-                        <th className="px-3 py-2 font-semibold">Title</th>
-                        <th className="px-3 py-2 font-semibold">Date</th>
-                        <th className="px-3 py-2 font-semibold text-center">Score</th>
-                        <th className="px-3 py-2 font-semibold text-right">Action</th>
+                        <th className="px-4 sm:px-5 py-2.5 font-semibold text-xs text-[#e4e4e7]">Topic / Title</th>
+                        <th className="px-3 py-2.5 font-semibold text-xs text-[#e4e4e7] hidden sm:table-cell">Date</th>
+                        <th className="px-3 py-2.5 font-semibold text-xs text-[#e4e4e7] text-center">Score</th>
+                        <th className="px-4 sm:px-5 py-2.5 font-semibold text-xs text-[#e4e4e7] text-right">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[var(--border)]">
+                    <tbody className="divide-y divide-[#2e2e33]/50 text-[#f0f0ee]">
                       {quizzes.slice(0, 8).map((quiz) => {
-                        const correctCount = Array.isArray(quiz.quiz) ? quiz.quiz.filter(q => q.isCorrect).length : 0
-                        const totalCount = Array.isArray(quiz.quiz) ? quiz.quiz.length : 0
-                        const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0
+                        const correctCount = Array.isArray(quiz.quiz) ? quiz.quiz.filter((q) => q.isCorrect).length : 0;
+                        const totalCount = Array.isArray(quiz.quiz) ? quiz.quiz.length : 0;
+                        const score = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
 
                         return (
-                          <tr key={quiz.id} className="hover:bg-[var(--muted)]/50 transition-colors">
-                            <td className="px-3 py-2"><span className="font-medium text-[var(--foreground)] line-clamp-1">{quiz.title}</span></td>
-                            <td className="px-3 py-2 text-[var(--muted-foreground)]">{new Date(quiz.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
-                            <td className="px-3 py-2 text-center">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${score >= 80 ? 'bg-green-500/20 text-green-500' : score >= 60 ? 'bg-yellow-500/20 text-yellow-500' : 'bg-red-500/20 text-red-500'}`}>
+                          <tr key={quiz.id} className="hover:bg-[#18181b] transition-colors">
+                            <td className="px-4 sm:px-5 py-3">
+                              <span className="font-medium text-[#f0f0ee] line-clamp-1 text-xs sm:text-sm">{quiz.title || 'Untitled Assessment'}</span>
+                            </td>
+                            <td className="px-3 py-3 text-[#d4d4d8] font-mono text-xs hidden sm:table-cell">
+                              {new Date(quiz.created_at).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </td>
+                            <td className="px-3 py-3 text-center">
+                              <span
+                                className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-mono font-semibold ${
+                                  score >= 80
+                                    ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                                    : score >= 60
+                                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                                    : 'bg-red-500/15 text-red-300 border border-red-500/30'
+                                }`}
+                              >
                                 {score}%
                               </span>
                             </td>
-                            <td className="px-3 py-2 text-right">
-                              <button onClick={() => handleViewQuiz(quiz)} className="text-[10px] px-2 py-1 rounded-md font-medium transition-all" style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>View</button>
+                            <td className="px-4 sm:px-5 py-3 text-right">
+                              <button
+                                onClick={() => handleViewQuiz(quiz)}
+                                className="btn-secondary px-3 py-1 text-xs font-medium hover:bg-[#282830]"
+                              >
+                                View
+                              </button>
                             </td>
                           </tr>
-                        )
+                        );
                       })}
                     </tbody>
                   </table>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </Reveal>
+          </div>
 
-          <div className="col-span-12 xl:col-span-3 grid gap-4 min-h-0 xl:grid-rows-[auto_minmax(0,1fr)]">
-            <Reveal delay={0.22} className="min-h-0">
-              <div className="rounded-xl p-4 border h-fit max-h-full overflow-auto" style={{ background: solidCardBg, borderColor: 'var(--border)', boxShadow: 'var(--shadow)' }}>
-                <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--foreground)' }}>Spaced Repetition</h2>
+          {/* ── RIGHT MASTER PANEL: ACTIONABLE STUDY PRIORITIES (5 Cols) ── */}
+          <div className="lg:col-span-5 card-standard p-0 flex flex-col min-h-0 overflow-hidden">
+            {/* Header */}
+            <div className="px-4 sm:px-5 py-3 border-b border-[#2e2e33] flex items-center justify-between shrink-0 bg-[#131519]/60">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <h2 className="text-sm font-semibold text-[#f0f0ee]">Study Priorities &amp; Actions</h2>
+              </div>
+              <span className={`text-xs font-mono font-medium px-2.5 py-0.5 rounded-md border ${
+                dueRepetitionItems.length > 0 ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+              }`}>
+                {dueRepetitionItems.length} due
+              </span>
+            </div>
+
+            <div className="flex-1 p-4 sm:p-5 overflow-y-auto min-h-0 space-y-5">
+              {/* Section 1: Spaced Repetition Due Queue */}
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Interval Reviews Due</span>
+                  </span>
+                  <span className="text-xs text-[#a1a1aa]">Scheduled repetitions</span>
+                </div>
+
                 {isLoadingRepetition ? (
-                  renderRepetitionSkeletonItems()
+                  <div className="space-y-2">
+                    <Skeleton style={{ height: '2.5rem', width: '100%' }} rounded="6px" />
+                    <Skeleton style={{ height: '2.5rem', width: '100%' }} rounded="6px" />
+                  </div>
                 ) : dueRepetitionItems.length === 0 ? (
-                  <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>No items due now.</p>
+                  <div className="p-3.5 bg-[#131519] border border-[#2e2e33] rounded-lg text-center text-xs sm:text-sm text-[#d4d4d8] flex items-center justify-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="text-emerald-300 font-medium">All spaced repetitions up to date</span>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {dueRepetitionItems.map((item) => (
-                      <div key={item.id} className="rounded-lg border p-2" style={{ borderColor: 'var(--border)' }}>
-                        <p className="text-xs font-semibold line-clamp-2">{item.topic_label}</p>
-                        <div className="mt-2 flex justify-end">
-                          <button
-                            onClick={() => handleMarkReviewed(item.id)}
-                            disabled={Boolean(reviewingQueueIds[item.id])}
-                            className="text-[10px] px-2 py-1 rounded-md font-medium"
-                            style={{ background: 'var(--primary)', color: 'var(--primary-foreground)', opacity: reviewingQueueIds[item.id] ? 0.7 : 1 }}
-                          >
-                            {reviewingQueueIds[item.id] ? 'Saving...' : 'Reviewed'}
-                          </button>
+                      <div
+                        key={item.id}
+                        className="p-3 bg-[#131519] border border-amber-500/30 rounded-lg flex items-center justify-between gap-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm font-medium text-[#f0f0ee] truncate">{item.topic_label || 'Study Item'}</p>
+                          <p className="text-xs text-amber-300 flex items-center gap-1 mt-0.5">
+                            <Clock className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Interval review due</span>
+                          </p>
                         </div>
+                        <button
+                          onClick={() => handleMarkReviewed(item.id)}
+                          disabled={Boolean(reviewingQueueIds[item.id])}
+                          className="btn-secondary px-3 py-1 text-xs font-medium shrink-0 border-amber-500/30 hover:bg-amber-500/10 text-amber-300"
+                        >
+                          {reviewingQueueIds[item.id] ? 'Saving...' : 'Mark Done'}
+                        </button>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-            </Reveal>
 
-            <Reveal delay={0.24} className="min-h-0">
-              {suggestions?.suggestions?.urgentAreas?.[0] ? (
-                <div className="rounded-xl p-4 border h-full overflow-auto" style={{ background: 'color-mix(in srgb, var(--primary) 8%, var(--card))', borderColor: 'var(--primary)', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)' }}>
-                  <h3 className="text-sm font-bold uppercase tracking-wider opacity-90 flex items-center gap-2 mb-3"><Vela size={30} /> Vela Suggestions</h3>
-                  <div className="space-y-3">
-                    {[0, 1, 2].map((index) => {
-                      const topicName = suggestions.analysisData.lowestScoringAreas[index]
-                      const urgentArea = suggestions.suggestions.urgentAreas[index]
-                      const studyAction = suggestions.suggestions.studyPlan[index]
+              {/* Section 2: Vela Diagnostic Guidance */}
+              <div className="pt-3 border-t border-[#2e2e33]">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <Vela size={18} />
+                  <span className="text-xs font-semibold text-blue-300">Vela Error Diagnostic Focus</span>
+                </div>
+
+                {isLoadingSuggestions ? (
+                  <div className="space-y-2">
+                    <Skeleton style={{ height: '1.4rem', width: '80%' }} rounded="6px" />
+                    <Skeleton style={{ height: '2.8rem', width: '100%' }} rounded="6px" />
+                  </div>
+                ) : suggestions?.suggestions?.urgentAreas?.[0] ? (
+                  <div className="space-y-2.5">
+                    {[0, 1].map((index) => {
+                      const topicName = suggestions.analysisData?.lowestScoringAreas?.[index];
+                      const urgentArea = suggestions.suggestions.urgentAreas[index];
+                      const studyAction = suggestions.suggestions.studyPlan[index];
+                      if (!topicName && !urgentArea) return null;
+
+                      const isSevere = index === 0;
+
                       return (
-                        <div key={index} className="border-b border-[var(--border)] pb-2 last:border-0 last:pb-0">
-                          <p className="font-bold mb-1 text-xs">{index + 1}. {topicName || urgentArea || 'General Review'}</p>
-                          <p className="text-[11px] opacity-80 italic leading-relaxed">{studyAction || 'Review fundamentals and practice problems'}</p>
+                        <div key={index} className={`p-3 bg-[#131519] border rounded-lg ${
+                          isSevere ? 'border-red-500/30' : 'border-amber-500/30'
+                        }`}>
+                          <div className="text-xs sm:text-sm font-medium text-[#f0f0ee] flex items-center justify-between gap-2">
+                            <span className="truncate font-semibold">{topicName || urgentArea}</span>
+                            <span className={`px-2 py-0.5 rounded text-xs font-mono font-medium shrink-0 border ${
+                              isSevere ? 'bg-red-500/10 text-red-300 border-red-500/30' : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                            }`}>
+                              {isSevere ? 'Priority 1' : 'Priority 2'}
+                            </span>
+                          </div>
+                          {studyAction && (
+                            <p className="text-xs text-[#d4d4d8] mt-1.5 leading-relaxed line-clamp-2">
+                              {studyAction}
+                            </p>
+                          )}
                         </div>
-                      )
+                      );
                     })}
                   </div>
-                  {suggestionAverageScore !== null && (
-                    <div className="flex items-center gap-2 pt-3 mt-3 border-t" style={{ borderColor: 'var(--border)' }}>
-                      <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--muted)' }}>
-                        <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, suggestionAverageScore))}%`, background: 'var(--primary)' }} />
-                      </div>
-                      <span className="text-[11px] font-semibold">{Math.round(suggestionAverageScore)}%</span>
-                    </div>
-                  )}
-                </div>
-              ) : suggestions?.message ? (
-                <div className="rounded-xl p-4 border h-full" style={{ background: solidCardBg, borderColor: 'var(--border)' }}>
-                  <div className="flex items-center gap-2 mb-3"><Vela size={30} /><h3 className="text-sm font-bold uppercase tracking-wider">Vela Suggestions</h3></div>
-                  <p className="text-xs text-[var(--muted-foreground)] italic">{suggestions.message}</p>
-                </div>
-              ) : isLoadingSuggestions || !suggestions ? (
-                <div className="h-full">{renderSuggestionSkeleton()}</div>
-              ) : (
-                <div className="rounded-xl p-4 border h-full" style={{ background: solidCardBg, borderColor: 'var(--border)' }}>
-                  <p className="text-xs">Loading suggestions...</p>
-                </div>
-              )}
-            </Reveal>
+                ) : (
+                  <div className="p-3.5 bg-[#131519] border border-[#2e2e33] rounded-lg text-center text-xs sm:text-sm text-[#d4d4d8]">
+                    <p className="text-emerald-300 font-medium">✓ No critical error clusters detected</p>
+                    <p className="text-xs mt-0.5 text-[#a1a1aa]">Take more quizzes to build longitudinal profile.</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-      </section>
+      </div>
     </main>
   );
 }
+

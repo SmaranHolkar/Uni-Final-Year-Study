@@ -53,11 +53,11 @@ export default function AuthPage() {
               <use href="#small-star" x="70" y="70"/>
               <use href="#star" x="100" y="65"/>
             </g>
-            <text x="75" y="34" fontFamily="DM Serif Display, serif" fontSize="22" fontWeight="600" fill="#CDD1D6">Learning Playground</text>
+            <text x="75" y="34" fontFamily="DM Serif Display, serif" fontSize="22" fontWeight="600" fill="#CDD1D6">Hydruslearn</text>
           </svg>
         </Link>
         <h2 className="text-xl font-semibold text-[#CDD1D6]">
-          {isSignUp ? 'Create your account' : 'Sign in to your playground'}
+          {isSignUp ? 'Create your Hydruslearn account' : 'Sign in to Hydruslearn'}
         </h2>
       </div>
 

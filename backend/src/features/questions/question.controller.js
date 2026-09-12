@@ -56,41 +56,54 @@ export async function generateMindmap(req, res) {
       async function processOne(index) {
         const q = selectedWrongQuestions[index];
         const id = `n${index}`;
-        const label = (q.prompt && String(q.prompt).slice(0, 120)) || `Topic ${index + 1}`;
+        const label = (q.topic || (q.prompt && String(q.prompt).slice(0, 80))) || `Topic ${index + 1}`;
+        const correctAnswerText = getCorrectAnswerText(q);
         let description = '';
 
         try {
           const text = (q.prompt && String(q.prompt)) || '';
+          let chunkContext = '';
           if (text.trim()) {
-            const emb = await getEmbedding(text);
-            const chunks = await getTopChunks(emb, 3, userId);
-            if (Array.isArray(chunks) && chunks.length) {
-              console.log('Context received for mindmap node:', chunks[0].chunk_text ? 'Yes' : 'No');
-              const correctAnswerText = getCorrectAnswerText(q);
-              description = await aiMindmapNode({
-                question: q.prompt,
-                correctAnswer: correctAnswerText,
-                context: chunks[0].chunk_text,
-                sourceLink: q.sourceLink || ''
-              });
+            try {
+              const emb = await getEmbedding(text);
+              const chunks = await getTopChunks(emb, 3, userId);
+              if (Array.isArray(chunks) && chunks.length && chunks[0]?.chunk_text) {
+                chunkContext = chunks[0].chunk_text;
+              }
+            } catch (embErr) {
+              console.warn('Embedding/chunk retrieval error for mindmap:', embErr?.message);
             }
           }
-        } catch (err) {
-          console.error('Error fetching chunks for question:', err);
-        }
 
-        if (description && description.trim().length > 0) {
-          generatedNodes.push({
-            index,
-            node: { id, label, description, category: 'Suggested Review', sourceLink: q.resource || '' },
-            edge: { from: 'root', to: id }
+          const effectiveContext = chunkContext || q.explanation || `Question: ${q.prompt}\nCorrect Answer: ${correctAnswerText}`;
+          description = await aiMindmapNode({
+            question: q.prompt,
+            correctAnswer: correctAnswerText,
+            context: effectiveContext,
+            sourceLink: q.sourceLink || q.resource || ''
           });
-        } else {
-          console.warn(`AI did not return description for node ${id} (${label})`);
+        } catch (err) {
+          console.error('Error generating mindmap node description:', err);
         }
 
-        // Small jitter smooths burstiness while staying far faster than fixed 5s sleeps.
-        const jitterMs = 250 + Math.floor(Math.random() * 250);
+        if (!description || !description.trim()) {
+          description = q.explanation || `Key Concept: The correct understanding is "${correctAnswerText}". Review this core area to resolve conceptual gaps.`;
+        }
+
+        generatedNodes.push({
+          index,
+          node: {
+            id,
+            label,
+            description,
+            category: q.topic || q.tag || 'Key Concept',
+            sourceLink: q.resource || q.sourceLink || ''
+          },
+          edge: { from: 'root', to: id }
+        });
+
+        // Small jitter smooths burstiness
+        const jitterMs = 150 + Math.floor(Math.random() * 150);
         await new Promise(resolve => setTimeout(resolve, jitterMs));
       }
 
@@ -172,7 +185,8 @@ Rules:
 // Generate an interactive learning tool plan from a free-form user prompt
 export async function generateLearningTool(req, res) {
   try {
-    let { prompt, context, metacognitiveAnalysis, documentTitle, chatHistory, previousTool } = req.body;
+    let { prompt, context, metacognitiveAnalysis, metacognitiveContext, documentTitle, chatHistory, previousTool } = req.body;
+    const effectiveMetacognitive = metacognitiveAnalysis || metacognitiveContext;
 
     const userId = req.user?.id;
 
@@ -197,7 +211,7 @@ export async function generateLearningTool(req, res) {
     }
 
     const tool = await generateLearningToolUtil(userId, prompt, context, {
-      metacognitiveAnalysis,
+      metacognitiveAnalysis: effectiveMetacognitive,
       documentTitle,
       chatHistory,
       previousTool
@@ -344,7 +358,7 @@ export async function saveLearningPlaygroundSession(req, res) {
           ALTER TABLE public.learning_playground_sessions ALTER COLUMN id DROP DEFAULT;
           ALTER TABLE public.learning_playground_sessions ALTER COLUMN id TYPE VARCHAR(128) USING id::text;
           ALTER TABLE public.learning_playground_sessions ALTER COLUMN id SET DEFAULT gen_random_uuid()::text;
-        `).catch(() => {});
+        `).catch(() => { });
         const retryResult = await pool.query(upsertQuery, [
           targetSessionId,
           userId,

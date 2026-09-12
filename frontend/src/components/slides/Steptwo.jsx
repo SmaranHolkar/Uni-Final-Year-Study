@@ -402,13 +402,13 @@ export default function StepTwo({ onNext, retakePayload = null }) {
         </div>
       </div>
 
-      <div style={{ background: 'var(--card)', padding: '30px', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', marginBottom: '30px' }} aria-hidden>
+      <div className="card-standard mb-6" aria-hidden>
         <Skeleton style={{ height: '1.25rem', width: '86%' }} />
         <Skeleton className="mt-3" style={{ height: '1rem', width: '72%' }} />
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '22px' }}>
+        <div className="flex flex-col gap-3 mt-6">
           {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={`quiz-option-skeleton-${idx}`} style={{ border: '2px solid var(--border)', borderRadius: '8px', padding: '16px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div key={`quiz-option-skeleton-${idx}`} className="border border-[#2e2e33] bg-[#131519] rounded-[10px] p-4 flex items-center gap-3">
               <Skeleton rounded="999px" style={{ width: '1rem', height: '1rem' }} />
               <Skeleton style={{ height: '0.85rem', width: `${84 - idx * 8}%` }} />
             </div>
@@ -416,16 +416,16 @@ export default function StepTwo({ onNext, retakePayload = null }) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <Skeleton rounded="8px" style={{ width: '8rem', height: '2.8rem' }} />
-        <Skeleton rounded="8px" style={{ width: '9rem', height: '2.8rem' }} />
+      <div className="flex justify-between">
+        <Skeleton rounded="10px" style={{ width: '8rem', height: '2.8rem' }} />
+        <Skeleton rounded="10px" style={{ width: '9rem', height: '2.8rem' }} />
       </div>
     </div>
   );
 
   if (!questions.length) {
     return (
-      <div role={errorMessage ? 'alert' : 'status'} aria-live={errorMessage ? 'assertive' : 'polite'}>
+      <div className="card-standard max-w-xl mx-auto p-6 text-center text-xs text-[#a1a1a6]" role={errorMessage ? 'alert' : 'status'} aria-live={errorMessage ? 'assertive' : 'polite'}>
         {errorMessage || 'No questions found.'}
       </div>
     );
@@ -440,79 +440,43 @@ export default function StepTwo({ onNext, retakePayload = null }) {
   ];
 
   const MindmapLoader = () => (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
-      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }} role="dialog" aria-modal="true" aria-labelledby="mindmap-loader-title" aria-describedby="mindmap-loader-desc">
-      <div style={{
-        background: 'var(--card)', border: '1px solid var(--border)',
-        borderRadius: '1.5rem', padding: '2.5rem 3rem',
-        maxWidth: '480px', width: '90%', textAlign: 'center',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-      }}>
+    <div className="fixed inset-0 z-50 bg-[#121214]/80 backdrop-blur-md flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="mindmap-loader-title" aria-describedby="mindmap-loader-desc">
+      <div className="card-standard max-w-md w-full p-6 sm:p-8 text-center shadow-2xl border border-[#2e2e33]">
         {/* Animating face */}
-        <div style={{ marginBottom: '1.25rem' }}>
-          <Vela size={100} loading={true} />
+        <div className="mb-4 flex justify-center">
+          <Vela size={80} loading={true} />
         </div>
-        <h2 id="mindmap-loader-title" style={{ margin: '0 0 0.4rem', fontSize: '1.3rem', fontWeight: 700, color: 'var(--foreground)' }}>
-          Building Your Mindmap
+        <h2 id="mindmap-loader-title" className="text-lg font-semibold tracking-tight text-[#f0f0ee] mb-1">
+          Synthesizing Mind's Mirror
         </h2>
-        <p id="mindmap-loader-desc" style={{ margin: '0 0 2rem', fontSize: '0.875rem', color: 'var(--muted-foreground)' }}>
-          This takes 30–60 seconds — we're crafting personalised review nodes for each mistake.
+        <p id="mindmap-loader-desc" className="text-xs text-[#a1a1a6] mb-6">
+          Personalising review nodes and diagnostic explanations from your study materials.
         </p>
 
         {/* Step list */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left', marginBottom: '2rem' }}>
+        <div className="flex flex-col gap-2 text-left mb-6">
           {mindmapSteps.map((step, idx) => (
-            <div key={idx} style={{
-              display: 'flex', alignItems: 'center', gap: '0.75rem',
-              padding: '0.6rem 0.9rem', borderRadius: '0.6rem',
-              background: 'var(--background)', border: '1px solid var(--border)',
-              animation: `mmFadeIn 0.4s ease ${idx * 0.35}s both`,
-            }}>
-              <span style={{ fontSize: '1.2rem' }}>{step.icon}</span>
-              <span style={{ fontSize: '0.875rem', color: 'var(--foreground)', flex: 1 }}>{step.label}</span>
-              <span style={{
-                width: '14px', height: '14px', borderRadius: '50%',
-                border: '2px solid var(--primary)', borderTopColor: 'transparent',
-                animation: `mmSpin 0.9s linear ${idx * 0.35}s infinite`,
-                flexShrink: 0,
-              }} />
+            <div key={idx} className="flex items-center gap-2.5 p-2.5 rounded-[10px] bg-[#131519] border border-[#2e2e33]">
+              <span className="text-base">{step.icon}</span>
+              <span className="text-xs text-[#f0f0ee] flex-1">{step.label}</span>
+              <span className="w-3.5 h-3.5 rounded-full border-2 border-[#f0f0ee] border-t-transparent animate-spin shrink-0" />
             </div>
           ))}
         </div>
 
         {/* Progress bar */}
-        <div style={{ background: 'var(--muted)', borderRadius: '999px', height: '6px', overflow: 'hidden' }}>
-          <div style={{
-            height: '100%', borderRadius: '999px',
-            background: 'linear-gradient(90deg, var(--primary), oklch(0.75 0.15 220))',
-            animation: 'mmProgress 40s linear forwards',
-          }} />
+        <div className="bg-[#131519] border border-[#2e2e33] rounded-full h-1.5 overflow-hidden">
+          <div className="h-full rounded-full bg-[#f0f0ee] animate-[mmProgress_40s_linear_forwards]" />
         </div>
 
         <style>{`
-          @keyframes mmPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
-          @keyframes mmSpin  { to{transform:rotate(360deg)} }
-          @keyframes mmFadeIn{ from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
-          @keyframes mmProgress{ from{width:0%} to{width:95%} }
+          @keyframes mmProgress { from{width:0%} to{width:95%} }
         `}</style>
       </div>
 
-      <p style={{
-          position: 'absolute',
-          width: '1px',
-          height: '1px',
-          padding: 0,
-          margin: '-1px',
-          overflow: 'hidden',
-          clip: 'rect(0, 0, 0, 0)',
-          whiteSpace: 'nowrap',
-          border: 0,
-        }} role="status" aria-live="polite" aria-atomic="true">
-          Building your mindmap. This may take up to one minute.
-        </p>
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        Building your mindmap. This may take up to one minute.
+      </p>
     </div>
   );
 
@@ -520,85 +484,71 @@ export default function StepTwo({ onNext, retakePayload = null }) {
   const q = questions[currentQuestionIndex];
   
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+    <div className="flex flex-col min-h-full">
       {fetchingMindmap && <MindmapLoader />}
 
       {!showScore ? (
-        <div style={{ flex: 1, padding: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+        <div className="flex-1 p-4 max-w-3xl mx-auto w-full">
           {/* Progress Indicator */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-            <span style={{ fontWeight: 600, color: 'var(--muted-foreground)' }}>
+          <div className="flex justify-between items-center mb-6">
+            <span className="text-xs font-medium uppercase tracking-wider text-[#a1a1a6]">
               Question {currentQuestionIndex + 1} of {questions.length}
             </span>
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div className="flex gap-1.5">
               {questions.map((_, idx) => (
                 <div 
                   key={idx}
-                  style={{
-                    width: '30px', 
-                    height: '4px', 
-                    borderRadius: '2px',
-                    background: idx === currentQuestionIndex 
-                      ? 'var(--primary)' 
+                  className={`w-7 h-1 rounded-full transition-colors ${
+                    idx === currentQuestionIndex 
+                      ? 'bg-[#f0f0ee]' 
                       : answers[idx] 
-                        ? 'var(--primary)' 
-                        : 'var(--muted)'
-                  }}
+                        ? 'bg-[#f0f0ee]/60' 
+                        : 'bg-[#2e2e33]'
+                  }`}
                 />
               ))}
             </div>
           </div>
 
           {/* Question Card */}
-          <div style={{ background: 'var(--card)', padding: '30px', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)', marginBottom: '30px' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '24px', lineHeight: 1.5 }}>
+          <div className="card-standard p-6 sm:p-8 mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-[#f0f0ee] mb-6 leading-relaxed">
               {q.prompt}
             </h2>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {(q.choices || []).map((c, idx) => (
-                <label 
-                  key={idx} 
-                  style={{
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    padding: '16px', 
-                    border: `2px solid ${answers[currentQuestionIndex] === c ? 'var(--primary)' : 'var(--border)'}`, 
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    background: answers[currentQuestionIndex] === c ? 'color-mix(in srgb, var(--primary) 10%, transparent)' : 'transparent',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name={`q${currentQuestionIndex}`}
-                    value={c}
-                    checked={answers[currentQuestionIndex] === c}
-                    onChange={(e) => selectAnswer(currentQuestionIndex, e.target.value)}
-                    style={{ marginRight: '16px', transform: 'scale(1.2)' }}
-                  />
-                  <span style={{ fontSize: '1rem', fontWeight: 500 }}>{c}</span>
-                </label>
-              ))}
+            <div className="flex flex-col gap-3">
+              {(q.choices || []).map((c, idx) => {
+                const isSelected = answers[currentQuestionIndex] === c;
+                return (
+                  <label 
+                    key={idx} 
+                    className={`flex items-center p-4 rounded-[10px] border transition-all cursor-pointer ${
+                      isSelected
+                        ? 'border-[#f0f0ee] bg-[#131519] text-[#f0f0ee] shadow-sm'
+                        : 'border-[#2e2e33] hover:border-[#404047] bg-[#18181b]/50 text-[#a1a1a6]'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={`q${currentQuestionIndex}`}
+                      value={c}
+                      checked={isSelected}
+                      onChange={(e) => selectAnswer(currentQuestionIndex, e.target.value)}
+                      className="mr-3.5 accent-[#f0f0ee]"
+                    />
+                    <span className="text-sm font-medium">{c}</span>
+                  </label>
+                );
+              })}
             </div>
           </div>
 
           {/* Navigation */}
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div className="flex justify-between items-center">
             <button 
               onClick={handlePrev} 
               disabled={currentQuestionIndex === 0}
-              style={{
-                padding: '12px 24px', 
-                borderRadius: '8px', 
-                fontWeight: 600,
-                opacity: currentQuestionIndex === 0 ? 0.5 : 1,
-                cursor: currentQuestionIndex === 0 ? 'not-allowed' : 'pointer',
-                background: 'var(--muted)',
-                color: 'var(--foreground)',
-                border: 'none'
-              }}
+              className="btn-secondary px-5 py-2.5 text-xs disabled:opacity-40"
             >
               Previous
             </button>
@@ -606,118 +556,78 @@ export default function StepTwo({ onNext, retakePayload = null }) {
             {currentQuestionIndex < questions.length - 1 ? (
               <button 
                 onClick={handleNext}
-                style={{
-                  padding: '12px 32px', 
-                  borderRadius: '8px', 
-                  fontWeight: 600,
-                  background: 'var(--primary)',
-                  color: 'var(--primary-foreground)',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
+                className="btn-primary px-6 py-2.5 text-xs font-medium"
               >
-                Next Question
+                Next Question →
               </button>
             ) : (
               <button 
                 onClick={handleFinish}
-                style={{
-                  padding: '12px 32px', 
-                  borderRadius: '8px', 
-                  fontWeight: 600,
-                  background: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer'
-                }}
+                className="btn-primary px-6 py-2.5 text-xs font-medium !bg-emerald-400 !text-[#121214] hover:!bg-emerald-300"
               >
-                Finish Quiz
+                Finish Quiz ✓
               </button>
             )}
           </div>
 
           {validationMessage && (
-            <div role="alert" style={{ marginTop: '14px', color: 'var(--destructive)', fontWeight: 600 }}>
+            <div role="alert" className="mt-4 p-3 rounded-[10px] bg-[#ef4444]/10 border border-[#ef4444]/30 text-xs text-[#f87171]">
               {validationMessage}
             </div>
           )}
         </div>
       ) : (
-        <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-            <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '10px' }}>Quiz Complete!</h2>
-            <div style={{ fontSize: '1.25rem', color: 'var(--muted-foreground)' }}>
-              You scored <span style={{ fontWeight: 800, color: 'var(--primary)' }}>{score}</span> out of {questions.length}
+        <div className="p-4 max-w-3xl mx-auto w-full space-y-8">
+          <div className="text-center card-standard p-8">
+            <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#f0f0ee] mb-2">Quiz Complete</h2>
+            <div className="text-sm text-[#a1a1a6]">
+              You scored <span className="text-lg font-semibold text-[#f0f0ee]">{score}</span> out of {questions.length}
+            </div>
+
+            {saveStatus && (
+               <div role="status" aria-live="polite" aria-atomic="true" className="mt-3 text-xs text-[#a1a1a6]">
+                 {saveStatus}
+               </div>
+            )}
+
+            <div className="flex gap-3 justify-center mt-6 flex-wrap">
+              <button 
+                onClick={handleGoToMindsMirror} 
+                className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-xs"
+              >
+                Mind's Mirror Diagnostics ✨
+              </button>
+              {mindmapData !== undefined && (
+                <button 
+                  onClick={() => onNext(mindmapData, quizResults)} 
+                  className="btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-xs"
+                >
+                  Interactive Studio →
+                </button>
+              )}
             </div>
           </div>
 
-          {saveStatus && (
-             <div role="status" aria-live="polite" aria-atomic="true" style={{ textAlign: 'center', marginBottom: '20px', color: saveStatus.includes('Failed') ? 'var(--destructive)' : 'var(--primary)', fontWeight: 600 }}>
-               {saveStatus}
-             </div>
-          )}
-
-          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginBottom: '40px', flexWrap: 'wrap' }}>
-            <button 
-              onClick={handleGoToMindsMirror} 
-              style={{
-                padding: '14px 28px', 
-                background: 'var(--primary)', 
-                color:'var(--primary-foreground)', 
-                borderRadius: '12px',
-                fontWeight: 700,
-                fontSize: '1.1rem',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              Go to Mind's Mirror ✨
-            </button>
-            {mindmapData !== undefined && (
-              <button 
-                onClick={() => onNext(mindmapData, quizResults)} 
-                style={{
-                  padding: '14px 28px', 
-                  background: 'transparent', 
-                  color: 'var(--foreground)', 
-                  border: '2px solid var(--border)',
-                  borderRadius: '12px',
-                  fontWeight: 700,
-                  fontSize: '1.1rem',
-                  cursor: 'pointer'
-                }}
-              >
-                Go to Learning Playground →
-              </button>
-            )}
-          </div>
-
           {/* Results List */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '8px' }}>Detailed Review</h3>
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-[#a1a1a6]">Detailed Review</h3>
             {quizResults.map((result, idx) => (
               <div
                 key={result.id ?? idx}
-                style={{
-                  border: `2px solid ${result.isCorrect ? 'var(--chart-2)' : 'var(--destructive)'}`,
-                  borderRadius: '12px',
-                  padding: '20px',
-                  background: 'var(--card)'
-                }}
+                className={`card-standard p-5 border ${
+                  result.isCorrect ? 'border-emerald-500/40 bg-[#18181b]' : 'border-[#ef4444]/40 bg-[#18181b]'
+                }`}
               >
-                <div style={{ fontWeight: 600, marginBottom: '12px', fontSize: '1.1rem' }}>
+                <div className="font-medium text-sm text-[#f0f0ee] mb-3">
                   Q{idx + 1}. {result.prompt}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px' }}>
-                  <div style={{ color: result.isCorrect ? 'var(--chart-2)' : 'var(--destructive)', fontWeight: 500 }}>
-                    <span style={{ opacity: 0.8, color: 'var(--muted-foreground)' }}>Your Answer:</span> {result.userAnswer ?? 'No answer'}
+                <div className="space-y-1 text-xs">
+                  <div className={result.isCorrect ? 'text-emerald-400 font-medium' : 'text-[#f87171] font-medium'}>
+                    <span className="text-[#a1a1a6]">Your Answer:</span> {result.userAnswer ?? 'No answer'}
                   </div>
                   {!result.isCorrect && (
-                    <div style={{ color: 'var(--chart-2)', fontWeight: 500 }}>
-                      <span style={{ opacity: 0.8, color: 'var(--muted-foreground)' }}>Correct Answer:</span> {result.correctAnswer ?? 'Not available'}
+                    <div className="text-emerald-400 font-medium">
+                      <span className="text-[#a1a1a6]">Correct Answer:</span> {result.correctAnswer ?? 'Not available'}
                     </div>
                   )}
                 </div>
@@ -729,4 +639,5 @@ export default function StepTwo({ onNext, retakePayload = null }) {
     </div>
   );
 }
+
 

@@ -17,13 +17,15 @@ export default function App() {
       <Router>
         <div className="app-container">
           <Navbar onOpenSessions={() => setOpenSessionTrigger((prev) => prev + 1)} />
-          <Routes>
-            <Route path="/" element={<Learningplayground triggerDrawer={openSessionTrigger} />} />
-            <Route path="/tools" element={<Learningplayground triggerDrawer={openSessionTrigger} />} />
-            <Route path="/auth" element={<AuthPage />} />
-            <Route path="/terms" element={<TermsAndConditions />} />
-            <Route path="/privacy" element={<PrivacyPolicy />} />
-          </Routes>
+          <div className="app-content-area">
+            <Routes>
+              <Route path="/" element={<Learningplayground triggerDrawer={openSessionTrigger} />} />
+              <Route path="/tools" element={<Learningplayground triggerDrawer={openSessionTrigger} />} />
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/terms" element={<TermsAndConditions />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+            </Routes>
+          </div>
         </div>
       </Router>
     </AuthProvider>

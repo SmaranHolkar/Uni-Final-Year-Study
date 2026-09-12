@@ -1,17 +1,24 @@
-# Learning Playground — Full AI Context
+# Hydruslearn — Full AI Context
 
-> This document provides extended context about Learning Playground for AI systems, research tools, and language models.
+> This document provides extended context about Hydruslearn for AI systems, research tools, and language models.
 
-## What is Learning Playground?
+## What is Hydruslearn?
 
-Learning Playground is an open-ended, AI-powered interactive study environment designed for university students and lifelong learners. Instead of restricting users to static flashcards or standard question banks, Learning Playground converts plain-English text prompts into rich, multi-modal interactive learning tools in real time.
+Hydruslearn is an open-ended, AI-powered interactive study environment designed for university students and lifelong learners. It features full RAG (Retrieval-Augmented Generation) and document ingestion—allowing users to upload lecture slides, PDF textbooks, YouTube videos, and handwritten notes to generate grounded interactive study tools in real time.
 
-## Core Features & Multi-Modal Formats
+## Core Features & Multi-Modal Ingestion
 
-### 1. Natural Language Tool Generator
-Users type any study requirement—for example:
-- *"Create a study plan for my biochemistry final"*
-- *"Build a practice quiz on contract law remedies"*
+### 1. RAG Ingestion & Document Processing
+Users can upload their own study materials to ground the AI in course-specific content:
+- **PDF & Document Ingestion**: Upload course notes, lecture PDFs, and textbook chapters with automatic semantic chunking and vector embeddings.
+- **YouTube Lecture Ingestion**: Paste video URLs to extract full transcripts and build revision materials.
+- **Photo OCR & Vision**: Upload photos of handwritten notebook pages or whiteboards.
+- **Citation Split-Viewer**: Inspect exact source passages, paragraph indices, and document citations directly alongside generated tools.
+
+### 2. Natural Language Tool Generator
+Users type any study requirement or ask questions grounded in their uploaded files—for example:
+- *"Create a study plan for my uploaded biochemistry lecture notes"*
+- *"Build a practice quiz on contract law remedies from Chapter 4"*
 - *"Generate interactive flashcards on quantum mechanics concepts"*
 - *"Construct a step-by-step flowchart for diagnostic medicine"*
 
@@ -43,6 +50,6 @@ The AI engine automatically plans, structures, and compiles the requested tool i
 
 ## Contact & Legal
 
-- **App Name**: Learning Playground
+- **App Name**: Hydruslearn
 - **License**: Proprietary EdTech Platform
 - **Terms & Privacy**: Available at `/terms` and `/privacy`

@@ -51,7 +51,7 @@ export default function AppSidebar() {
       <div className="h-14 flex items-center px-4 border-b border-slate-800 flex-shrink-0">
         <Vela size={26} />
         <span className={`ml-3 text-sm font-bold text-white tracking-tight whitespace-nowrap transition-all duration-200 ${hovered ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}>
-          Learning Playground
+          Hydruslearn
         </span>
       </div>
 

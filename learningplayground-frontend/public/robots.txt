@@ -1,4 +1,4 @@
-# Learning Playground robots.txt
+# Hydruslearn robots.txt
 User-agent: *
 
 Allow: /

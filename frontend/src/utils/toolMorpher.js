@@ -2,11 +2,54 @@
 
 function buildClientCrosswordLayout(items) {
   const words = (items || []).map((it, i) => {
-    const rawWord = String(it.word || it.front || it.concept || it.term || `WORD${i + 1}`).toUpperCase().replace(/[^A-Z]/g, '');
-    const cleanWord = rawWord.length >= 3 ? rawWord.slice(0, 12) : `TERM${i + 1}`;
-    const clue = String(it.clue || it.back || it.definition || it.explanation || it.detail || 'Key concept clue and definition');
+    const f = String(it.front || it.question || it.title || it.concept || it.left || '').trim();
+    const b = String(it.back || it.answerText || it.answer || it.definition || it.explanation || it.right || '').trim();
+    const directWord = String(it.word || it.term || '').trim();
+    const directClue = String(it.clue || it.hint || '').trim();
+
+    let wordCandidate = '';
+    let clueCandidate = '';
+
+    if (directWord && directWord.replace(/[^A-Za-z]/g, '').length >= 3) {
+      wordCandidate = directWord;
+      clueCandidate = directClue || b || f;
+    } else if (f && b) {
+      const fWords = f.split(/\s+/).length;
+      const bWords = b.split(/\s+/).length;
+      if (fWords <= 2 && f.replace(/[^A-Za-z]/g, '').length <= 12 && bWords > fWords) {
+        wordCandidate = f;
+        clueCandidate = b;
+      } else if (bWords <= 2 && b.replace(/[^A-Za-z]/g, '').length <= 12 && fWords > bWords) {
+        wordCandidate = b;
+        clueCandidate = f;
+      } else if (f.length <= b.length) {
+        wordCandidate = f;
+        clueCandidate = b;
+      } else {
+        wordCandidate = b;
+        clueCandidate = f;
+      }
+    } else {
+      wordCandidate = directWord || f || b || `TERM${i + 1}`;
+      clueCandidate = directClue || b || f || `Key concept definition for term ${i + 1}`;
+    }
+
+    let cleanWord = wordCandidate.toUpperCase().replace(/[^A-Z]/g, '');
+    if (cleanWord.length > 12) {
+      const firstWordOnly = wordCandidate.split(/[\s\-_]+/)[0]?.toUpperCase().replace(/[^A-Z]/g, '') || '';
+      cleanWord = firstWordOnly.length >= 3 && firstWordOnly.length <= 12 ? firstWordOnly : cleanWord.slice(0, 10);
+    }
+    if (cleanWord.length < 3) {
+      cleanWord = `TERM${i + 1}`;
+    }
+
+    let clue = clueCandidate.trim();
+    if (!clue || clue.toUpperCase().replace(/[^A-Z]/g, '') === cleanWord) {
+      clue = `Key concept definition and application for ${cleanWord}.`;
+    }
+
     return { word: cleanWord, clue, number: i + 1 };
-  }).filter(w => w.word.length >= 3).slice(0, 8);
+  }).filter(w => w.word.length >= 3).slice(0, 12);
 
   if (words.length === 0) return null;
 
@@ -73,135 +116,325 @@ function buildClientCrosswordLayout(items) {
   };
 }
 
-function getDynamicAcademicItems(title, format) {
+function buildClientWordSearchLayout(items, gridSize = 10) {
+  const words = (items || []).map((it, i) => {
+    const rawWord = String(it.word || it.front || it.concept || it.term || `WORD${i + 1}`).toUpperCase().replace(/[^A-Z]/g, '');
+    const cleanWord = rawWord.length >= 3 ? rawWord.slice(0, gridSize) : `TERM${i + 1}`;
+    const clue = String(it.clue || it.back || it.definition || it.explanation || `Find ${cleanWord}`);
+    return { word: cleanWord, clue, id: String(i + 1) };
+  }).filter(w => w.word.length >= 3).slice(0, 6);
+
+  const grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(''));
+  const directions = [
+    { dr: 0, dc: 1 },
+    { dr: 1, dc: 0 },
+    { dr: 1, dc: 1 },
+  ];
+
+  const placed = [];
+  for (const item of words) {
+    let placedWord = false;
+    for (let attempts = 0; attempts < 100; attempts++) {
+      const dir = directions[Math.floor(Math.random() * directions.length)];
+      const startR = Math.floor(Math.random() * (gridSize - (dir.dr ? item.word.length : 0)));
+      const startC = Math.floor(Math.random() * (gridSize - (dir.dc ? item.word.length : 0)));
+
+      let fits = true;
+      for (let i = 0; i < item.word.length; i++) {
+        const r = startR + i * dir.dr;
+        const c = startC + i * dir.dc;
+        if (grid[r][c] !== '' && grid[r][c] !== item.word[i]) {
+          fits = false;
+          break;
+        }
+      }
+
+      if (fits) {
+        for (let i = 0; i < item.word.length; i++) {
+          grid[startR + i * dir.dr][startC + i * dir.dc] = item.word[i];
+        }
+        placed.push({ ...item, startRow: startR, startCol: startC, dir });
+        placedWord = true;
+        break;
+      }
+    }
+    if (!placedWord) {
+      placed.push({ ...item, startRow: 0, startCol: 0, dir: directions[0] });
+    }
+  }
+
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  for (let r = 0; r < gridSize; r++) {
+    for (let c = 0; c < gridSize; c++) {
+      if (grid[r][c] === '') {
+        grid[r][c] = alphabet[Math.floor(Math.random() * alphabet.length)];
+      }
+    }
+  }
+
+  return { grid, words: placed };
+}
+
+function classifyTopicCategory(topic) {
+  const t = String(topic || '').toLowerCase();
+  if (/calcul|math|physic|algebra|geomet|chem|equat|formul|quant|statistic|thermodynam/i.test(t)) return 'formula';
+  if (/histor|war|revolut|centur|treaty|monarch|presid|politic|law|empir|civil/i.test(t)) return 'timeline';
+  if (/french|german|spanish|latin|gramm|vocab|kanji|mandarin|italian|linguist|translat/i.test(t)) return 'language';
+  if (/bio|cell|photosynth|mitos|dna|organ|pathol|physiol|ecolog|genet|evolut|climat|river|joint|wood/i.test(t)) return 'process';
+  return 'general';
+}
+
+function getDynamicAcademicItems(title) {
   const cleanTitle = (title || 'Core Subject').replace(/revision|tool|interactive|study|quiz|flashcards/gi, '').trim() || 'Fundamentals';
+  const category = classifyTopicCategory(cleanTitle);
+
+  if (category === 'formula') {
+    return [
+      {
+        id: '1',
+        front: `Fundamental Equation of ${cleanTitle}`,
+        back: `Defines the core quantitative relationship and governing physical/mathematical law for ${cleanTitle}.`,
+        left: `Governing Equation`,
+        right: `Fundamental mathematical formulation for ${cleanTitle}`,
+        question: `What primary relationship is expressed by the governing formula in ${cleanTitle}?`,
+        choices: [
+          `Proportional scaling between primary inputs and output rate.`,
+          `Constant invariant equilibrium regardless of boundary conditions.`,
+          `Inverse non-linear oscillation without direct damping.`,
+          `Stochastic divergence under nominal parameters.`
+        ],
+        answer: 'A',
+        answerText: `Proportional scaling between primary inputs and output rate.`,
+        explanation: `The primary formula establishes direct proportional scaling between key variables.`,
+        word: 'EQUATION',
+        clue: `Core formula governing ${cleanTitle}`,
+        text: `Define Formula & Variables`,
+        position: 1,
+        detail: `Identify dependent and independent variables with their standard SI units.`
+      },
+      {
+        id: '2',
+        front: `Variable Units & Dimensional Analysis`,
+        back: `Standard SI units, conversion factors, and dimensional consistency checks required for calculations.`,
+        left: `Units & Dimensions`,
+        right: `Standard SI units and dimensional validation`,
+        question: `Why is dimensional analysis critical when solving problems in ${cleanTitle}?`,
+        choices: [
+          `It verifies mathematical consistency and catches algebraic errors before calculation.`,
+          `It changes the fundamental values of universal constants.`,
+          `It eliminates the need for numeric arithmetic entirely.`,
+          `It applies only to non-physical hypothetical quantities.`
+        ],
+        answer: 'A',
+        answerText: `It verifies mathematical consistency and catches algebraic errors before calculation.`,
+        explanation: `Dimensional consistency ensures both sides of the equation maintain equivalent physical dimensions.`,
+        word: 'DIMENSION',
+        clue: `Consistency check for physical units`,
+        text: `Derive Boundary Equations`,
+        position: 2,
+        detail: `Apply boundary conditions to isolate the target variable.`
+      },
+      {
+        id: '3',
+        front: `Boundary Limits & Edge Cases`,
+        back: `Behavior of ${cleanTitle} as variables approach zero, infinity, or critical transition thresholds.`,
+        left: `Boundary Conditions`,
+        right: `Critical thresholds and asymptotic behavior`,
+        question: `What occurs at the upper boundary condition of ${cleanTitle}?`,
+        choices: [
+          `The system approaches an asymptotic saturation limit.`,
+          `The variables invert signs instantaneously.`,
+          `The governing law ceases to apply under any condition.`,
+          `The output becomes completely undefined.`
+        ],
+        answer: 'A',
+        answerText: `The system approaches an asymptotic saturation limit.`,
+        explanation: `Asymptotic limits prevent unconstrained divergence in physical systems.`,
+        word: 'BOUNDARY',
+        clue: `Threshold limit for system variables`,
+        text: `Evaluate & Verify Solution`,
+        position: 3,
+        detail: `Check unit consistency and magnitude sanity against known physical limits.`
+      }
+    ];
+  }
+
+  if (category === 'timeline') {
+    return [
+      {
+        id: '1',
+        front: `Antecedents & Catalysts of ${cleanTitle}`,
+        back: `Underlying socioeconomic, political, and institutional factors that precipitated ${cleanTitle}.`,
+        left: `Catalysts & Origins`,
+        right: `Initial conditions and driving triggers`,
+        question: `Which factor served as the primary catalyst for ${cleanTitle}?`,
+        choices: [
+          `Systemic tensions and structural shifts leading to a critical turning point.`,
+          `An isolated administrative anomaly with no wider historical impact.`,
+          `Immediate consensus among all opposing parties.`,
+          `A sudden reduction in external economic and political pressures.`
+        ],
+        answer: 'A',
+        answerText: `Systemic tensions and structural shifts leading to a critical turning point.`,
+        explanation: `Structural triggers create the preconditions required for major historical transitions.`,
+        word: 'CATALYST',
+        clue: `Initial trigger or turning point`,
+        text: `Origins & Preconditions`,
+        position: 1,
+        detail: `Underlying structural causes establish the initial impetus.`
+      },
+      {
+        id: '2',
+        front: `Pivotal Milestone of ${cleanTitle}`,
+        back: `The decisive event, battle, treaty, or legislation that permanently shifted the trajectory of ${cleanTitle}.`,
+        left: `Pivotal Milestone`,
+        right: `Decisive turning point and structural realignment`,
+        question: `What was the defining significance of the pivotal milestone in ${cleanTitle}?`,
+        choices: [
+          `It fundamentally realigned political authority and altered strategic momentum.`,
+          `It restored the pre-existing status quo without modification.`,
+          `It was promptly reversed within days with zero long-term impact.`,
+          `It occurred in total secrecy without public awareness.`
+        ],
+        answer: 'A',
+        answerText: `It fundamentally realigned political authority and altered strategic momentum.`,
+        explanation: `Pivotal milestones alter institutional dynamics and define historical epochs.`,
+        word: 'MILESTONE',
+        clue: `Decisive turning point in trajectory`,
+        text: `Decisive Climax`,
+        position: 2,
+        detail: `Key actions shift the balance of power and determine outcomes.`
+      },
+      {
+        id: '3',
+        front: `Long-Term Consequences & Legacy`,
+        back: `Enduring structural transformations, legal precedents, and cultural legacy of ${cleanTitle}.`,
+        left: `Historical Legacy`,
+        right: `Enduring structural impacts and modern ramifications`,
+        question: `What enduring legacy resulted from ${cleanTitle}?`,
+        choices: [
+          `Permanent institutional reform and foundational legal/social precedents.`,
+          `Immediate return to traditional structures within months.`,
+          `Complete loss of historical documentation regarding the event.`,
+          `Isolated localized effects without broader systemic resonance.`
+        ],
+        answer: 'A',
+        answerText: `Permanent institutional reform and foundational legal/social precedents.`,
+        explanation: `Historical transformations establish lasting frameworks that influence subsequent eras.`,
+        word: 'LEGACY',
+        clue: `Enduring historical consequence`,
+        text: `Settlement & Legacy`,
+        position: 3,
+        detail: `Codification of treaties and new institutional norms.`
+      }
+    ];
+  }
+
+  // Process / General default
   return [
     {
       id: '1',
       front: `Core Principle of ${cleanTitle}`,
-      concept: `Core Principle of ${cleanTitle}`,
-      back: `The fundamental axiom governing ${cleanTitle}, establishing underlying physiological/theoretical frameworks and high-yield baseline rules for exam synthesis.`,
-      explanation: `Fundamental axiom governing ${cleanTitle}. Essential baseline knowledge required before advanced mechanism applications.`,
-      question: `Which statement most accurately characterizes the primary governing mechanism of ${cleanTitle}?`,
+      concept: `Core Principle`,
+      back: `The foundational rule and primary mechanism governing ${cleanTitle}, establishing baseline concepts for exam synthesis.`,
+      explanation: `Fundamental axiom governing ${cleanTitle}. Essential baseline knowledge required before advanced applications.`,
+      left: `Core Principle`,
+      right: `Foundational axiom and governing mechanism for ${cleanTitle}`,
+      question: `Which statement most accurately characterizes the primary mechanism of ${cleanTitle}?`,
       choices: [
-        `It establishes the rate-limiting foundational pathway essential for downstream stability.`,
-        `It operates exclusively under isolated conditions without influencing secondary feedback loops.`,
-        `It remains chemically/conceptually inert during typical physiological transitions.`,
-        `It acts solely as an unregulated byproduct without specific receptor or kinetic activity.`
+        `It establishes the foundational operational framework essential for overall system function.`,
+        `It operates exclusively in isolation without interacting with secondary components.`,
+        `It remains completely inactive during standard operational conditions.`,
+        `It acts solely as an unregulated byproduct without specific function.`
       ],
-      answer: `It establishes the rate-limiting foundational pathway essential for downstream stability.`,
-      clue: `Primary rate-limiting foundational mechanism of ${cleanTitle}`,
+      answer: 'A',
+      answerText: `It establishes the foundational operational framework essential for overall system function.`,
+      clue: `Primary foundational mechanism of ${cleanTitle}`,
       word: 'PRINCIPLE',
-      keyPoints: ['Rate-limiting baseline mechanism', 'Governing theoretical framework', 'High-yield exam synthesis point'],
-      situation: `A scenario where the primary framework of ${cleanTitle} is under active stress or perturbation.`,
-      options: [
-        { text: 'Stabilize primary feedback and maintain equilibrium', consequence: 'Optimal regulatory response restored successfully.' },
-        { text: 'Over-activate secondary pathway prematurely', consequence: 'Causes feedback decompensation and theoretical breakdown.' }
-      ]
+      text: `Initiation & Baseline`,
+      position: 1,
+      detail: `Initial activation and foundational setup of ${cleanTitle}.`
     },
     {
       id: '2',
-      front: `Rate-Limiting Reaction & Kinetics`,
-      concept: `Reaction Kinetics & Catalysis`,
-      back: `Specific enzymatic or physical rate-limiting steps that dictate overall system velocity, activation energy barriers, and response efficiency.`,
-      explanation: `Rate-limiting kinetics determine the overall reaction velocity and metabolic/physical throughput.`,
-      question: `What factor primarily dictates the rate-limiting kinetics in ${cleanTitle}?`,
+      front: `Key Operational Mechanism`,
+      concept: `Operational Mechanism`,
+      back: `Specific sequence of actions, intermediate states, and transformations that drive ${cleanTitle}.`,
+      explanation: `Step-by-step mechanism determines overall efficiency and output throughput.`,
+      left: `Operational Mechanism`,
+      right: `Step-by-step transformation sequence driving system behavior`,
+      question: `What factor primarily dictates the operational efficiency in ${cleanTitle}?`,
       choices: [
-        `Enzymatic/physical substrate availability and activation energy barriers.`,
-        `Random Brownian fluctuation independent of temperature or concentration.`,
+        `Component availability and the specific rate-limiting intermediate step.`,
+        `Random unconstrained fluctuations independent of external inputs.`,
         `Passive accumulation of inert end-products.`,
         `Spontaneous unmediated phase transitions.`
       ],
-      answer: `Enzymatic/physical substrate availability and activation energy barriers.`,
-      clue: `Enzymatic or physical kinetic barrier controlling reaction velocity`,
-      word: 'KINETICS',
-      keyPoints: ['Activation energy barriers', 'Substrate saturation profile', 'Velocity control point'],
-      situation: `Kinetic overload occurs due to saturated transport and catalytic channels.`,
-      options: [
-        { text: 'Introduce competitive modulator to adjust velocity', consequence: 'Regulates kinetic throughput and protects system equilibrium.' },
-        { text: 'Increase substrate concentration unconditionally', consequence: 'Leads to severe saturation toxicity and kinetic bottlenecking.' }
-      ]
+      answer: 'A',
+      answerText: `Component availability and the specific rate-limiting intermediate step.`,
+      clue: `Step-by-step operational sequence`,
+      word: 'MECHANISM',
+      text: `Process Execution`,
+      position: 2,
+      detail: `Execution of core transformations and intermediate state transitions.`
     },
     {
       id: '3',
-      front: `Regulation & Allosteric Feedback`,
-      concept: `Feedback & Control Loops`,
-      back: `Positive and negative feedback loops that fine-tune homeostasis, prevent runaway reactions, and calibrate response to external perturbations.`,
-      explanation: `Feedback loops modulate operational intensity and protect against metabolic/computational failure.`,
+      front: `Regulation & Control`,
+      concept: `Control Loops`,
+      back: `Feedback mechanisms and control parameters that maintain balance and prevent runaway failure in ${cleanTitle}.`,
+      explanation: `Feedback loops modulate operational intensity and protect against system breakdown.`,
+      left: `Regulation & Control`,
+      right: `Feedback loops maintaining equilibrium and preventing failure`,
       question: `How does negative feedback maintain stability within ${cleanTitle}?`,
       choices: [
-        `Accumulation of downstream products inhibits initial catalytic activity to prevent overproduction.`,
+        `Downstream accumulation signals upstream dampening to prevent overproduction or exhaustion.`,
         `By amplifying initial stimulus exponentially without an upper threshold.`,
-        `Through irreversible degradation of all primary cofactors.`,
-        `By preventing all subsequent signal transduction permanently.`
+        `Through irreversible degradation of all primary resources.`,
+        `By preventing all subsequent signal communication permanently.`
       ],
-      answer: `Accumulation of downstream products inhibits initial catalytic activity to prevent overproduction.`,
-      clue: `Homeostatic mechanism where product inhibits upstream catalysts`,
-      word: 'FEEDBACK',
-      keyPoints: ['Negative feedback inhibition', 'Allosteric site binding', 'Homeostatic equilibrium calibration'],
-      situation: `Feedback inhibition fails, risking catastrophic runaway excitation.`,
-      options: [
-        { text: 'Administer allosteric negative inhibitor', consequence: 'Successfully triggers feedback suppression and restabilizes the cycle.' },
-        { text: 'Ignore signal and observe progression', consequence: 'Triggers uncontrolled cascade and metabolic exhaustion.' }
-      ]
+      answer: 'A',
+      answerText: `Downstream accumulation signals upstream dampening to prevent overproduction or exhaustion.`,
+      clue: `Homeostatic mechanism maintaining equilibrium`,
+      word: 'REGULATION',
+      text: `Feedback & Equilibrium`,
+      position: 3,
+      detail: `Regulation mechanisms adjust throughput to restore balance.`
     },
     {
       id: '4',
-      front: `Clinical & Practical Application`,
-      concept: `Clinical & Real-World Translation`,
-      back: `Translation of core mechanisms into practical diagnostic criteria, pharmacological targeting, engineering solutions, and exam problem-solving.`,
-      explanation: `Clinical/real-world translation bridges foundational theory with active diagnostic problem solving.`,
-      question: `In practical diagnostic or engineering settings, what is the key clinical hallmark of ${cleanTitle}?`,
+      front: `Practical Application & Problem Solving`,
+      concept: `Real-World Application`,
+      back: `Translation of core concepts into practical diagnostic methods, design implementations, and exam problem-solving.`,
+      explanation: `Practical translation bridges foundational theory with active problem solving.`,
+      left: `Practical Application`,
+      right: `Diagnostic problem-solving and real-world implementation`,
+      question: `In practical problem-solving, what is the most critical analytical step for ${cleanTitle}?`,
       choices: [
-        `Characteristic phenotypic, biochemical, or computational shift observable under standard assays.`,
-        `Total absence of any measurable biomarkers or telemetry signals.`,
-        `Completely uniform presentation across all demographic variables.`,
-        `Spontaneous resolution within milliseconds without intervention.`
+        `Identifying the governing variables and isolating the limiting factor.`,
+        `Assuming all variables remain completely constant across scenarios.`,
+        `Applying generalized intuition without verifying boundary conditions.`,
+        `Ignoring secondary interactions completely.`
       ],
-      answer: `Characteristic phenotypic, biochemical, or computational shift observable under standard assays.`,
-      clue: `Measurable diagnostic or operational signature used in practice`,
-      word: 'HALLMARK',
-      keyPoints: ['Diagnostic biomarker/metric', 'Targeted intervention strategy', 'Differential diagnostic criteria'],
-      situation: `An ambiguous clinical/technical presentation mimics ${cleanTitle}.`,
-      options: [
-        { text: 'Order confirmatory gold-standard assay', consequence: 'Accurately differentiates underlying pathology and confirms diagnosis.' },
-        { text: 'Initiate empirical aggressive therapy without testing', consequence: 'Risks iatrogenic complications and misdiagnosis.' }
-      ]
-    },
-    {
-      id: '5',
-      front: `High-Yield Exam Pitfalls & Misconceptions`,
-      concept: `Exam Trap & Contrast Analysis`,
-      back: `Common student misconceptions, subtle distractor traps, and critical differentiators frequently tested on board and university examinations.`,
-      explanation: `Exam traps exploit subtle overlaps with analogous sister pathways.`,
-      question: `What is the most frequent conceptual trap students encounter regarding ${cleanTitle}?`,
-      choices: [
-        `Confusing secondary associative markers with the true causative rate-limiting mechanism.`,
-        `Assuming all cellular and mathematical models are 100% deterministic.`,
-        `Believing that temperature has zero effect on reaction rates.`,
-        `Equating negative feedback with destructive failure.`
-      ],
-      answer: `Confusing secondary associative markers with the true causative rate-limiting mechanism.`,
-      clue: `Common misconception between correlation and causation in exams`,
-      word: 'ANALYSIS',
-      keyPoints: ['Causative vs associative markers', 'Sister pathway differential', 'Common distractor patterns'],
-      situation: `A high-stakes exam question presents two near-identical mechanisms.`,
-      options: [
-        { text: 'Isolate the specific rate-limiting cofactor', consequence: 'Correctly identifies the distinguishing exam variable and secures full marks.' },
-        { text: 'Select the broader generic option', consequence: 'Falls for the high-yield distractor trap.' }
-      ]
+      answer: 'A',
+      answerText: `Identifying the governing variables and isolating the limiting factor.`,
+      clue: `Diagnostic problem-solving method`,
+      word: 'APPLICATION',
+      text: `Synthesis & Verification`,
+      position: 4,
+      detail: `Application of principles to novel exam and practical scenarios.`
     }
   ];
 }
 
 export function morphToolToHtml(targetFormat, title, description, rawItems) {
   const format = String(targetFormat || 'flashcards').toLowerCase();
-  const validRaw = Array.isArray(rawItems) && rawItems.length > 0 && rawItems.some(it => it && (it.front || it.question || it.term || it.concept));
-  const items = validRaw ? rawItems : getDynamicAcademicItems(title, format);
+  const validRaw = Array.isArray(rawItems) && rawItems.length > 0 && rawItems.some(it => it && (it.front || it.question || it.term || it.concept || it.left || it.word));
+  const items = validRaw ? rawItems : getDynamicAcademicItems(title);
   const itemsJson = JSON.stringify(items);
 
   const baseCss = `
-    @import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap');
 
     :root {
       --background: #13161c;
@@ -213,8 +446,8 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
       --accent: #38bdf8;
       --muted: #212733;
       --muted-foreground: #94a3b8;
-      --font-display: 'Newsreader', 'Lora', 'Georgia', serif;
-      --font-ui: 'Plus Jakarta Sans', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      --font-display: 'DM Serif Display', Georgia, serif;
+      --font-ui: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -233,13 +466,13 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
     #app-header { margin-bottom: 1.25rem; width: 100%; text-align: center; }
     h1 { font-family: var(--font-ui); font-size: 1.3rem; font-weight: 700; color: #fff; letter-spacing: -0.01em; margin-bottom: 0.35rem; }
     p.header-desc { font-size: 0.85rem; color: var(--muted-foreground); max-width: 600px; margin: 0 auto; line-height: 1.5; }
-    .badge { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.65rem; border-radius: 9999px; font-size: 0.725rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; background: var(--muted); border: 1px solid var(--border); color: var(--accent); font-family: var(--font-ui); }
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; font-family: var(--font-ui); cursor: pointer; transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1); border: none; }
-    .btn-primary { background: var(--primary); color: #fff; border-radius: 12px; }
+    .badge { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.65rem; border-radius: 4px; font-size: 0.725rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; background: var(--muted); border: 1px solid var(--border); color: var(--accent); font-family: var(--font-ui); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; font-family: var(--font-ui); cursor: pointer; transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1); border: none; border-radius: 6px; }
+    .btn-primary { background: var(--primary); color: #fff; }
     .btn-primary:hover { background: var(--primary-hover); }
-    .btn-secondary { background: var(--card); color: var(--foreground); border: 1px solid var(--border); border-radius: 10px; }
+    .btn-secondary { background: var(--card); color: var(--foreground); border: 1px solid var(--border); }
     .btn-secondary:hover { background: var(--muted); border-color: var(--primary); }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
     .text-left { text-align: left; }
     .display-question { font-family: var(--font-display); font-size: 1.65rem; font-weight: 600; line-height: 1.35; color: #ffffff; letter-spacing: -0.015em; }
   `;
@@ -248,36 +481,37 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
   if (format.includes('flashcard') || format.includes('cards')) {
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>${baseCss}
       .fc-container { perspective: 1200px; width: 100%; max-width: 600px; min-height: 310px; cursor: pointer; margin: 1.25rem 0 1.5rem 0; }
-      .fc-card { width: 100%; min-height: 310px; position: relative; transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); border-radius: 20px; border: 1px solid var(--border); background: var(--card); box-shadow: 0 16px 40px -10px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05); }
+      .fc-card { width: 100%; min-height: 310px; position: relative; transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1); border-radius: 8px; border: 1px solid var(--border); background: var(--card); box-shadow: 0 16px 40px -10px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05); }
       .fc-card:hover { border-color: rgba(90, 125, 153, 0.6); }
       .fc-card.flipped { transform: rotateY(180deg); }
-      .fc-front, .fc-back { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; padding: 2rem 2.25rem; border-radius: 20px; text-align: left; box-sizing: border-box; }
-      .fc-front { background: radial-gradient(circle at 10% 10%, rgba(90, 125, 153, 0.12) 0%, transparent 60%), #171B23; border-left: 4px solid #5A7D99; }
-      .fc-back { transform: rotateY(180deg); background: radial-gradient(circle at 90% 10%, rgba(56, 189, 248, 0.1) 0%, transparent 60%), #141821; border-left: 4px solid #38bdf8; }
+      .fc-front, .fc-back { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; padding: 2rem 2.25rem; border-radius: 8px; text-align: left; box-sizing: border-box; }
+      .fc-front { background: radial-gradient(circle at 10% 10%, rgba(90, 125, 153, 0.12) 0%, transparent 60%), #171B23; border: 1px solid var(--border); }
+      .fc-back { transform: rotateY(180deg); background: radial-gradient(circle at 90% 10%, rgba(56, 189, 248, 0.1) 0%, transparent 60%), #141821; border: 1px solid var(--border); }
       
       .card-topbar { width: 100%; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
-      .card-tag { font-family: var(--font-ui); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: #94a3b8; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.25rem 0.65rem; border-radius: 6px; }
+      .card-tag { font-family: var(--font-ui); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: #94a3b8; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0.25rem 0.65rem; border-radius: 4px; }
       .card-index { font-family: var(--font-ui); font-size: 0.75rem; font-weight: 600; color: #64748b; }
       .card-body-content { width: 100%; flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 0.5rem 0; }
       .display-answer { font-family: var(--font-ui); font-size: 1.05rem; font-weight: 400; line-height: 1.7; color: #e2e8f0; letter-spacing: 0.01em; }
       .card-bottombar { width: 100%; display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid rgba(255, 255, 255, 0.06); }
       .flip-hint { font-family: var(--font-ui); font-size: 0.75rem; color: #64748b; display: flex; align-items: center; gap: 0.4rem; }
-      .kbd-pill { background: #21262E; border: 1px solid #3A4250; border-radius: 4px; padding: 0.1rem 0.35rem; font-size: 0.65rem; font-family: monospace; color: #94a3b8; }
+      .kbd-badge { background: #21262E; border: 1px solid #3A4250; border-radius: 4px; padding: 0.1rem 0.35rem; font-size: 0.65rem; font-family: monospace; color: #94a3b8; }
       .controls-bar { display: flex; align-items: center; justify-content: center; gap: 0.75rem; width: 100%; max-width: 600px; margin-top: 0.25rem; }
-      .btn-nav { padding: 0.65rem 1.15rem; font-size: 0.825rem; font-weight: 600; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; transition: all 0.15s ease; }
-      .btn-nav:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); color: #ffffff; transform: translateY(-1px); }
-      .btn-flip-hero { padding: 0.85rem 2.25rem; font-size: 0.95rem; font-weight: 700; border-radius: 14px; background: linear-gradient(135deg, #5A7D99 0%, #3D5E7A 100%); color: #ffffff; box-shadow: 0 4px 18px rgba(90, 125, 153, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2); letter-spacing: 0.02em; min-width: 175px; transform: scale(1.02); }
-      .btn-flip-hero:hover { background: linear-gradient(135deg, #6b90ad 0%, #466c8c 100%); box-shadow: 0 6px 24px rgba(90, 125, 153, 0.55); transform: scale(1.04) translateY(-1px); }
-      .btn-shuffle { padding: 0.65rem 0.85rem; font-size: 0.8rem; border-radius: 12px; background: transparent; border: 1px solid transparent; color: #64748b; }
+      .btn-nav { padding: 0.65rem 1.15rem; font-size: 0.825rem; font-weight: 600; border-radius: 6px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; transition: all 0.15s ease; }
+      .btn-nav:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); color: #ffffff; }
+      .btn-flip-hero { padding: 0.85rem 2.25rem; font-size: 0.95rem; font-weight: 700; border-radius: 6px; background: linear-gradient(135deg, #5A7D99 0%, #3D5E7A 100%); color: #ffffff; box-shadow: 0 4px 18px rgba(90, 125, 153, 0.4); letter-spacing: 0.02em; min-width: 175px; }
+      .btn-flip-hero:hover { background: linear-gradient(135deg, #6b90ad 0%, #466c8c 100%); }
+      .btn-shuffle { padding: 0.65rem 0.85rem; font-size: 0.8rem; border-radius: 6px; background: transparent; border: 1px solid var(--border); color: #64748b; }
       .btn-shuffle:hover { background: rgba(255, 255, 255, 0.05); color: #cbd5e1; }
       .leitner-bar { display: flex; gap: 0.5rem; justify-content: center; margin-top: 1.15rem; flex-wrap: wrap; }
-      .leitner-btn { padding: 0.45rem 1rem; font-size: 0.75rem; font-weight: 700; border-radius: 8px; border: 1px solid transparent; cursor: pointer; font-family: var(--font-ui); transition: all 0.15s; }
+      .leitner-btn { padding: 0.45rem 1rem; font-size: 0.75rem; font-weight: 700; border-radius: 4px; border: 1px solid transparent; cursor: pointer; font-family: var(--font-ui); transition: all 0.15s; }
       .leitner-again { background: rgba(239,68,68,0.12); color: #f87171; border-color: rgba(239,68,68,0.25); }
-      .leitner-again:hover { background: #ef4444; color: #fff; box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
+      .leitner-again:hover { background: #ef4444; color: #fff; }
       .leitner-good { background: rgba(59,130,246,0.12); color: #60a5fa; border-color: rgba(59,130,246,0.25); }
-      .leitner-good:hover { background: #3b82f6; color: #fff; box-shadow: 0 4px 12px rgba(59,130,246,0.3); }
+      .leitner-good:hover { background: #3b82f6; color: #fff; }
       .leitner-easy { background: rgba(16,185,129,0.12); color: #34d399; border-color: rgba(16,185,129,0.25); }
-      .leitner-easy:hover { background: #10b981; color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,0.3); }
+      .leitner-easy:hover { background: #10b981; color: #fff; }
+      .citation-btn { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.7rem; font-weight: 700; color: #93c5fd; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); cursor: pointer; transition: all 0.15s ease; font-family: var(--font-ui); }
     </style></head><body>
       <div id="app">
         <header id="app-header">
@@ -291,21 +525,27 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
               <div class="fc-front">
                 <div class="card-topbar">
                   <span class="card-tag">Question / Concept</span>
-                  <span class="card-index" id="fc-progress">Card 1 of ${items.length}</span>
+                  <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <button class="citation-btn" id="fc-cite-btn" style="display:none;" onclick="event.stopPropagation(); triggerCitation();">📖 Citation</button>
+                    <span class="card-index" id="fc-progress">Card 1 of ${items.length}</span>
+                  </div>
                 </div>
                 <div class="card-body-content">
                   <h2 id="front-text" class="display-question"></h2>
                   <span id="hint-text" style="font-size:0.85rem;color:#94a3b8;line-height:1.4;"></span>
                 </div>
                 <div class="card-bottombar">
-                  <span class="flip-hint">Click card or press <kbd class="kbd-pill">Space</kbd> to flip</span>
+                  <span class="flip-hint">Click card or press <kbd class="kbd-badge">Space</kbd> to flip</span>
                   <span style="font-size:0.75rem;color:#64748b;">🔄 3D Flip</span>
                 </div>
               </div>
               <div class="fc-back">
                 <div class="card-topbar">
                   <span class="card-tag" style="background:rgba(56,189,248,0.1);color:#38bdf8;border-color:rgba(56,189,248,0.25);">Answer / Breakdown</span>
-                  <span class="card-index" id="fc-progress-back">Card 1 of ${items.length}</span>
+                  <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <button class="citation-btn" id="fc-cite-btn-back" style="display:none;" onclick="event.stopPropagation(); triggerCitation();">📖 Citation</button>
+                    <span class="card-index" id="fc-progress-back">Card 1 of ${items.length}</span>
+                  </div>
                 </div>
                 <div class="card-body-content">
                   <p id="back-text" class="display-answer"></p>
@@ -319,12 +559,12 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
           </div>
           
           <div class="controls-bar">
-            <button class="btn btn-nav" id="fc-prev" title="Previous card (Left Arrow)">← Prev</button>
-            <button class="btn btn-flip-hero" id="fc-flip" title="Flip card (Spacebar)">
+            <button class="btn btn-nav" id="fc-prev">← Prev</button>
+            <button class="btn btn-flip-hero" id="fc-flip">
               <span>Flip Card</span>
-              <kbd class="kbd-pill" style="background:rgba(0,0,0,0.25);border-color:rgba(255,255,255,0.2);color:#fff;">Space</kbd>
+              <kbd class="kbd-badge" style="background:rgba(0,0,0,0.25);border-color:rgba(255,255,255,0.2);color:#fff;">Space</kbd>
             </button>
-            <button class="btn btn-nav" id="fc-next" title="Next card (Right Arrow)">Next →</button>
+            <button class="btn btn-nav" id="fc-next">Next →</button>
             <button class="btn btn-shuffle" id="fc-shuffle" title="Shuffle deck">🔀</button>
           </div>
 
@@ -346,6 +586,16 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
         const prog = document.getElementById('fc-progress');
         const progBack = document.getElementById('fc-progress-back');
 
+        function triggerCitation() {
+          const it = DATA[cur] || {};
+          if (it.citation) {
+            window.parent?.postMessage({
+              type: 'OPEN_CITATION',
+              citation: it.citation
+            }, '*');
+          }
+        }
+
         function render() {
           if (!DATA.length) return;
           const it = DATA[cur];
@@ -355,6 +605,11 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
           const progText = 'Card ' + (cur + 1) + ' of ' + DATA.length;
           if (prog) prog.textContent = progText;
           if (progBack) progBack.textContent = progText;
+          const cBtn = document.getElementById('fc-cite-btn');
+          const cBtnBack = document.getElementById('fc-cite-btn-back');
+          const hasCitation = Boolean(it.citation && (it.citation.title || it.citation.excerpt));
+          if (cBtn) cBtn.style.display = hasCitation ? 'inline-flex' : 'none';
+          if (cBtnBack) cBtnBack.style.display = hasCitation ? 'inline-flex' : 'none';
           isFlipped = false;
           inner.classList.remove('flipped');
         }
@@ -388,13 +643,13 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
   // 2. TIMED ASSESSMENT MCQ QUIZ WITH DEEP EXPLANATION DRAWER
   if (format.includes('quiz') || format.includes('assessment') || format.includes('exam') || format.includes('mcq')) {
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>${baseCss}
-      .quiz-card { width: 100%; max-width: 680px; margin: 1rem 0; background: var(--card); border: 1.5px solid var(--border); border-radius: 20px; padding: 2rem; }
-      .choice-btn { width: 100%; text-align: left; padding: 1rem 1.25rem; margin-bottom: 0.75rem; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1.5px solid var(--border); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 0.95rem; line-height: 1.5; transition: all 0.15s; }
-      .choice-btn:hover { border-color: var(--primary); background: rgba(90,125,153,0.15); transform: translateY(-1px); }
-      .choice-btn.correct { background: rgba(16,185,129,0.15)!important; border-color: #10b981!important; color: #34d399!important; box-shadow: 0 0 15px rgba(16,185,129,0.2); }
+      .quiz-card { width: 100%; max-width: 680px; margin: 1rem 0; background: var(--card); border: 1.5px solid var(--border); border-radius: 8px; padding: 2rem; }
+      .choice-btn { width: 100%; text-align: left; padding: 0.95rem 1.25rem; margin-bottom: 0.65rem; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1.5px solid var(--border); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: space-between; font-size: 0.95rem; line-height: 1.5; transition: all 0.15s; }
+      .choice-btn:hover { border-color: var(--primary); background: rgba(90,125,153,0.15); }
+      .choice-btn.correct { background: rgba(16,185,129,0.18)!important; border-color: #10b981!important; color: #34d399!important; }
       .choice-btn.wrong { background: rgba(239,68,68,0.15)!important; border-color: #ef4444!important; color: #f87171!important; }
-      .key-pill { font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 6px; background: #21262E; color: #94a3b8; font-family: var(--font-ui); border: 1px solid var(--border); }
-      .exp-drawer { margin-top: 1.25rem; padding: 1.25rem; border-radius: 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); font-size: 0.9rem; line-height: 1.6; }
+      .key-badge { font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px; background: #21262E; color: #94a3b8; font-family: var(--font-ui); border: 1px solid var(--border); }
+      .exp-drawer { margin-top: 1.25rem; padding: 1.25rem; border-radius: 6px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); font-size: 0.9rem; line-height: 1.6; }
     </style></head><body>
       <div id="app">
         <header id="app-header">
@@ -418,7 +673,7 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
               <p id="exp-text" style="color:#cbd5e1;"></p>
             </div>
           </div>
-          <div id="summary-card" class="card text-center" style="display:none;width:100%;max-width:560px;padding:2.5rem;">
+          <div id="summary-card" class="card text-center" style="display:none;width:100%;max-width:560px;padding:2.5rem;border-radius:8px;">
             <span class="badge" style="background:rgba(16,185,129,0.2);color:#34d399;border-color:#10b981;margin-bottom:1rem;">Evaluation Complete</span>
             <h2 style="font-family:var(--font-display);font-size:1.85rem;font-weight:700;color:#fff;margin-bottom:0.5rem;">Assessment Finished! 🎉</h2>
             <p id="final-score" style="font-size:1.25rem;color:#38bdf8;font-weight:700;margin:1.25rem 0;"></p>
@@ -471,9 +726,9 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
           
           const rawChoices = Array.isArray(it.choices) && it.choices.length >= 2 ? [...it.choices] : [
             it.answerText || it.answer || it.back || 'Correct concept verified',
-            'Secondary associative marker without direct causal kinetic influence.',
+            'Alternative perspective without direct causal kinetic influence.',
             'Unregulated degradation pathway independent of feedback equilibrium.',
-            'Spontaneous unmediated reaction occurring solely under isolated test conditions.'
+            'Spontaneous unmediated reaction occurring solely under isolated conditions.'
           ];
 
           let correctText = it.answerText || '';
@@ -487,7 +742,7 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
           rawChoices.forEach((opt, idx) => {
             const btn = document.createElement('button');
             btn.className = 'choice-btn';
-            btn.innerHTML = '<span style="font-weight:500;">' + opt + '</span><span class="key-pill">' + (keys[idx] || (idx + 1)) + '</span>';
+            btn.innerHTML = '<span style="font-weight:500;">' + opt + '</span><span class="key-badge">' + (keys[idx] || (idx + 1)) + '</span>';
             btn.onclick = () => handleChoice(opt, correctText, btn, idx);
             cBox.appendChild(btn);
           });
@@ -548,11 +803,332 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
     </body></html>`;
   }
 
-  // 3. CLOZE DELETION & ACTIVE RECALL BLURTING
+  // 3. MATCHING GAME (2-COLUMN INTERACTIVE CONNECTOR)
+  if (format.includes('match')) {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>${baseCss}
+      .matching-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; width: 100%; max-width: 780px; margin: 1.25rem 0; }
+      .match-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 6px; padding: 1rem 1.25rem; cursor: pointer; transition: all 0.15s; font-size: 0.9rem; line-height: 1.5; color: #fff; user-select: none; display: flex; align-items: center; justify-content: space-between; min-height: 60px; }
+      .match-card:hover { border-color: var(--primary); background: rgba(90,125,153,0.12); }
+      .match-card.selected { border-color: #38bdf8; background: rgba(56,189,248,0.18); }
+      .match-card.matched { border-color: #10b981; background: rgba(16,185,129,0.15); color: #34d399; cursor: default; opacity: 0.7; pointer-events: none; }
+      .match-card.error { border-color: #ef4444; background: rgba(239,68,68,0.15); color: #f87171; }
+      @media (max-width: 640px) { .matching-grid { grid-template-columns: 1fr; gap: 1rem; } }
+    </style></head><body>
+      <div id="app">
+        <header id="app-header">
+          <span class="badge" style="background:#5A7D99;color:white;">Interactive Matching</span>
+          <h1 style="margin-top:0.4rem;">${title}</h1>
+          <p class="header-desc">Click a concept on the left, then select its matching definition on the right.</p>
+          <div style="display:flex;gap:0.75rem;justify-content:center;margin-top:0.5rem;">
+            <span class="badge" id="match-score">Matched: 0 / ${items.length}</span>
+            <span class="badge" id="match-attempts">Attempts: 0</span>
+          </div>
+        </header>
+        <main id="app-main" style="width:100%;display:flex;flex-direction:column;align-items:center;">
+          <div class="matching-grid">
+            <div id="left-col" style="display:grid;gap:0.75rem;"></div>
+            <div id="right-col" style="display:grid;gap:0.75rem;"></div>
+          </div>
+          <div id="match-summary" class="card text-center" style="display:none;width:100%;max-width:520px;padding:2rem;">
+            <span class="badge" style="background:rgba(16,185,129,0.2);color:#34d399;border-color:#10b981;margin-bottom:0.75rem;">All Pairs Connected!</span>
+            <h2 style="font-family:var(--font-display);font-size:1.6rem;color:#fff;margin-bottom:0.5rem;">Mastery Confirmed 🎉</h2>
+            <p id="match-stats" style="color:#94a3b8;font-size:0.9rem;margin-bottom:1.25rem;"></p>
+            <button class="btn btn-primary" onclick="initMatching()">Play Again</button>
+          </div>
+        </main>
+      </div>
+      <script>
+        const RAW = ${itemsJson};
+        let PAIRS = RAW.map((it, idx) => ({
+          id: it.id || String(idx + 1),
+          left: it.left || it.term || it.front || it.concept || ('Term ' + (idx + 1)),
+          right: it.right || it.definition || it.back || it.explanation || ('Definition ' + (idx + 1))
+        }));
+
+        let selectedLeft = null;
+        let selectedRight = null;
+        let matchedCount = 0;
+        let attempts = 0;
+
+        function initMatching() {
+          selectedLeft = null; selectedRight = null; matchedCount = 0; attempts = 0;
+          document.getElementById('match-score').textContent = 'Matched: 0 / ' + PAIRS.length;
+          document.getElementById('match-attempts').textContent = 'Attempts: 0';
+          document.getElementById('match-summary').style.display = 'none';
+
+          const leftItems = [...PAIRS].sort(() => Math.random() - 0.5);
+          const rightItems = [...PAIRS].sort(() => Math.random() - 0.5);
+
+          const lCol = document.getElementById('left-col');
+          const rCol = document.getElementById('right-col');
+          lCol.innerHTML = ''; rCol.innerHTML = '';
+
+          leftItems.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'match-card';
+            card.dataset.id = item.id;
+            card.dataset.side = 'left';
+            card.textContent = item.left;
+            card.onclick = () => handleSelect('left', item.id, card);
+            lCol.appendChild(card);
+          });
+
+          rightItems.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'match-card';
+            card.dataset.id = item.id;
+            card.dataset.side = 'right';
+            card.textContent = item.right;
+            card.onclick = () => handleSelect('right', item.id, card);
+            rCol.appendChild(card);
+          });
+        }
+
+        function handleSelect(side, id, el) {
+          if (el.classList.contains('matched')) return;
+
+          if (side === 'left') {
+            document.querySelectorAll('[data-side="left"]').forEach(c => c.classList.remove('selected'));
+            selectedLeft = { id, el };
+            el.classList.add('selected');
+          } else {
+            document.querySelectorAll('[data-side="right"]').forEach(c => c.classList.remove('selected'));
+            selectedRight = { id, el };
+            el.classList.add('selected');
+          }
+
+          if (selectedLeft && selectedRight) {
+            attempts++;
+            document.getElementById('match-attempts').textContent = 'Attempts: ' + attempts;
+            if (selectedLeft.id === selectedRight.id) {
+              selectedLeft.el.classList.remove('selected');
+              selectedRight.el.classList.remove('selected');
+              selectedLeft.el.classList.add('matched');
+              selectedRight.el.classList.add('matched');
+              matchedCount++;
+              document.getElementById('match-score').textContent = 'Matched: ' + matchedCount + ' / ' + PAIRS.length;
+              selectedLeft = null;
+              selectedRight = null;
+
+              if (matchedCount >= PAIRS.length) {
+                document.getElementById('match-summary').style.display = 'block';
+                document.getElementById('match-stats').textContent = 'Completed in ' + attempts + ' attempts with all pairs successfully matched.';
+              }
+            } else {
+              const lEl = selectedLeft.el;
+              const rEl = selectedRight.el;
+              lEl.classList.add('error');
+              rEl.classList.add('error');
+              setTimeout(() => {
+                lEl.classList.remove('error', 'selected');
+                rEl.classList.remove('error', 'selected');
+              }, 600);
+              selectedLeft = null;
+              selectedRight = null;
+            }
+          }
+        }
+
+        initMatching();
+      </script>
+    </body></html>`;
+  }
+
+  // 4. CROSSWORD PUZZLE
+  if (format.includes('crossword')) {
+    const layout = buildClientCrosswordLayout(items);
+    const layoutJson = JSON.stringify(layout || {});
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>${baseCss}
+      .cw-layout { display: flex; gap: 1.5rem; width: 100%; max-width: 900px; margin: 1rem 0; flex-wrap: wrap; justify-content: center; }
+      .cw-grid { display: grid; gap: 2px; background: #28303e; padding: 4px; border-radius: 6px; border: 1px solid var(--border); }
+      .cw-cell { width: 34px; height: 34px; background: #13161c; position: relative; display: flex; align-items: center; justify-content: center; }
+      .cw-cell.empty { background: transparent; }
+      .cw-cell input { width: 100%; height: 100%; border: none; background: #1A1E26; text-align: center; color: #fff; font-size: 0.95rem; font-weight: 700; text-transform: uppercase; font-family: monospace; border-radius: 2px; outline: none; }
+      .cw-cell input:focus { background: rgba(90,125,153,0.3); border: 1.5px solid #38bdf8; }
+      .cw-cell.correct input { background: rgba(16,185,129,0.25); color: #34d399; }
+      .cw-num { position: absolute; top: 1px; left: 2px; font-size: 8px; font-weight: 800; color: #94a3b8; pointer-events: none; }
+      .cw-clues { flex: 1; min-width: 280px; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.25rem; font-size: 0.85rem; max-height: 480px; overflow-y: auto; }
+      .cw-clue-item { padding: 0.4rem 0.5rem; margin-bottom: 0.4rem; border-radius: 4px; line-height: 1.4; color: #cbd5e1; }
+      .cw-clue-item strong { color: #5A7D99; }
+    </style></head><body>
+      <div id="app">
+        <header id="app-header">
+          <span class="badge" style="background:#5A7D99;color:white;">Academic Crossword</span>
+          <h1 style="margin-top:0.4rem;">${title}</h1>
+          <p class="header-desc">Fill in the crossword puzzle using the academic clues below.</p>
+        </header>
+        <main id="app-main" style="width:100%;display:flex;flex-direction:column;align-items:center;">
+          <div class="cw-layout">
+            <div id="cw-grid-box" class="cw-grid"></div>
+            <div class="cw-clues">
+              <h3 style="font-size:0.95rem;font-weight:700;color:#fff;margin-bottom:0.75rem;">Across & Down Clues</h3>
+              <div id="clues-list"></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.75rem;margin-top:1rem;">
+            <button class="btn btn-primary" onclick="checkCrossword()">Check Answers</button>
+            <button class="btn btn-secondary" onclick="revealCrossword()">Reveal Letters</button>
+          </div>
+          <div id="cw-status" style="margin-top:0.75rem;font-weight:700;font-size:0.9rem;"></div>
+        </main>
+      </div>
+      <script>
+        const LAYOUT = ${layoutJson};
+        const rows = LAYOUT.gridRows || 8;
+        const cols = LAYOUT.gridCols || 8;
+        const words = LAYOUT.words || [];
+
+        const gridBox = document.getElementById('cw-grid-box');
+        gridBox.style.gridTemplateRows = 'repeat(' + rows + ', 34px)';
+        gridBox.style.gridTemplateColumns = 'repeat(' + cols + ', 34px)';
+
+        const cellMap = {};
+        for (let r = 1; r <= rows; r++) {
+          for (let c = 1; c <= cols; c++) {
+            cellMap[r + '-' + c] = null;
+          }
+        }
+
+        words.forEach(w => {
+          for (let i = 0; i < w.word.length; i++) {
+            const r = w.direction === 'down' ? w.startRow + i : w.startRow;
+            const c = w.direction === 'across' ? w.startCol + i : w.startCol;
+            const key = r + '-' + c;
+            if (!cellMap[key]) {
+              cellMap[key] = { char: w.word[i], num: i === 0 ? w.number : null };
+            } else if (i === 0 && !cellMap[key].num) {
+              cellMap[key].num = w.number;
+            }
+          }
+        });
+
+        for (let r = 1; r <= rows; r++) {
+          for (let c = 1; c <= cols; c++) {
+            const info = cellMap[r + '-' + c];
+            const div = document.createElement('div');
+            if (info) {
+              div.className = 'cw-cell';
+              if (info.num) {
+                const numSpan = document.createElement('span');
+                numSpan.className = 'cw-num';
+                numSpan.textContent = info.num;
+                div.appendChild(numSpan);
+              }
+              const inp = document.createElement('input');
+              inp.maxLength = 1;
+              inp.dataset.answer = info.char;
+              inp.dataset.pos = r + '-' + c;
+              div.appendChild(inp);
+            } else {
+              div.className = 'cw-cell empty';
+            }
+            gridBox.appendChild(div);
+          }
+        }
+
+        const cluesBox = document.getElementById('clues-list');
+        words.forEach(w => {
+          const item = document.createElement('div');
+          item.className = 'cw-clue-item';
+          item.innerHTML = '<strong>' + w.number + '. ' + w.direction.toUpperCase() + ' (' + w.word.length + ' letters):</strong> ' + w.clue;
+          cluesBox.appendChild(item);
+        });
+
+        function checkCrossword() {
+          let correct = 0;
+          let total = 0;
+          document.querySelectorAll('.cw-cell input').forEach(inp => {
+            total++;
+            if (inp.value.toUpperCase() === inp.dataset.answer) {
+              correct++;
+              inp.parentElement.classList.add('correct');
+            } else {
+              inp.parentElement.classList.remove('correct');
+            }
+          });
+          const status = document.getElementById('cw-status');
+          if (correct === total) {
+            status.innerHTML = '<span style="color:#10b981;">🎉 Great job! Puzzle completely solved!</span>';
+          } else {
+            status.innerHTML = '<span style="color:#f59e0b;">' + correct + ' / ' + total + ' letters correct. Keep going!</span>';
+          }
+        }
+
+        function revealCrossword() {
+          document.querySelectorAll('.cw-cell input').forEach(inp => {
+            inp.value = inp.dataset.answer;
+            inp.parentElement.classList.add('correct');
+          });
+        }
+      </script>
+    </body></html>`;
+  }
+
+  // 5. WORD SEARCH PUZZLE
+  if (format.includes('wordsearch') || format.includes('word-search') || format.includes('search')) {
+    const wsLayout = buildClientWordSearchLayout(items, 10);
+    const wsJson = JSON.stringify(wsLayout);
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>${baseCss}
+      .ws-container { display: flex; gap: 1.5rem; width: 100%; max-width: 860px; margin: 1rem 0; flex-wrap: wrap; justify-content: center; }
+      .ws-grid { display: grid; grid-template-columns: repeat(10, 32px); grid-template-rows: repeat(10, 32px); gap: 2px; background: #28303e; padding: 4px; border-radius: 6px; border: 1px solid var(--border); user-select: none; }
+      .ws-cell { width: 32px; height: 32px; background: #1A1E26; display: flex; align-items: center; justify-content: center; font-family: monospace; font-weight: 700; font-size: 0.95rem; color: #cbd5e1; cursor: pointer; border-radius: 2px; transition: all 0.15s; }
+      .ws-cell:hover { background: rgba(90,125,153,0.3); color: #fff; }
+      .ws-cell.highlight { background: #5A7D99; color: #fff; }
+      .ws-cell.found { background: rgba(16,185,129,0.3); color: #34d399; font-weight: 800; }
+      .ws-wordlist { flex: 1; min-width: 240px; background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 1.25rem; }
+      .ws-word-item { padding: 0.35rem 0.6rem; border-radius: 4px; margin-bottom: 0.35rem; font-size: 0.85rem; color: #cbd5e1; display: flex; justify-content: space-between; align-items: center; }
+      .ws-word-item.found { text-decoration: line-through; opacity: 0.5; color: #10b981; }
+    </style></head><body>
+      <div id="app">
+        <header id="app-header">
+          <span class="badge" style="background:#5A7D99;color:white;">Academic Word Search</span>
+          <h1 style="margin-top:0.4rem;">${title}</h1>
+          <p class="header-desc">Find all hidden key terms in the puzzle matrix below.</p>
+        </header>
+        <main id="app-main" style="width:100%;display:flex;flex-direction:column;align-items:center;">
+          <div class="ws-container">
+            <div id="ws-grid" class="ws-grid"></div>
+            <div class="ws-wordlist">
+              <h3 style="font-size:0.95rem;font-weight:700;color:#fff;margin-bottom:0.75rem;">Terms to Find</h3>
+              <div id="ws-words"></div>
+            </div>
+          </div>
+        </main>
+      </div>
+      <script>
+        const LAYOUT = ${wsJson};
+        const gridEl = document.getElementById('ws-grid');
+        const wordsEl = document.getElementById('ws-words');
+
+        LAYOUT.grid.forEach((row, r) => {
+          row.forEach((letter, c) => {
+            const cell = document.createElement('div');
+            cell.className = 'ws-cell';
+            cell.textContent = letter;
+            cell.dataset.r = r;
+            cell.dataset.c = c;
+            cell.onclick = () => {
+              cell.classList.toggle('found');
+            };
+            gridEl.appendChild(cell);
+          });
+        });
+
+        LAYOUT.words.forEach(w => {
+          const div = document.createElement('div');
+          div.className = 'ws-word-item';
+          div.innerHTML = '<strong>' + w.word + '</strong><span style="font-size:0.75rem;color:#94a3b8;">' + w.clue + '</span>';
+          wordsEl.appendChild(div);
+        });
+      </script>
+    </body></html>`;
+  }
+
+  // 6. CLOZE DELETION & ACTIVE RECALL BLURTING
   if (format.includes('cloze') || format.includes('blurt') || format.includes('fill') || format.includes('gap')) {
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>${baseCss}
-      .cloze-card { padding: 1.75rem; background: var(--card); border: 1.5px solid var(--border); border-radius: 18px; width: 100%; max-width: 680px; margin: 1rem 0; }
-      .occlusion-mask { display: inline-block; padding: 0.2rem 0.75rem; border-radius: 6px; background: #28303e; color: #5A7D99; cursor: pointer; user-select: none; font-weight: 700; border: 1px dashed #5A7D99; transition: all 0.2s; }
+      .cloze-card { padding: 1.75rem; background: var(--card); border: 1.5px solid var(--border); border-radius: 6px; width: 100%; max-width: 680px; margin: 1rem 0; }
+      .occlusion-mask { display: inline-block; padding: 0.2rem 0.75rem; border-radius: 4px; background: #28303e; color: #5A7D99; cursor: pointer; user-select: none; font-weight: 700; border: 1px dashed #5A7D99; transition: all 0.2s; }
       .occlusion-mask.revealed { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid #10b981; text-decoration: none; }
     </style></head><body>
       <div id="app">
@@ -593,10 +1169,10 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
     </body></html>`;
   }
 
-  // 4. FEYNMAN ACTIVE RECALL & EXPLANATION GRADER
+  // 7. FEYNMAN ACTIVE RECALL & EXPLANATION GRADER
   if (format.includes('feynman') || format.includes('grader')) {
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>${baseCss}
-      .feynman-box { width: 100%; max-width: 700px; margin: 1rem 0; background: var(--card); border: 1.5px solid var(--border); border-radius: 20px; padding: 2rem; text-align: left; }
+      .feynman-box { width: 100%; max-width: 700px; margin: 1rem 0; background: var(--card); border: 1.5px solid var(--border); border-radius: 6px; padding: 2rem; text-align: left; }
     </style></head><body>
       <div id="app">
         <header id="app-header">
@@ -609,18 +1185,18 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
           <div class="feynman-box">
             <h2 id="f-title" class="display-question" style="font-size:1.5rem;margin-bottom:0.5rem;"></h2>
             <p id="f-prompt" class="muted" style="font-size:0.9rem;margin-bottom:1.25rem;color:#94a3b8;"></p>
-            <textarea id="f-input" rows="4" placeholder="Explain the underlying mechanism and why this works in your own words..." style="width:100%;padding:0.85rem;border-radius:12px;background:#13161c;border:1px solid var(--border);color:#fff;font-size:0.9rem;resize:vertical;line-height:1.5;"></textarea>
+            <textarea id="f-input" rows="4" placeholder="Explain the underlying mechanism and why this works in your own words..." style="width:100%;padding:0.85rem;border-radius:6px;background:#13161c;border:1px solid var(--border);color:#fff;font-size:0.9rem;resize:vertical;line-height:1.5;"></textarea>
             <div style="display:flex;gap:0.75rem;margin-top:1rem;">
               <button class="btn btn-primary w-full" style="padding:0.75rem 1.5rem;font-weight:700;" id="f-grade-btn">⚡ Evaluate Explanation</button>
               <button class="btn btn-secondary" id="f-model-btn" style="white-space:nowrap;padding:0.75rem 1.25rem;">Model Answer</button>
             </div>
-            <div id="f-feedback" class="card" style="display:none;margin-top:1.25rem;background:var(--muted);border-radius:14px;">
+            <div id="f-feedback" class="card" style="display:none;margin-top:1.25rem;background:var(--muted);border-radius:6px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem;">
                 <h4 style="font-weight:700;font-size:0.95rem;color:#fff;">Feynman Rubric Assessment</h4>
                 <span id="f-score" style="font-weight:800;color:#10b981;font-size:1rem;"></span>
               </div>
               <div id="f-checklist" style="display:grid;gap:0.4rem;font-size:0.85rem;margin-bottom:0.75rem;"></div>
-              <div id="f-model-box" style="display:none;padding:0.85rem;border-radius:10px;background:rgba(90,125,153,0.15);border:1px solid rgba(90,125,153,0.3);font-size:0.85rem;line-height:1.6;">
+              <div id="f-model-box" style="display:none;padding:0.85rem;border-radius:6px;background:rgba(90,125,153,0.15);border:1px solid rgba(90,125,153,0.3);font-size:0.85rem;line-height:1.6;">
                 <strong style="color:#5A7D99;">Exemplar Master Explanation:</strong> <span id="f-model-text" style="color:#e2e8f0;"></span>
               </div>
             </div>
@@ -688,20 +1264,20 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
     </body></html>`;
   }
 
-  // 5. CHRONOLOGICAL TIMELINE & MILESTONE ORDERING
+  // 8. CHRONOLOGICAL TIMELINE & MILESTONE ORDERING
   if (format.includes('timeline') || format.includes('chronol') || format.includes('ordering') || format.includes('sequence')) {
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>${baseCss}
       .timeline-track-container { position: relative; padding-left: 2.25rem; width: 100%; max-width: 760px; margin: 0 auto; }
       .timeline-vertical-spine { position: absolute; left: 1rem; top: 1rem; bottom: 1rem; width: 2.5px; background: linear-gradient(to bottom, var(--primary), #3D6660, #10b981); opacity: 0.35; border-radius: 2px; }
       .timeline-slot { position: relative; margin-bottom: 0.85rem; }
-      .timeline-slot-node { position: absolute; left: -2.25rem; top: 1.15rem; width: 14px; height: 14px; border-radius: 50%; background: var(--background); border: 2.5px solid var(--primary); z-index: 2; transition: all 0.2s; }
-      .timeline-slot-node.locked { border-color: #10b981; background: #10b981; box-shadow: 0 0 8px rgba(16,185,129,0.5); }
-      .timeline-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 14px; padding: 1.1rem 1.35rem; cursor: grab; user-select: none; transition: all 0.2s; display: flex; align-items: center; gap: 0.85rem; position: relative; }
-      .timeline-card:hover { border-color: rgba(90,125,153,0.6); transform: translateY(-1px); }
+      .timeline-slot-node { position: absolute; left: -2.25rem; top: 1.15rem; width: 14px; height: 14px; border-radius: 4px; background: var(--background); border: 2px solid var(--primary); z-index: 2; transition: all 0.2s; }
+      .timeline-slot-node.locked { border-color: #10b981; background: #10b981; }
+      .timeline-card { background: var(--card); border: 1.5px solid var(--border); border-radius: 6px; padding: 1.1rem 1.35rem; cursor: grab; user-select: none; transition: all 0.2s; display: flex; align-items: center; gap: 0.85rem; position: relative; }
+      .timeline-card:hover { border-color: rgba(90,125,153,0.6); }
       .timeline-card.correct-order { border-color: #10b981; background: rgba(16,185,129,0.08); }
       .drag-handle { color: #8E8E93; font-size: 1.25rem; cursor: grab; }
-      .order-pill { width: 28px; height: 28px; border-radius: 50%; background: var(--muted); border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; color: var(--primary); }
-      .move-btn { background: #21262E; border: 1px solid var(--border); color: #CDD1D6; border-radius: 6px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.7rem; }
+      .order-badge { width: 26px; height: 26px; border-radius: 4px; background: var(--muted); border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; color: var(--primary); }
+      .move-btn { background: #21262E; border: 1px solid var(--border); color: #CDD1D6; border-radius: 4px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.7rem; }
     </style></head><body>
       <div id="app">
         <header id="app-header">
@@ -739,7 +1315,7 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
             slot.innerHTML = '<div class="timeline-slot-node" id="node-' + index + '"></div>' +
               '<div class="timeline-card" data-index="' + index + '">' +
                 '<span class="drag-handle">⠿</span>' +
-                '<div class="order-pill">' + (index + 1) + '</div>' +
+                '<div class="order-badge">' + (index + 1) + '</div>' +
                 '<div style="flex:1;"><h3 style="font-family:var(--font-display);font-size:1.15rem;font-weight:600;color:#fff;margin-bottom:0.25rem;">' + item.text + '</h3>' +
                 '<p style="font-size:0.85rem;color:#94a3b8;line-height:1.5;">' + item.detail + '</p></div>' +
                 '<div style="display:flex;flex-direction:column;gap:0.25rem;"><button class="move-btn" onclick="moveItem(' + index + ',-1)">▲</button><button class="move-btn" onclick="moveItem(' + index + ',1)">▼</button></div>' +
@@ -783,10 +1359,10 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
     </body></html>`;
   }
 
-  // 6. DEFAULT 3-IN-1 REVISION KIT (CORNELL NOTES + FLASHCARDS + ASSESSMENT)
+  // 9. DEFAULT 3-IN-1 REVISION KIT (CORNELL NOTES + FLASHCARDS)
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>${baseCss}
     .tab-btn.active { background: #5A7D99; color: white; font-weight: 700; border-color: #5A7D99; }
-    .cornell-row { display: grid; grid-template-columns: 200px 1fr; gap: 1.25rem; padding: 1.25rem; background: var(--card); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 0.85rem; }
+    .cornell-row { display: grid; grid-template-columns: 200px 1fr; gap: 1.25rem; padding: 1.25rem; background: var(--card); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 0.85rem; }
     @media(max-width: 640px) { .cornell-row { grid-template-columns: 1fr; gap: 0.5rem; } }
   </style></head><body>
     <div id="app">
@@ -802,7 +1378,7 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
       <main id="app-main" style="width:100%;max-width:800px;">
         <div id="view-notes" class="text-left" style="display:grid;gap:0.75rem;width:100%;"></div>
         <div id="view-cards" class="text-left" style="display:none;width:100%;">
-          <div class="card" id="card-elem" style="min-height:280px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;background:radial-gradient(circle at 10% 10%, rgba(90, 125, 153, 0.12) 0%, transparent 60%), #171B23;border-left:4px solid #5A7D99;border-radius:20px;padding:2rem;">
+          <div class="card" id="card-elem" style="min-height:280px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;background:radial-gradient(circle at 10% 10%, rgba(90, 125, 153, 0.12) 0%, transparent 60%), #171B23;border:1px solid var(--border);border-radius:6px;padding:2rem;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
               <span class="badge" id="c-badge" style="background:rgba(255,255,255,0.06);color:#94a3b8;border-color:rgba(255,255,255,0.1);">Front (Click to Flip)</span>
               <span style="font-size:0.75rem;color:#64748b;font-family:var(--font-ui);" id="c-count">Concept 1</span>
@@ -816,9 +1392,9 @@ export function morphToolToHtml(targetFormat, title, description, rawItems) {
             </div>
           </div>
           <div style="display:flex;gap:0.75rem;margin-top:1rem;justify-content:center;align-items:center;">
-            <button class="btn btn-secondary" id="c-prev" style="padding:0.65rem 1.15rem;font-size:0.825rem;font-weight:600;border-radius:12px;">← Prev</button>
-            <button class="btn btn-primary" id="c-flip" style="padding:0.85rem 2.25rem;font-size:0.95rem;font-weight:700;border-radius:14px;background:linear-gradient(135deg, #5A7D99 0%, #3D5E7A 100%);color:#fff;box-shadow:0 4px 18px rgba(90, 125, 153, 0.4);min-width:170px;">Flip Card</button>
-            <button class="btn btn-secondary" id="c-next" style="padding:0.65rem 1.15rem;font-size:0.825rem;font-weight:600;border-radius:12px;">Next →</button>
+            <button class="btn btn-secondary" id="c-prev" style="padding:0.65rem 1.15rem;font-size:0.825rem;font-weight:600;border-radius:6px;">← Prev</button>
+            <button class="btn btn-primary" id="c-flip" style="padding:0.85rem 2.25rem;font-size:0.95rem;font-weight:700;border-radius:6px;background:linear-gradient(135deg, #5A7D99 0%, #3D5E7A 100%);color:#fff;box-shadow:0 4px 18px rgba(90, 125, 153, 0.4);min-width:170px;">Flip Card</button>
+            <button class="btn btn-secondary" id="c-next" style="padding:0.65rem 1.15rem;font-size:0.825rem;font-weight:600;border-radius:6px;">Next →</button>
           </div>
         </div>
       </main>

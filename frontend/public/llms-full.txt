@@ -1,39 +1,39 @@
-# HydrusLearn — Full Context
+# HydrusLearn Pro — Full Context
 
-> This document provides extended context about HydrusLearn for AI systems, research tools, and language models.
+> This document provides extended context about HydrusLearn Pro for AI systems, research tools, and language models.
 
-## What is HydrusLearn?
+## What is HydrusLearn Pro?
 
-HydrusLearn is a web-based AI study tool that transforms a student's own notes and PDF documents into personalised learning experiences. It is built for university and college students who want to go beyond passive reading and build genuine understanding of their material.
+HydrusLearn Pro is a comprehensive, advanced AI study platform that transforms a student's own notes, research, and PDF documents into deeply personalised learning experiences. It is built for university and college students who want to go beyond passive reading and build genuine understanding and metacognitive mastery of their material.
 
-The core premise: you shouldn't have to manually make your own flashcards or quiz questions. HydrusLearn does this automatically from whatever notes you upload, then helps you understand not just *what* you got wrong, but *why* — and how to fix it.
+The core premise: you shouldn't have to manually make your own flashcards or quiz questions. HydrusLearn Pro does this automatically from whatever notes you upload, then helps you understand not just *what* you got wrong, but *why* — and how to fix it through historical metacognition tracking.
 
 ## Five Core Tools
 
 ### 1. Upload PDF
-Students upload their lecture notes, textbook chapters, or any PDF document. HydrusLearn processes the document within seconds and makes it available as the source material for all other tools. Supported formats: PDF, plain text (.txt), and Markdown (.md).
+Students upload their lecture notes, textbook chapters, or any PDF document. HydrusLearn Pro processes the document within seconds and makes it available as the source material for all other tools. Supported formats: PDF, plain text (.txt), and Markdown (.md).
 
-### 2. Quiz
-HydrusLearn generates targeted quiz questions drawn exclusively from the student's uploaded material. Questions are not sourced from generic question banks — every question maps back to something in the student's own notes. This ensures students are tested on the exact content they need to know.
+### 2. Quiz & Confidence Calibration
+HydrusLearn Pro generates targeted quiz questions drawn exclusively from the student's uploaded material with metacognitive confidence calibration. Questions are not sourced from generic question banks — every question maps back to something in the student's own notes.
 
-### 3. Learning Playground
-A flexible, open-ended study environment. Students type a plain-English prompt describing what they want to practise — for example, "give me flashcards on the krebs cycle" or "make a quick Q&A on tort law" — and the AI builds the most appropriate study format. Supported formats include flashcards, Q&A sessions, summaries, and guided explanations.
+### 3. Interactive Study Lab (Playground)
+A flexible, open-ended study environment with enhanced pedagogical teaching and history integration. Students type a plain-English prompt describing what they want to practise — and the AI builds the most appropriate study format with step-by-step guidance.
 
 ### 4. Mind's Mirror
-A metacognitive analysis tool. After a student completes a quiz, Mind's Mirror reviews their mistakes and identifies patterns — for example, "you consistently confuse correlation and causation" or "you understand the concept but misapply it under time pressure." Rather than just showing a score, it helps the student understand *how* they think and where the real gap is. This is inspired by metacognitive research showing that students who understand their own learning patterns improve faster.
+A metacognitive analysis tool. After a student completes a quiz, Mind's Mirror reviews their mistakes and identifies patterns across their study history — for example, "you consistently confuse correlation and causation" or "you understand the concept but misapply it under time pressure."
 
 ### 5. Marketplace
-A community tool library where students can discover, use, and share study tools created by others. Tools can be forked and customised. Designed to reduce duplicated effort across students studying the same material.
+A community tool library where students can discover, use, and share study tools created by others. Tools can be forked and customised.
 
-## How HydrusLearn Compares to Alternatives
+## How HydrusLearn Pro Compares to Alternatives
 
-| Feature | HydrusLearn | Anki | Quizlet | Notion AI |
+| Feature | HydrusLearn Pro | Anki | Quizlet | Notion AI |
 |---|---|---|---|---|
 | Auto-generates from your notes | ✅ | ❌ (manual) | ❌ (manual) | ✅ (basic) |
 | Quiz from uploaded PDF | ✅ | ❌ | ❌ | ❌ |
-| Metacognitive feedback | ✅ | ❌ | ❌ | ❌ |
+| Metacognitive feedback & History | ✅ | ❌ | ❌ | ❌ |
 | Free tier | ✅ | ✅ | ✅ (limited) | ✅ (limited) |
-| Learning Playground | ✅ | ❌ | ❌ | ❌ |
+| Interactive Study Lab | ✅ | ❌ | ❌ | ❌ |
 | Community marketplace | ✅ | ❌ | ✅ | ❌ |
 
 ## Target Users
@@ -79,7 +79,7 @@ A: Anki and Quizlet require you to manually create flashcards and questions. Hyd
 
 ## Brand Information
 
-- **Name:** HydrusLearn
+- **Name:** HydrusLearn Pro
 - **Website:** https://hydruslearn.com
 - **Category:** AI EdTech, Study Tools, Educational Technology
 - **Founded:** 2026

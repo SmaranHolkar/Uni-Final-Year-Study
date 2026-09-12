@@ -89,8 +89,20 @@ const Sidebar = () => {
         <div className="sidebar-content">
           {/* Logo/Header */}
           <Link to="/dashboard" className="sidebar-logo" onClick={closeSidebar}>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 50" width="180" height="40">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 50" width="180" height="40">
               <defs>
+                <linearGradient id="sb-proGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#38bdf8"/>
+                  <stop offset="50%" stopColor="#6366f1"/>
+                  <stop offset="100%" stopColor="#8b5cf6"/>
+                </linearGradient>
+                <linearGradient id="sb-proBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.6)"/>
+                  <stop offset="100%" stopColor="rgba(255,255,255,0.1)"/>
+                </linearGradient>
+                <filter id="sb-proGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#6366f1" floodOpacity="0.45"/>
+                </filter>
                 <path id="sb-star" d="M 0 -6 L 1.5 -1.5 L 6 0 L 1.5 1.5 L 0 6 L -1.5 1.5 L -6 0 L -1.5 -1.5 Z" fill="#fff"/>
                 <path id="sb-small-star" d="M 0 -4 L 1 -1 L 4 0 L 1 1 L 0 4 L -1 1 L -4 0 L -1 -1 Z" fill="#fff"/>
               </defs>
@@ -103,7 +115,9 @@ const Sidebar = () => {
                 <use href="#sb-small-star" x="70" y="70"/>
                 <use href="#sb-star" x="100" y="65"/>
               </g>
-              <text x="75" y="34" fontFamily="system-ui, -apple-system, sans-serif" fontSize="24" fontWeight="600" fill="#fff">HydrusLearn</text>
+              <text x="75" y="34" fontFamily="system-ui, -apple-system, sans-serif" fontSize="22" fontWeight="700" letterSpacing="-0.3" fill="#fff">
+                HydrusLearn
+              </text>
             </svg>
           </Link>
 
@@ -137,10 +151,10 @@ const Sidebar = () => {
             </NavLink>
           )}
 
-          {/* Learning playground */}
+          {/* Interactive Studio */}
           {user && (
             <NavLink to="/Learningplayground" className="sidebar-link" onClick={closeSidebar}>
-              <Lightbulb size={18} /> Learning Playground
+              <Lightbulb size={18} /> Interactive Studio
             </NavLink>
           )}
 
