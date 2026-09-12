@@ -21,6 +21,3 @@ DEPLOYMENT_FIX.md
 # Diagram files
 *.drawio
 *.drawio.bkp
-
-# Local caches & tools
-.impeccable/

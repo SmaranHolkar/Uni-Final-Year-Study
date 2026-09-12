@@ -9,8 +9,8 @@ import mindmapImg from "../assets/mindmap.png";
    SITE CONSTANTS & SEO
    ═══════════════════════════════════════════════════════════════ */
 const SITE_NAME = "HydrusLearn Pro";
-const LANDING_TITLE = "HydrusLearn Pro — Your Notes. Your Mistakes. Your Learning System.";
-const LANDING_DESCRIPTION = "Turn lecture slides, PDFs, and notes into grounded practice quizzes, concept maps, and mistake diagnostics with exact citations.";
+const LANDING_TITLE = "HydrusLearn Pro — Study Smarter & Ace Your Exams";
+const LANDING_DESCRIPTION = "Turn your lecture notes, slides, and PDFs into interactive quizzes, smart flashcards, and mind maps in seconds. Pinpoint your weak spots and study with confidence.";
 const LANDING_PATH = "/";
 
 const getBaseUrl = () =>
@@ -44,7 +44,7 @@ const upsertCanonical = (href) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   DATA STRUCTURES (Scannable, High-Signal Student Content)
+   DATA STRUCTURES (Student-Friendly Copy & Clean Obsidian Styling)
    ═══════════════════════════════════════════════════════════════ */
 const featureCards = [
   {
@@ -52,7 +52,7 @@ const featureCards = [
     badgeColor: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
     title: "Directly from your lectures & notes",
     summary:
-      "Drop in slides, papers, or notes. Every question and answer links directly back to the exact passage so you know where it came from.",
+      "Drop in your lecture slides, research papers, or syllabus notes. Every question and answer links straight back to the exact passage in your material so you know exactly where it came from.",
     image: uploadDocsImg,
     alt: "Document upload interface with passage citations",
     format: "PDF, Slides, OCR, YouTube",
@@ -62,7 +62,7 @@ const featureCards = [
     badgeColor: "text-amber-400 bg-amber-500/10 border-amber-500/20",
     title: "Interactive tools built from your notes",
     summary:
-      "Turn dense chapters into active recall flashcards, matching games, and practice quizzes tailored specifically to your syllabus.",
+      "Turn heavy chapters into interactive flashcards, matching games, mind maps, and practice quizzes tailored specifically to what you are studying.",
     image: learningPlaygroundImg,
     alt: "Interactive study canvas with study tools",
     format: "Instant Flashcards & Quizzes",
@@ -72,7 +72,7 @@ const featureCards = [
     badgeColor: "text-blue-400 bg-blue-500/10 border-blue-500/20",
     title: "Pinpoint your mistakes before exam day",
     summary:
-      "Mind's Mirror analyzes why you missed a question — categorizing errors into simple recall slips vs deep concept gaps.",
+      "Mind's Mirror looks at why you missed a question — letting you know whether it was a quick recall slip or a concept you need to review before test day.",
     image: mindsMirrorImg,
     alt: "Mind's Mirror error diagnosis interface",
     format: "Personalized Progress Insights",
@@ -82,65 +82,70 @@ const featureCards = [
     badgeColor: "text-sky-400 bg-sky-500/10 border-sky-500/20",
     title: "See the big picture clearly",
     summary:
-      "Automatically connects the dots between complex ideas into interactive concept maps that make revision intuitive.",
+      "Automatically connects the dots between complex ideas with interactive concept maps that make big topics easy to navigate and revise.",
     image: mindmapImg,
     alt: "Visual concept mind map",
     format: "Interactive Visual Graphs",
   },
 ];
 
-
-
 const dialecticItems = [
   {
     number: "01",
-    title: "Manual Flashcards",
+    title: "Making Cards by Hand",
     subtitle: "Anki & Quizlet",
     description:
-      "Typing out flashcards one by one is exhausting and misses the broader conceptual connections between lecture topics.",
-    verdict: "Hours spent typing instead of studying",
-    verdictColor: "text-[#a1a1aa]",
+      "Spending hours typing out flashcards one by one leaves you tired before you even start revising, and often misses the bigger conceptual picture.",
+    verdict: "Too much time spent typing",
   },
   {
     number: "02",
     title: "Generic AI Chatbots",
     subtitle: "ChatGPT & General LLMs",
     description:
-      "Chatbots can hallucinate, ignore syllabus boundaries, and encourage passive reading instead of verified active recall.",
-    verdict: "Unverified, out-of-syllabus answers",
-    verdictColor: "text-[#a1a1aa]",
+      "Chatbots can make things up, give answers that aren't on your exam syllabus, and encourage passive reading instead of active testing.",
+    verdict: "Risky & ungrounded answers",
   },
   {
     number: "03",
     title: "HydrusLearn Pro",
     subtitle: "Your AI Study Companion",
     description:
-      "Converts your lecture notes into grounded quizzes, concept maps, and smart error diagnostics with direct paragraph citations.",
-    verdict: "Source-grounded revision confidence",
-    verdictColor: "text-emerald-400",
+      "Instantly converts your lecture notes and slides into grounded quizzes, concept maps, and smart error diagnostics with direct citations.",
+    verdict: "Source-grounded study confidence",
   },
 ];
 
 const specificationRows = [
   {
-    feature: "Document Library & Uploads",
-    core: "Instant on-the-spot tool generation from PDFs, slides, text & YouTube",
-    pro: "Permanent cloud library with fast search & split-screen citation reader",
+    feature: "Lecture & Note Uploads",
+    core: "Generate quick study tools on the spot from PDFs, slides, text notes, and YouTube videos",
+    pro: "Permanent cloud document library with fast search and split-screen PDF reader",
   },
   {
-    feature: "Active Recall Quizzing",
+    feature: "Active Recall Quizzes",
     core: "Practice quizzes with instant right/wrong answer feedback",
-    pro: "Detailed explanations with exact paragraph citations linking to slides",
+    pro: "Detailed explanations with exact paragraph citations linking to your lecture slides",
   },
   {
-    feature: "Mistake Diagnostics",
-    core: "Standard score summary & correct answer review",
-    pro: "Mind's Mirror: separates memory slips from deep concept gaps over time",
+    feature: "Mistake Analysis",
+    core: "Standard score summary and answer review after each quiz",
+    pro: "Mind's Mirror: categorizes mistakes into concept gaps vs memory slips over time",
   },
   {
-    feature: "Interactive Study Canvas",
-    core: "Generate single interactive study tools on demand",
-    pro: "Personalized revision queues, spaced repetition & Socratic tutoring",
+    feature: "Interactive Study Tools",
+    core: "Create flashcards, matching decks, and mind maps on demand",
+    pro: "Link study sessions to focus your revision directly on topics you struggle with",
+  },
+  {
+    feature: "AI Study Coaching",
+    core: "Direct answer explanations based on your uploaded text",
+    pro: "Socratic step-by-step tutoring that guides you through tricky exam questions",
+  },
+  {
+    feature: "Study Tool Sharing",
+    core: "Browse and use helpful study tools created by fellow students",
+    pro: "Save, organize, and customize your own study collections across semesters",
   },
 ];
 
@@ -173,52 +178,42 @@ const inquiries = [
 ];
 
 /* ═══════════════════════════════════════════════════════════════
-   1. HERO SECTION — DISTINCT VALUE PROPOSITION
+   1. HERO SECTION — CLEAN EDITORIAL OBSIDIAN CANVAS
    ═══════════════════════════════════════════════════════════════ */
 const HeroSection = () => {
   return (
-    <header className="relative min-h-[75vh] pt-24 sm:pt-32 pb-16 px-6 sm:px-12 max-w-[1400px] mx-auto flex flex-col justify-center overflow-hidden">
-      {/* ── SUBTLE GEOMETRIC ARCHITECTURAL BACKGROUND ── */}
-      <div
-        className="pointer-events-none absolute right-[4%] top-[12%] -z-10 w-[560px] h-[560px] flex items-center justify-center opacity-35"
-        aria-hidden="true"
-      >
-        <div className="absolute w-[540px] h-[540px] rounded-full border border-[#2e2e33]" />
-        <div className="absolute w-[390px] h-[390px] rounded-full border border-[#2e2e33]" />
-        <div className="absolute w-[240px] h-[240px] rounded-full border border-[#2e2e33]" />
-        <div className="w-[140px] h-[140px] rounded-full bg-[#18181b] border border-[#38383f]" />
-      </div>
-
-      {/* ── DISPLAY HEADLINE (Unique Positioning) ── */}
-      <div className="max-w-[950px] z-10 pb-4">
+    <header className="relative min-h-[75vh] pt-24 sm:pt-32 pb-20 px-6 sm:px-12 max-w-[1400px] mx-auto flex flex-col justify-center overflow-hidden">
+      {/* ── DISPLAY HEADLINE (Clean Editorial Typography) ── */}
+      <div className="max-w-[900px] z-10 pb-8">
         <h1
-          className="text-[#f0f0ee] text-4xl sm:text-6xl md:text-7xl font-normal tracking-tight leading-[1.06] select-none"
+          className="text-[#f0f0ee] text-4xl sm:text-6xl md:text-7xl font-normal tracking-tight leading-[1.08] select-none"
           style={{ fontFeatureSettings: '"cv01", "ss03"' }}
         >
-          <span className="block">Your notes. Your mistakes.</span>
-          <span className="block text-[#a1a1aa]">Your learning system.</span>
+          <span className="block">Study smarter.</span>
+          <span className="block text-[#a1a1aa]">Revise faster.</span>
+          <span className="block text-[#f0f0ee]">Ace your exams.</span>
         </h1>
 
-        <p className="mt-6 text-lg sm:text-xl text-[#d4d4d8] max-w-[50ch] leading-relaxed">
-          Drop in your lecture slides, papers, and notes. HydrusLearn constructs grounded practice quizzes, concept maps, and smart error diagnostics with exact citations.
+        <p className="mt-6 text-lg sm:text-xl text-[#a1a1aa] max-w-[48ch] leading-relaxed">
+          Turn your lecture slides, notes, and textbooks into grounded practice quizzes, concept maps, and mistake diagnostics in seconds.
         </p>
 
         {/* ── HERO ACTION BUTTONS ── */}
         <div className="flex flex-wrap items-center gap-4 mt-8">
           <Link
             to="/signup"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#f0f0ee] text-[#121214] hover:bg-white font-semibold text-sm transition-colors"
+            className="inline-flex items-center gap-2.5 px-6 py-3 bg-[#f0f0ee] text-[#121214] hover:bg-white font-semibold text-sm transition-colors"
             style={{ borderRadius: "10px" }}
           >
             <span>Start studying for free</span>
             <span>→</span>
           </Link>
           <a
-            href="#vela-showcase"
+            href="#capabilities"
             className="inline-flex items-center gap-2 px-5 py-3 bg-[#18181b] border border-[#2e2e33] hover:border-[#404047] text-[#f0f0ee] text-sm font-medium transition-colors"
             style={{ borderRadius: "10px" }}
           >
-            <span>See Vela in action</span>
+            <span>Explore study tools</span>
           </a>
         </div>
       </div>
@@ -227,20 +222,20 @@ const HeroSection = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   2. SYSTEM CAPABILITIES — CLEAN SOLID TILES (Short Copy)
+   2. SYSTEM CAPABILITIES — CLEAN SOLID TILES
    ═══════════════════════════════════════════════════════════════ */
 const CapabilitiesSection = () => (
   <section id="capabilities" className="py-20 px-6 sm:px-12 max-w-[1400px] mx-auto border-t border-[#2e2e33]">
-    <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 mb-12">
+    <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 mb-14">
       <div>
-        <div className="text-xs text-[#a1a1aa] font-mono uppercase tracking-wider mb-2">
-          ✦ Core Capabilities
+        <div className="text-xs text-[#a1a1aa] font-mono uppercase tracking-wider mb-3">
+          ✦ Study Tools
         </div>
         <h2 className="text-3xl sm:text-4xl md:text-5xl font-normal text-[#f0f0ee] tracking-tight leading-tight max-w-[20ch]">
           Everything you need to master tough topics.
         </h2>
       </div>
-      <div className="text-sm sm:text-base text-[#a1a1aa] max-w-[36ch] leading-relaxed">
+      <div className="text-base sm:text-lg text-[#a1a1aa] max-w-[36ch] leading-relaxed">
         Turn heavy slide decks and textbooks into interactive, enjoyable study tools in seconds.
       </div>
     </div>
@@ -250,11 +245,11 @@ const CapabilitiesSection = () => (
       {featureCards.map((card) => (
         <div
           key={card.title}
-          className="bg-[#18181b] p-6 sm:p-8 border border-[#2e2e33] flex flex-col justify-between space-y-5 overflow-hidden"
+          className="bg-[#18181b] p-7 sm:p-9 border border-[#2e2e33] flex flex-col justify-between space-y-6 transition-colors duration-200 overflow-hidden"
           style={{ borderRadius: "12px" }}
         >
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-xs font-mono pb-2.5 border-b border-[#2e2e33]">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-xs sm:text-sm font-mono pb-3 border-b border-[#2e2e33]">
               <span className={`px-2.5 py-0.5 rounded-full border ${card.badgeColor}`}>
                 {card.label}
               </span>
@@ -263,12 +258,12 @@ const CapabilitiesSection = () => (
             <h3 className="text-xl sm:text-2xl font-normal text-[#f0f0ee] tracking-tight leading-snug">
               {card.title}
             </h3>
-            <p className="text-sm sm:text-base text-[#a1a1aa] leading-relaxed max-w-[48ch]">
+            <p className="text-sm sm:text-base text-[#a1a1aa] leading-relaxed max-w-[50ch]">
               {card.summary}
             </p>
           </div>
 
-          <div className="border border-[#2e2e33] bg-[#121214] overflow-hidden mt-3 rounded-lg">
+          <div className="border border-[#2e2e33] bg-[#121214] overflow-hidden mt-4 rounded-lg">
             <img
               src={card.image}
               alt={card.alt}
@@ -281,14 +276,13 @@ const CapabilitiesSection = () => (
   </section>
 );
 
-
 /* ═══════════════════════════════════════════════════════════════
-   4. CRITICAL COMPARISON (Scannable Multi-Method Contrast)
+   3. CRITICAL COMPARISON (Clean Multi-Method Breakdown)
    ═══════════════════════════════════════════════════════════════ */
 const ComparisonSection = () => (
   <section className="py-20 px-6 sm:px-12 max-w-[1400px] mx-auto border-t border-[#2e2e33]">
-    <div className="mb-12">
-      <div className="text-xs text-[#a1a1aa] font-mono uppercase tracking-wider mb-2">
+    <div className="mb-14">
+      <div className="text-xs text-[#a1a1aa] font-mono uppercase tracking-wider mb-3">
         ✦ Why It Works
       </div>
       <h2 className="text-3xl sm:text-4xl md:text-5xl font-normal text-[#f0f0ee] tracking-tight leading-tight max-w-[22ch]">
@@ -296,19 +290,18 @@ const ComparisonSection = () => (
       </h2>
     </div>
 
-    {/* 3-Column Comparison */}
+    {/* 3-Column Comparison with Solid Highlight */}
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-[#2e2e33] border-y border-[#2e2e33]">
       {dialecticItems.map((item, index) => {
         const isHydrus = index === 2;
         return (
           <div
             key={item.title}
-            className={`p-6 sm:p-8 flex flex-col justify-between space-y-6 ${
-              isHydrus ? "bg-[#18181b] relative border-l lg:border-l-0 border-[#3b82f6]/40" : "bg-transparent"
-            }`}
+            className={`p-7 sm:p-9 flex flex-col justify-between space-y-6 ${isHydrus ? "bg-[#18181b] relative border-l lg:border-l-0 border-[#3b82f6]/40" : "bg-transparent"
+              }`}
           >
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-xs font-mono">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs sm:text-sm font-mono">
                 <span className={isHydrus ? "text-blue-400 font-semibold" : "text-[#a1a1aa]"}>
                   Method {item.number} • {item.subtitle}
                 </span>
@@ -321,14 +314,15 @@ const ComparisonSection = () => (
               <h3 className="text-xl sm:text-2xl font-normal text-[#f0f0ee] tracking-tight">
                 {item.title}
               </h3>
-              <p className="text-sm text-[#a1a1aa] leading-relaxed max-w-[36ch]">
+              <p className="text-sm sm:text-base text-[#a1a1aa] leading-relaxed max-w-[36ch]">
                 {item.description}
               </p>
             </div>
 
-            <div className={`pt-3.5 text-xs sm:text-sm font-mono border-t border-[#2e2e33] flex items-center justify-between ${item.verdictColor}`}>
+            <div className={`pt-4 text-sm font-mono border-t border-[#2e2e33] flex items-center justify-between ${isHydrus ? "text-emerald-400 font-medium" : "text-[#a1a1aa]"
+              }`}>
               <span>Result:</span>
-              <span className="text-right">{item.verdict}</span>
+              <span>{item.verdict}</span>
             </div>
           </div>
         );
@@ -338,149 +332,174 @@ const ComparisonSection = () => (
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   5. TWO EDITIONS & SCANNABLE SPECIFICATION MATRIX
+   4. TWO EDITIONS & SPECIFICATION MATRIX (Solid Clean Plan Cards)
    ═══════════════════════════════════════════════════════════════ */
-const EditionsSection = () => (
-  <section id="compare-editions" className="py-20 px-6 sm:px-12 max-w-[1400px] mx-auto border-t border-[#2e2e33]">
-    <div className="mb-12">
-      <div className="text-xs text-[#a1a1aa] font-mono uppercase tracking-wider mb-2">
-        ✦ Simple Plans
-      </div>
-      <h2 className="text-3xl sm:text-4xl md:text-5xl font-normal text-[#f0f0ee] tracking-tight leading-tight max-w-[20ch]">
-        Start free, upgrade when you're ready.
-      </h2>
-    </div>
+const EditionsSection = () => {
+  const [isOpen, setIsOpen] = useState(false);
 
-    {/* Side-by-Side Edition Tiles */}
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-14">
-      {/* Core Sandbox */}
-      <div
-        className="bg-[#18181b] p-6 sm:p-8 border border-[#2e2e33] flex flex-col justify-between space-y-6"
-        style={{ borderRadius: "12px" }}
-      >
-        <div className="space-y-4">
-          <div className="flex items-center justify-between pb-3.5 border-b border-[#2e2e33]">
-            <h3 className="text-2xl font-normal text-[#f0f0ee]">Hydruslearn Core</h3>
-            <span className="text-xs font-mono text-[#a1a1aa] px-2.5 py-1 border border-[#2e2e33] rounded-full">
-              Free Forever
-            </span>
-          </div>
-          <p className="text-sm text-[#a1a1aa] leading-relaxed max-w-[44ch]">
-            Instant study tool generator. Drop in notes and build flashcards, mind maps, and practice quizzes on the spot.
-          </p>
-
-          <ul className="space-y-2.5 pt-1 text-sm text-[#f0f0ee]">
-            <li className="flex items-center gap-2.5">
-              <span className="text-[#a1a1aa] font-mono text-xs">■</span>
-              <span>Instant tool generator from text, PDFs, or YouTube links</span>
-            </li>
-            <li className="flex items-center gap-2.5">
-              <span className="text-[#a1a1aa] font-mono text-xs">■</span>
-              <span>Side-by-side document reader with citations</span>
-            </li>
-            <li className="flex items-center gap-2.5">
-              <span className="text-[#a1a1aa] font-mono text-xs">■</span>
-              <span>Access to community study tool marketplace</span>
-            </li>
-          </ul>
+  return (
+    <section id="compare-editions" className="py-20 px-6 sm:px-12 max-w-[1400px] mx-auto border-t border-[#2e2e33]">
+      <div className="mb-14">
+        <div className="text-xs text-[#a1a1aa] font-mono uppercase tracking-wider mb-3">
+          ✦ Simple Plans
         </div>
-
-        <a
-          href="http://localhost:5174"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center justify-between px-5 py-3 border border-[#2e2e33] text-[#f0f0ee] hover:bg-[#282830] text-sm transition-colors font-medium"
-          style={{ borderRadius: "10px" }}
-        >
-          <span>Open Free Sandbox</span>
-          <span>→</span>
-        </a>
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-normal text-[#f0f0ee] tracking-tight leading-tight max-w-[20ch]">
+          Start free, upgrade when you're ready.
+        </h2>
       </div>
 
-      {/* Pro Platform */}
-      <div
-        className="bg-[#18181b] p-6 sm:p-8 border border-[#3b82f6]/40 flex flex-col justify-between space-y-6"
-        style={{ borderRadius: "12px" }}
-      >
-        <div className="space-y-4">
-          <div className="flex items-center justify-between pb-3.5 border-b border-[#2e2e33]">
-            <h3 className="text-2xl font-normal text-[#f0f0ee]">Hydruslearn Pro</h3>
-            <span className="text-xs font-mono text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2.5 py-1 font-medium rounded-full">
-              ★ Student Favorite
-            </span>
+      {/* Side-by-Side Edition Tiles */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
+        {/* Core Sandbox */}
+        <div
+          className="bg-[#18181b] p-7 sm:p-10 border border-[#2e2e33] flex flex-col justify-between space-y-6"
+          style={{ borderRadius: "12px" }}
+        >
+          <div className="space-y-5">
+            <div className="flex items-center justify-between pb-4 border-b border-[#2e2e33]">
+              <h3 className="text-2xl font-normal text-[#f0f0ee]">Hydruslearn Core</h3>
+              <span className="text-xs font-mono text-[#a1a1aa] px-2.5 py-1 border border-[#2e2e33] rounded-full">
+                Free Forever
+              </span>
+            </div>
+            <p className="text-sm sm:text-base text-[#a1a1aa] leading-relaxed max-w-[44ch]">
+              Perfect for quick revision sessions. Paste your notes and generate flashcards, mind maps, and practice quizzes right away.
+            </p>
+
+            <ul className="space-y-3 pt-2 text-sm sm:text-base text-[#f0f0ee]">
+              <li className="flex items-center gap-3">
+                <span className="text-[#a1a1aa] font-mono text-sm">■</span>
+                <span>Instant study tool generator from text or prompts</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="text-[#a1a1aa] font-mono text-sm">■</span>
+                <span>Supports PDFs, notes, OCR images &amp; YouTube links</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="text-[#a1a1aa] font-mono text-sm">■</span>
+                <span>Side-by-side document split reader with citations</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="text-[#a1a1aa] font-mono text-sm">■</span>
+                <span>Explore and use community-created study tools</span>
+              </li>
+            </ul>
           </div>
-          <p className="text-sm text-[#cbd5e1] leading-relaxed max-w-[44ch]">
-            Your persistent study hub. Saves your document library, diagnoses weak spots with Mind's Mirror, and guides you with Socratic tutoring.
-          </p>
 
-          <ul className="space-y-2.5 pt-1 text-sm text-[#f0f0ee]">
-            <li className="flex items-center gap-2.5">
-              <span className="text-emerald-400 font-mono text-xs">✓</span>
-              <span>Unlimited cloud document library &amp; citation split viewer</span>
-            </li>
-            <li className="flex items-center gap-2.5">
-              <span className="text-blue-400 font-mono text-xs">✓</span>
-              <span>Mind's Mirror: separates recall slips from concept gaps</span>
-            </li>
-            <li className="flex items-center gap-2.5">
-              <span className="text-emerald-400 font-mono text-xs">✓</span>
-              <span>Socratic step-by-step guidance &amp; spaced repetition history</span>
-            </li>
-          </ul>
-        </div>
-
-        <Link
-          to="/signup"
-          className="inline-flex items-center justify-between px-5 py-3 bg-[#f0f0ee] text-[#121214] hover:bg-white font-semibold text-sm transition-colors"
-          style={{ borderRadius: "10px" }}
-        >
-          <span>Get Started Free with Pro</span>
-          <span>→</span>
-        </Link>
-      </div>
-    </div>
-
-    {/* Architectural Specification Table (Scannable 4-Row Matrix) */}
-    <div className="border-t border-b border-[#2e2e33]">
-      <div className="py-4 flex items-center justify-between">
-        <h3 className="text-lg font-normal text-[#f0f0ee]">
-          Feature Breakdown
-        </h3>
-        <span className="text-xs font-mono text-[#a1a1aa]">
-          Side-by-Side Comparison
-        </span>
-      </div>
-
-      <div className="divide-y divide-[#2e2e33]">
-        {specificationRows.map((row) => (
-          <div
-            key={row.feature}
-            className="grid grid-cols-1 lg:grid-cols-12 py-4 gap-3 items-start"
+          <a
+            href="http://localhost:5174"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-between px-5 py-3 border border-[#2e2e33] text-[#f0f0ee] hover:bg-[#282830] text-sm transition-colors font-medium"
+            style={{ borderRadius: "10px" }}
           >
-            <div className="lg:col-span-4 text-sm font-medium text-[#f0f0ee] max-w-[28ch]">
-              {row.feature}
-            </div>
-            <div className="lg:col-span-4 text-xs sm:text-sm text-[#a1a1aa] leading-relaxed max-w-[36ch]">
-              <span className="text-xs font-mono text-[#a1a1aa] block mb-0.5 font-medium">
-                Core Sandbox
+            <span>Open Free Sandbox</span>
+            <span>→</span>
+          </a>
+        </div>
+
+        {/* Pro Platform */}
+        <div
+          className="bg-[#18181b] p-7 sm:p-10 border border-[#3b82f6]/40 flex flex-col justify-between space-y-6"
+          style={{ borderRadius: "12px" }}
+        >
+          <div className="space-y-5">
+            <div className="flex items-center justify-between pb-4 border-b border-[#2e2e33]">
+              <h3 className="text-2xl font-normal text-[#f0f0ee]">Hydruslearn Pro</h3>
+              <span className="text-xs font-mono text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2.5 py-1 font-medium rounded-full">
+                ★ Student Favorite
               </span>
-              {row.core}
             </div>
-            <div className="lg:col-span-4 text-xs sm:text-sm text-[#f0f0ee] leading-relaxed max-w-[36ch]">
-              <span className="text-xs font-mono text-blue-400 block mb-0.5 font-semibold">
-                Pro Platform
-              </span>
-              {row.pro}
-            </div>
+            <p className="text-sm sm:text-base text-[#cbd5e1] leading-relaxed max-w-[44ch]">
+              Your complete study suite. Saves all your documents in one place, tracks your progress over time, and coaches you through difficult concepts.
+            </p>
+
+            <ul className="space-y-3 pt-2 text-sm sm:text-base text-[#f0f0ee]">
+              <li className="flex items-center gap-3">
+                <span className="text-emerald-400 font-mono text-sm">✓</span>
+                <span>Unlimited cloud document storage &amp; in-app PDF reader</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="text-blue-400 font-mono text-sm">✓</span>
+                <span>Mind's Mirror: reveals your exact concept gaps</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="text-amber-400 font-mono text-sm">✓</span>
+                <span>Socratic step-by-step tutoring on tough questions</span>
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="text-emerald-400 font-mono text-sm">✓</span>
+                <span>Save quiz history &amp; revision sessions across devices</span>
+              </li>
+            </ul>
           </div>
-        ))}
+
+          <Link
+            to="/signup"
+            className="inline-flex items-center justify-between px-5 py-3 bg-[#f0f0ee] text-[#121214] hover:bg-white font-semibold text-sm transition-colors"
+            style={{ borderRadius: "10px" }}
+          >
+            <span>Get Started Free with Pro</span>
+            <span>→</span>
+          </Link>
+        </div>
       </div>
-    </div>
-  </section>
-);
+
+      {/* Collapsible Feature Breakdown Accordion */}
+      <div className="border border-[#2e2e33] bg-[#141417] rounded-xl overflow-hidden transition-all">
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full py-4 px-6 flex items-center justify-between text-left hover:bg-[#18181b] transition-colors group cursor-pointer"
+          aria-expanded={isOpen}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-sm sm:text-base font-medium text-[#f0f0ee]">
+              Feature Breakdown &amp; Side-by-Side Comparison
+            </span>
+            <span className="text-xs font-mono text-[#a1a1aa] hidden sm:inline-block">
+              ({specificationRows.length} Categories)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-mono text-[#a1a1aa] group-hover:text-[#f0f0ee] transition-colors">
+            <span>{isOpen ? "Hide matrix" : "View full matrix"}</span>
+            <span className="text-sm font-mono">{isOpen ? "▲" : "▼"}</span>
+          </div>
+        </button>
+
+        {isOpen && (
+          <div className="px-6 py-2 border-t border-[#2e2e33] bg-[#18181b] divide-y divide-[#2e2e33] animate-fadeIn">
+            {specificationRows.map((row) => (
+              <div
+                key={row.feature}
+                className="grid grid-cols-1 lg:grid-cols-12 py-4 gap-4 items-start"
+              >
+                <div className="lg:col-span-4 text-sm font-medium text-[#f0f0ee] max-w-[28ch]">
+                  {row.feature}
+                </div>
+                <div className="lg:col-span-4 text-xs sm:text-sm text-[#a1a1aa] leading-relaxed max-w-[36ch]">
+                  <span className="text-xs font-mono text-[#a1a1aa] block mb-0.5 font-medium">
+                    Core Sandbox
+                  </span>
+                  {row.core}
+                </div>
+                <div className="lg:col-span-4 text-xs sm:text-sm text-[#f0f0ee] leading-relaxed max-w-[36ch]">
+                  <span className="text-xs font-mono text-blue-400 block mb-0.5 font-semibold">
+                    Pro Platform
+                  </span>
+                  {row.pro}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
 
 /* ═══════════════════════════════════════════════════════════════
-   6. INQUIRIES (FAQ) (Clean Editorial Accordion)
+   5. INQUIRIES (FAQ) (Clean Editorial Accordion)
    ═══════════════════════════════════════════════════════════════ */
 const InquiriesSection = () => {
   const [openIndex, setOpenIndex] = useState(null);
@@ -499,7 +518,7 @@ const InquiriesSection = () => {
           <h2 className="text-3xl sm:text-4xl font-normal text-[#f0f0ee] tracking-tight leading-tight max-w-[18ch]">
             Frequently Asked Questions
           </h2>
-          <p className="text-sm text-[#a1a1aa] leading-relaxed max-w-[32ch]">
+          <p className="text-sm sm:text-base text-[#a1a1aa] leading-relaxed max-w-[32ch]">
             Quick answers about uploading notes, privacy, and how it helps you study.
           </p>
         </div>
@@ -508,7 +527,7 @@ const InquiriesSection = () => {
           {inquiries.map((item, idx) => {
             const isOpen = openIndex === idx;
             return (
-              <div key={idx} className="py-4">
+              <div key={idx} className="py-5">
                 <button
                   onClick={() => toggle(idx)}
                   className="w-full flex items-center justify-between text-left group py-1"
@@ -522,7 +541,7 @@ const InquiriesSection = () => {
                 </button>
 
                 {isOpen && (
-                  <p className="pt-2.5 pb-1 text-sm text-[#a1a1aa] leading-relaxed font-normal max-w-[58ch]">
+                  <p className="pt-3 pb-2 text-sm sm:text-base text-[#a1a1aa] leading-relaxed font-normal max-w-[58ch]">
                     {item.answer}
                   </p>
                 )}
@@ -536,7 +555,7 @@ const InquiriesSection = () => {
 };
 
 /* ═══════════════════════════════════════════════════════════════
-   7. EPILOGUE & FOOTER (Clean Solid Finish)
+   6. EPILOGUE & FOOTER (Clean Solid Finish)
    ═══════════════════════════════════════════════════════════════ */
 const EpilogueSection = () => (
   <section className="py-20 px-6 sm:px-12 max-w-[1400px] mx-auto border-t border-[#2e2e33]">
@@ -551,7 +570,7 @@ const EpilogueSection = () => (
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-normal text-[#f0f0ee] tracking-tight leading-tight">
           Make your next study session your best one.
         </h2>
-        <p className="text-sm text-[#a1a1aa] leading-relaxed">
+        <p className="text-sm sm:text-base text-[#a1a1aa] leading-relaxed">
           Drop in your lecture notes and see how easy revision can be.
         </p>
       </div>
@@ -603,6 +622,73 @@ const FooterSection = () => (
 );
 
 /* ═══════════════════════════════════════════════════════════════
+   AMBIENT COLOR BLUR SYSTEM (Luminous Chromatic Background Pools)
+   ═══════════════════════════════════════════════════════════════ */
+const AmbientBackgroundOrbs = () => (
+  <div className="pointer-events-none absolute inset-0 overflow-hidden z-0 select-none" aria-hidden="true">
+    {/* Orb 1: Hero Top Right — Sapphire Azure & Blue Glow */}
+    <div
+      className="absolute -top-[2%] right-[0%] w-[650px] h-[650px] rounded-full"
+      style={{
+        background: "radial-gradient(circle, rgba(59, 130, 246, 0.45) 0%, rgba(37, 99, 235, 0.22) 40%, rgba(29, 78, 216, 0.06) 65%, transparent 75%)",
+        filter: "blur(70px)",
+        mixBlendMode: "screen",
+      }}
+    />
+
+    {/* Orb 2: Hero Top Left — Electric Violet & Indigo Glow */}
+    <div
+      className="absolute top-[6%] -left-[8%] w-[580px] h-[580px] rounded-full"
+      style={{
+        background: "radial-gradient(circle, rgba(139, 92, 246, 0.40) 0%, rgba(99, 102, 241, 0.18) 45%, transparent 70%)",
+        filter: "blur(75px)",
+        mixBlendMode: "screen",
+      }}
+    />
+
+    {/* Orb 3: Capabilities Mid-Section — Neon Emerald & Teal Glow */}
+    <div
+      className="absolute top-[26%] right-[2%] w-[600px] h-[600px] rounded-full"
+      style={{
+        background: "radial-gradient(circle, rgba(16, 185, 129, 0.38) 0%, rgba(5, 150, 105, 0.16) 45%, transparent 70%)",
+        filter: "blur(80px)",
+        mixBlendMode: "screen",
+      }}
+    />
+
+    {/* Orb 4: Comparison Section — Warm Golden Amber Glow */}
+    <div
+      className="absolute top-[46%] -left-[5%] w-[620px] h-[620px] rounded-full"
+      style={{
+        background: "radial-gradient(circle, rgba(245, 158, 11, 0.32) 0%, rgba(217, 119, 6, 0.14) 45%, transparent 70%)",
+        filter: "blur(75px)",
+        mixBlendMode: "screen",
+      }}
+    />
+
+    {/* Orb 5: Editions / Pricing — Cyan & Sapphire Highlight */}
+    <div
+      className="absolute top-[66%] right-[5%] w-[650px] h-[650px] rounded-full"
+      style={{
+        background: "radial-gradient(circle, rgba(14, 165, 233, 0.40) 0%, rgba(59, 130, 246, 0.18) 45%, transparent 70%)",
+        filter: "blur(75px)",
+        mixBlendMode: "screen",
+      }}
+    />
+
+    {/* Orb 6: Bottom FAQ & Epilogue — Deep Purple & Magenta Aura */}
+    <div
+      className="absolute bottom-[2%] left-[4%] w-[700px] h-[700px] rounded-full"
+      style={{
+        background: "radial-gradient(circle, rgba(168, 85, 247, 0.38) 0%, rgba(124, 58, 237, 0.16) 45%, transparent 70%)",
+        filter: "blur(80px)",
+        mixBlendMode: "screen",
+      }}
+    />
+  </div>
+);
+
+/* ═══════════════════════════════════════════════════════════════
    ROOT LANDING COMPONENT (Obsidian Dark Canvas #121214)
    ═══════════════════════════════════════════════════════════════ */
 export default function LandingPage() {
@@ -633,10 +719,13 @@ export default function LandingPage() {
 
   return (
     <div
-      className="min-h-screen text-[#f0f0ee] selection:bg-[#f0f0ee] selection:text-[#121214] antialiased relative"
+      className="min-h-screen text-[#f0f0ee] selection:bg-[#f0f0ee] selection:text-[#121214] antialiased relative overflow-x-hidden"
       style={{ backgroundColor: "#121214" }}
     >
-      <main>
+      {/* Ambient Atmospheric Chromatic Background Blurs */}
+      <AmbientBackgroundOrbs />
+
+      <main className="relative z-10">
         <HeroSection />
         <CapabilitiesSection />
         <ComparisonSection />
