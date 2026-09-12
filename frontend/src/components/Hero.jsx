@@ -41,7 +41,7 @@ const upsertCanonical = (href) => {
     document.head.appendChild(link);
   }
   link.setAttribute("href", href);
-  return { tag, created };
+  return { tag: link, created };
 };
 
 /* ═══════════════════════════════════════════════════════════════
