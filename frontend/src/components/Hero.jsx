@@ -329,134 +329,322 @@ const CapabilitiesSection = () => (
 );
 
 /* ═══════════════════════════════════════════════════════════════
-   3. VELA STUDIO SHOWCASE — “TELL VELA WHAT TO BUILD” (Killer Moment)
+   3. VELA STUDIO SCROLL SHOWCASE — PINNED CAMERA & EXPANDING TOOL ENGINE
    ═══════════════════════════════════════════════════════════════ */
-const VelaShowcaseSection = () => {
+const VelaScrollShowcase = () => {
+  const containerRef = React.useRef(null);
+  const [scrollProgress, setScrollProgress] = useState(0);
   const [activeTab, setActiveTab] = useState(0);
+  const [simStep, setSimStep] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const totalScrollable = rect.height - window.innerHeight;
+      if (totalScrollable <= 0) return;
+      const scrolled = -rect.top;
+      const progress = Math.max(0, Math.min(1, scrolled / totalScrollable));
+      setScrollProgress(progress);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Simulation step timer
+  useEffect(() => {
+    if (!isPlaying) return;
+    const timer = setInterval(() => {
+      setSimStep((prev) => (prev + 1) % 4);
+    }, 2600);
+    return () => clearInterval(timer);
+  }, [isPlaying]);
+
+  // Derived progress transitions
+  // 0.0 -> 0.35 : Vela centered and big, intro title visible
+  // 0.35 -> 0.70 : Vela shrinks and docks to top-left, demo container expands
+  // 0.70 -> 1.0 : Full interactive video/demo simulation running
+  const shrinkFactor = Math.min(1, Math.max(0, (scrollProgress - 0.12) / 0.45));
+  const demoReveal = Math.min(1, Math.max(0, (scrollProgress - 0.22) / 0.4));
+  const introFade = Math.max(0, 1 - scrollProgress * 3.2);
+
   const current = velaExamples[activeTab];
 
+  // Dynamic simulation state messages per step
+  const simStates = [
+    {
+      action: "Process P1 running (0ms - 2ms)",
+      quantum: "Quantum remaining: 0ms (Expired)",
+      event: "Clock interrupt triggered. Context-switch in progress.",
+      answer: "P1 quantum expired; saving CPU registers to PCB.",
+      statusColor: "text-amber-400",
+    },
+    {
+      action: "Context Switch: P1 -> P2",
+      quantum: "Context switch overhead: 0.4ms",
+      event: "Loading P2 memory registers from PCB.",
+      answer: "P1 pushed to Ready Queue tail; P2 dispatched to CPU.",
+      statusColor: "text-blue-400",
+    },
+    {
+      action: "Process P2 running (2.4ms - 4.4ms)",
+      quantum: "Quantum remaining: 2.0ms -> 0ms",
+      event: "Process P2 executing active burst slice.",
+      answer: "P2 completes 2ms slice; preempted for Process P3.",
+      statusColor: "text-emerald-400",
+    },
+    {
+      action: "Active Recall Verification Passed",
+      quantum: "Round Robin fairness verified • Zero starvation",
+      event: "All 3 processes scheduled with 100% citation grounding.",
+      answer: "Mastery +10 pts • Concept gaps resolved.",
+      statusColor: "text-emerald-400 font-bold",
+    },
+  ];
+
+  const currentSim = simStates[simStep];
+
   return (
-    <section id="vela-showcase" className="py-20 px-6 sm:px-12 max-w-[1400px] mx-auto border-t border-[#2e2e33]">
-      <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 mb-12">
-        <div>
-          <div className="flex items-center gap-2 text-xs text-blue-400 font-mono uppercase tracking-wider mb-2">
-            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-            <span>Adaptive Tool Synthesis</span>
+    <div
+      id="vela-showcase"
+      ref={containerRef}
+      className="relative w-full border-t border-[#2e2e33]"
+      style={{ height: "230vh" }}
+    >
+      {/* ── STICKY VIEWPORT CONTAINER (Pins while scrolling) ── */}
+      <div className="sticky top-0 h-screen w-full flex flex-col justify-center items-center overflow-hidden px-4 sm:px-8 bg-[#121214]">
+        
+        {/* Subtle Background Radial Matrix */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-25">
+          <div className="w-[800px] h-[800px] rounded-full border border-[#2e2e33]/60" />
+          <div className="w-[500px] h-[500px] rounded-full border border-[#2e2e33]/40" />
+        </div>
+
+        {/* ── PHASE 1: BIG VELA MASCOT (Shrinks & moves to top-left as you scroll) ── */}
+        <div
+          className="absolute z-30 transition-transform duration-75 ease-out flex items-center gap-4 pointer-events-none sm:pointer-events-auto"
+          style={{
+            transform: `translate(${
+              (1 - shrinkFactor) * 0 + shrinkFactor * (typeof window !== "undefined" && window.innerWidth < 640 ? -120 : -320)
+            }px, ${
+              (1 - shrinkFactor) * (typeof window !== "undefined" && window.innerWidth < 640 ? -110 : -140) + shrinkFactor * -260
+            }px) scale(${1.8 - shrinkFactor * 1.15})`,
+          }}
+        >
+          <div className="p-3 rounded-2xl bg-[#18181b]/90 border border-[#2e2e33] backdrop-blur-md shadow-2xl">
+            <Vela size={shrinkFactor > 0.6 ? 48 : 80} color="#60a5fa" loading={shrinkFactor > 0.4} />
           </div>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-normal text-[#f0f0ee] tracking-tight leading-tight max-w-[20ch]">
+          {shrinkFactor > 0.5 && (
+            <div className="hidden sm:block text-left">
+              <div className="text-xs font-semibold text-[#f0f0ee] flex items-center gap-1.5">
+                <span>Vela Engine</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                  Live Compiler
+                </span>
+              </div>
+              <div className="text-[11px] text-[#a1a1aa]">Autonomous Study Architect</div>
+            </div>
+          )}
+        </div>
+
+        {/* ── INTRO TITLE (Visible at top of scroll, fades as you scroll down) ── */}
+        <div
+          className="absolute top-[52%] sm:top-[50%] z-20 text-center max-w-xl transition-opacity duration-150 pointer-events-none px-4"
+          style={{
+            opacity: introFade,
+            transform: `translateY(${(1 - introFade) * -20}px)`,
+          }}
+        >
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-blue-500/30 bg-blue-500/10 text-xs font-mono text-blue-300 mb-3">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            <span>Meet Vela</span>
+          </div>
+          <h2 className="text-3xl sm:text-5xl font-normal text-[#f0f0ee] tracking-tight">
             Tell Vela what to build.
           </h2>
-        </div>
-        <div className="text-sm sm:text-base text-[#a1a1aa] max-w-[42ch] leading-relaxed">
-          Vela doesn't just answer questions — it compiles customized interactive study sandboxes, simulations, and active-recall games directly from your syllabus.
-        </div>
-      </div>
-
-      {/* Vela Interactive Demo Container */}
-      <div
-        className="bg-[#18181b] border border-[#2e2e33] overflow-hidden shadow-2xl"
-        style={{ borderRadius: "14px" }}
-      >
-        {/* Top Subject Switcher Tabs */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[#2e2e33] bg-[#141417]">
-          <div className="flex items-center gap-3">
-            <Vela size={32} color="#60a5fa" />
-            <div>
-              <div className="text-xs font-semibold text-[#f0f0ee] flex items-center gap-1.5">
-                <span>Vela AI Engine</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30">
-                  Ready
-                </span>
-              </div>
-              <div className="text-[11px] text-[#a1a1aa]">Autonomous Study Tool Compiler</div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {velaExamples.map((ex, idx) => (
-              <button
-                key={ex.id}
-                onClick={() => setActiveTab(idx)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  activeTab === idx
-                    ? "bg-[#27272a] text-[#f0f0ee] border border-[#3f3f46]"
-                    : "text-[#a1a1aa] hover:text-[#f0f0ee] hover:bg-[#1f1f23]"
-                }`}
-              >
-                {ex.tabLabel}
-              </button>
-            ))}
+          <p className="text-sm sm:text-base text-[#a1a1aa] mt-2">
+            Scroll down to watch Vela compile live interactive revision sandboxes.
+          </p>
+          <div className="mt-4 text-xs font-mono text-blue-400 flex items-center justify-center gap-1 animate-bounce">
+            <span>↓ Scroll to build tool</span>
           </div>
         </div>
 
-        {/* Interactive Showcase Body */}
-        <div className="p-6 sm:p-8 space-y-6">
-          {/* User Prompt Box */}
-          <div className="space-y-2">
-            <div className="text-xs font-mono text-[#a1a1aa] uppercase tracking-wider flex items-center gap-1.5">
-              <span>Student Prompt:</span>
-            </div>
-            <div className="p-4 rounded-xl bg-[#131519] border border-[#2e2e33] flex items-start gap-3">
-              <span className="text-base">💬</span>
-              <p className="text-sm sm:text-base font-medium text-[#f0f0ee] italic leading-relaxed">
-                "{current.prompt}"
-              </p>
-            </div>
-          </div>
-
-          {/* Generated Sandbox Preview */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-xs font-mono">
-              <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
-                <span>✨</span> Compiled Interactive Sandbox
-              </span>
-              <span className="text-[#a1a1aa]">{current.stats}</span>
-            </div>
-
-            {/* Simulated Live Canvas Node Card */}
-            <div className="p-5 sm:p-6 rounded-xl bg-[#111317] border border-[#38383f] space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#27272a]">
-                <div>
-                  <div className="text-base font-semibold text-[#f0f0ee]">{current.toolTitle}</div>
-                  <div className="text-xs text-[#a1a1aa] mt-0.5">{current.highlightNode.state}</div>
-                </div>
-                <span className={`self-start sm:self-auto px-2.5 py-0.5 rounded-full text-xs font-mono border ${current.accent}`}>
-                  {current.badge}
+        {/* ── PHASE 2 & 3: REVEALED INTERACTIVE TOOL SIMULATION STAGE ── */}
+        <div
+          className="relative z-20 w-full max-w-[1050px] transition-all duration-150 ease-out"
+          style={{
+            opacity: demoReveal,
+            transform: `translateY(${(1 - demoReveal) * 40}px) scale(${0.92 + demoReveal * 0.08})`,
+            pointerEvents: demoReveal > 0.4 ? "auto" : "none",
+          }}
+        >
+          {/* Outer Compiler Window */}
+          <div
+            className="bg-[#18181b] border border-[#2e2e33] overflow-hidden shadow-2xl"
+            style={{ borderRadius: "14px" }}
+          >
+            {/* Window Titlebar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-[#2e2e33] bg-[#141417]">
+              <div className="flex items-center gap-2 pl-0 sm:pl-36">
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/60" />
+                <span className="text-xs font-mono text-[#a1a1aa] ml-2 truncate">
+                  vela-studio://synthesize/{current.id}
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-                <div className="p-3 rounded-lg bg-[#18181b] border border-[#2e2e33] space-y-1">
-                  <div className="text-[#a1a1aa] uppercase text-[10px]">Real-time State &amp; Metrics</div>
-                  <div className="text-[#f0f0ee] font-medium">{current.highlightNode.metric}</div>
+              {/* Subject Selectors */}
+              <div className="flex items-center gap-1.5">
+                {velaExamples.map((ex, idx) => (
+                  <button
+                    key={ex.id}
+                    onClick={() => {
+                      setActiveTab(idx);
+                      setSimStep(0);
+                    }}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                      activeTab === idx
+                        ? "bg-[#27272a] text-[#f0f0ee] border border-[#3f3f46]"
+                        : "text-[#a1a1aa] hover:text-[#f0f0ee]"
+                    }`}
+                  >
+                    {ex.tabLabel}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Stage Body */}
+            <div className="p-5 sm:p-7 space-y-5">
+              {/* User Prompt Bar */}
+              <div className="p-3.5 rounded-xl bg-[#131519] border border-[#2e2e33] flex items-center justify-between gap-3">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <span className="text-sm">💬</span>
+                  <p className="text-xs sm:text-sm text-[#f0f0ee] font-mono truncate">
+                    <span className="text-blue-400">Student: </span>"{current.prompt}"
+                  </p>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex-shrink-0 hidden sm:inline-block">
+                  ✓ Compiled in 1.4s
+                </span>
+              </div>
+
+              {/* LIVE SIMULATED TOOL VIEWPORT (Simulates Interactive Video/Tool Playing) */}
+              <div className="p-5 rounded-xl bg-[#101318] border border-[#2e2e33] space-y-4 relative overflow-hidden">
+                {/* Header of Active Tool */}
+                <div className="flex items-center justify-between pb-3 border-b border-[#222834]">
+                  <div>
+                    <h3 className="text-sm sm:text-base font-semibold text-[#f0f0ee] flex items-center gap-2">
+                      <span>{current.toolTitle}</span>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    </h3>
+                    <p className="text-xs text-[#a1a1aa] mt-0.5 font-mono">{current.stats}</p>
+                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-mono border ${current.accent}`}>
+                    {current.badge}
+                  </span>
                 </div>
 
-                <div className="p-3 rounded-lg bg-[#18181b] border border-[#2e2e33] space-y-1">
-                  <div className="text-emerald-400 uppercase text-[10px]">Active Recall Socratic Diagnostic</div>
-                  <div className="text-[#d4d4d8] font-normal leading-relaxed">{current.highlightNode.diagnostic}</div>
+                {/* Simulated Interactive Timeline & Process Queue */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs font-mono text-[#a1a1aa]">
+                    <span>Interactive Execution Timeline (Time Slice: 2ms)</span>
+                    <span className={currentSim.statusColor}>Step {simStep + 1} of 4</span>
+                  </div>
+
+                  {/* Visual Process Gantt Bar */}
+                  <div className="h-9 w-full bg-[#161d2b] rounded-lg border border-[#243042] flex overflow-hidden p-1 gap-1">
+                    <div
+                      className={`h-full rounded transition-all duration-500 flex items-center justify-center font-mono text-xs font-bold ${
+                        simStep === 0
+                          ? "w-1/3 bg-blue-500 text-white shadow-lg"
+                          : "w-1/3 bg-blue-500/40 text-blue-200"
+                      }`}
+                    >
+                      P1 [2ms]
+                    </div>
+                    <div
+                      className={`h-full rounded transition-all duration-500 flex items-center justify-center font-mono text-xs font-bold ${
+                        simStep === 1
+                          ? "w-1/12 bg-amber-500 text-slate-950 animate-pulse"
+                          : "w-1/12 bg-slate-700/40 text-slate-400 text-[10px]"
+                      }`}
+                    >
+                      SW
+                    </div>
+                    <div
+                      className={`h-full rounded transition-all duration-500 flex items-center justify-center font-mono text-xs font-bold ${
+                        simStep === 2
+                          ? "w-1/3 bg-emerald-500 text-slate-950 shadow-lg"
+                          : "w-1/3 bg-emerald-500/40 text-emerald-200"
+                      }`}
+                    >
+                      P2 [2ms]
+                    </div>
+                    <div
+                      className={`h-full rounded transition-all duration-500 flex items-center justify-center font-mono text-xs font-bold ${
+                        simStep === 3
+                          ? "flex-1 bg-indigo-500 text-white shadow-lg"
+                          : "flex-1 bg-indigo-500/40 text-indigo-200"
+                      }`}
+                    >
+                      P3 [1ms]
+                    </div>
+                  </div>
                 </div>
+
+                {/* Socratic Question & Verification Card */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono pt-1">
+                  <div className="p-3 rounded-lg bg-[#151b26] border border-[#243042] space-y-1">
+                    <div className="text-blue-300 uppercase text-[10px] font-semibold">Active State</div>
+                    <div className="text-[#f0f0ee]">{currentSim.action}</div>
+                    <div className="text-[#a1a1aa] text-[11px]">{currentSim.event}</div>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-[#151b26] border border-[#243042] space-y-1">
+                    <div className="text-emerald-400 uppercase text-[10px] font-semibold">Socratic Diagnostic</div>
+                    <div className="text-[#d4d4d8] leading-relaxed">{currentSim.answer}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Control & CTA Bar */}
+              <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-[#2e2e33]">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSimStep((prev) => (prev + 1) % 4)}
+                    className="px-3 py-1.5 rounded-lg bg-[#27272a] hover:bg-[#333338] text-xs font-mono text-[#f0f0ee] border border-[#3f3f46] transition-colors"
+                  >
+                    ▶ Step Simulation ({simStep + 1}/4)
+                  </button>
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className="text-xs text-[#a1a1aa] hover:text-[#f0f0ee] font-mono transition-colors"
+                  >
+                    {isPlaying ? "⏸ Pause auto-play" : "▶ Resume auto-play"}
+                  </button>
+                </div>
+
+                <a
+                  href="http://localhost:5174"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#f0f0ee] text-[#121214] hover:bg-white text-xs font-semibold rounded-lg transition-colors self-start sm:self-auto shadow-sm"
+                >
+                  <span>Launch Free Playground</span>
+                  <span>→</span>
+                </a>
               </div>
             </div>
           </div>
-
-          {/* Bottom Action Strip */}
-          <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-[#2e2e33]">
-            <p className="text-xs text-[#a1a1aa]">
-              Build your own custom interactive modules in the free standalone sandbox.
-            </p>
-            <a
-              href="http://localhost:5174"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#f0f0ee] text-[#121214] hover:bg-white text-xs font-semibold rounded-lg transition-colors self-start sm:self-auto"
-            >
-              <span>Launch Free Sandbox</span>
-              <span>→</span>
-            </a>
-          </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 };
 
@@ -817,7 +1005,7 @@ export default function LandingPage() {
       <main>
         <HeroSection />
         <CapabilitiesSection />
-        <VelaShowcaseSection />
+        <VelaScrollShowcase />
         <ComparisonSection />
         <EditionsSection />
         <InquiriesSection />
