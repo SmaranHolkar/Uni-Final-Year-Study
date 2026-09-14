@@ -55,8 +55,10 @@ export async function saveQuizMindmap({ userId, title, quizResults, mindmapNodes
 
 // Retrieves all quiz + mindmap records for a user.
 export async function getUserQuizzesMindmaps(userId) {
-  const client = await pool.connect();
+  if (!userId) return [];
+  let client;
   try {
+    client = await pool.connect();
     const query = `
       SELECT id, user_id, title, quiz, mindmap, embedding, retake_of_quiz_id, created_at, updated_at
       FROM public.quizzes_mindmaps
@@ -64,9 +66,12 @@ export async function getUserQuizzesMindmaps(userId) {
       ORDER BY created_at DESC;
     `;
     const result = await client.query(query, [userId]);
-    return result.rows;
+    return result.rows || [];
+  } catch (err) {
+    console.warn('[quiz.service] getUserQuizzesMindmaps fallback on DB error:', err.message);
+    return [];
   } finally {
-    client.release();
+    if (client) client.release();
   }
 }
 

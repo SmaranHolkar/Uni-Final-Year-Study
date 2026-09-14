@@ -185,19 +185,40 @@ export async function consumeDailyQuota(userId, actionType) {
 }
 
 export async function getTierStatusForUser(userId) {
-  if (!userId) throw new Error('userId is required');
+  const defaultQuotas = Object.entries(FREE_TIER_LIMITS).map(([actionType, limit]) => ({
+    actionType,
+    used: 0,
+    limit,
+    remaining: limit,
+  }));
 
-  const client = await pool.connect();
+  if (!userId) {
+    return {
+      tier: 'free',
+      isUnlimited: true,
+      unlimitedUntil: null,
+      quotas: defaultQuotas,
+    };
+  }
+
+  let client;
   try {
+    client = await pool.connect();
     await client.query('BEGIN');
     const tier = await ensureTierRowLocked(client, userId);
 
-    const { rows } = await client.query(
-      `SELECT action_type, used_count, limit_count
-       FROM public.daily_usage_counters
-       WHERE user_id = $1 AND usage_date = CURRENT_DATE`,
-      [userId]
-    );
+    let rows = [];
+    try {
+      const result = await client.query(
+        `SELECT action_type, used_count, limit_count
+         FROM public.daily_usage_counters
+         WHERE user_id = $1 AND usage_date = CURRENT_DATE`,
+        [userId]
+      );
+      rows = result.rows || [];
+    } catch (queryErr) {
+      console.warn('[tier.service] daily_usage_counters query skipped:', queryErr.message);
+    }
 
     await client.query('COMMIT');
 
@@ -223,10 +244,18 @@ export async function getTierStatusForUser(userId) {
       quotas,
     };
   } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
+    if (client) {
+      try { await client.query('ROLLBACK'); } catch {}
+    }
+    console.warn('[tier.service] getTierStatusForUser fallback on DB error:', err.message);
+    return {
+      tier: 'free',
+      isUnlimited: true,
+      unlimitedUntil: null,
+      quotas: defaultQuotas,
+    };
   } finally {
-    client.release();
+    if (client) client.release();
   }
 }
 
@@ -386,19 +415,24 @@ export async function recordQuizOutcome(userId, { quizId, title, quizResults }) 
 }
 
 export async function getDueSpacedRepetition(userId, limit = 10) {
-  if (!userId) throw new Error('userId is required');
+  if (!userId) return [];
   const safeLimit = Math.min(Math.max(Number(limit) || 10, 1), 50);
 
-  const { rows } = await pool.query(
-    `SELECT id, topic_key, topic_label, source_quiz_id, next_review_at, last_reviewed_at, last_score_percentage
-     FROM public.spaced_repetition_queue
-     WHERE user_id = $1 AND next_review_at <= NOW()
-     ORDER BY next_review_at ASC
-     LIMIT $2`,
-    [userId, safeLimit]
-  );
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, topic_key, topic_label, source_quiz_id, next_review_at, last_reviewed_at, last_score_percentage
+       FROM public.spaced_repetition_queue
+       WHERE user_id = $1 AND next_review_at <= NOW()
+       ORDER BY next_review_at ASC
+       LIMIT $2`,
+      [userId, safeLimit]
+    );
 
-  return rows;
+    return rows || [];
+  } catch (err) {
+    console.warn('[tier.service] getDueSpacedRepetition fallback on DB error:', err.message);
+    return [];
+  }
 }
 
 export async function markSpacedRepetitionReviewed(userId, queueId) {

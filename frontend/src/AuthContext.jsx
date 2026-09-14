@@ -16,25 +16,49 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     // Get session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && !localStorage.getItem('session_start')) {
-        localStorage.setItem('session_start', Date.now().toString());
-      }
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('[AuthContext] Session error:', error.message);
+          if (error.message?.includes('Refresh Token') || error.status === 400) {
+            localStorage.removeItem('session_start');
+            supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+          }
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        const initialSession = data?.session ?? null;
+        if (initialSession && !localStorage.getItem('session_start')) {
+          localStorage.setItem('session_start', Date.now().toString());
+        }
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.warn('[AuthContext] getSession failed:', err?.message || err);
+        localStorage.removeItem('session_start');
+        supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+      });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (_event === 'SIGNED_IN') {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      if (event === 'SIGNED_IN') {
         localStorage.setItem('session_start', Date.now().toString());
       }
-      if (_event === 'SIGNED_OUT') {
+      if (event === 'SIGNED_OUT') {
         localStorage.removeItem('session_start');
       }
-      setSession(session);
-      setUser(session?.user ?? null);
+      if (event === 'TOKEN_REFRESHED' && !newSession) {
+        localStorage.removeItem('session_start');
+      }
+      setSession(newSession ?? null);
+      setUser(newSession?.user ?? null);
       setLoading(false);
     });
 

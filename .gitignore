@@ -21,3 +21,7 @@ DEPLOYMENT_FIX.md
 # Diagram files
 *.drawio
 *.drawio.bkp
+
+# Agent/IDE local metadata
+.impeccable/
+

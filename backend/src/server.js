@@ -30,34 +30,38 @@ async function runAutoMigrations() {
     const client = await pool.connect();
     try {
       await client.query(`
+        CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
         DO $$ 
         BEGIN
-            IF NOT EXISTS (
-                SELECT 1 
-                FROM information_schema.columns 
-                WHERE table_schema = 'public' 
-                AND table_name = 'w_embeddings' 
-                AND column_name = 'paragraph_index'
-            ) THEN
-                ALTER TABLE public.w_embeddings ADD COLUMN paragraph_index INT DEFAULT 1;
-            END IF;
-            IF NOT EXISTS (
-                SELECT 1 
-                FROM information_schema.columns 
-                WHERE table_schema = 'public' 
-                AND table_name = 'w_embeddings' 
-                AND column_name = 'page_number'
-            ) THEN
-                ALTER TABLE public.w_embeddings ADD COLUMN page_number INT DEFAULT 1;
-            END IF;
-            IF NOT EXISTS (
-                SELECT 1 
-                FROM information_schema.columns 
-                WHERE table_schema = 'public' 
-                AND table_name = 'w_embeddings' 
-                AND column_name = 'file_url'
-            ) THEN
-                ALTER TABLE public.w_embeddings ADD COLUMN file_url TEXT;
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'w_embeddings') THEN
+              IF NOT EXISTS (
+                  SELECT 1 
+                  FROM information_schema.columns 
+                  WHERE table_schema = 'public' 
+                  AND table_name = 'w_embeddings' 
+                  AND column_name = 'paragraph_index'
+              ) THEN
+                  ALTER TABLE public.w_embeddings ADD COLUMN paragraph_index INT DEFAULT 1;
+              END IF;
+              IF NOT EXISTS (
+                  SELECT 1 
+                  FROM information_schema.columns 
+                  WHERE table_schema = 'public' 
+                  AND table_name = 'w_embeddings' 
+                  AND column_name = 'page_number'
+              ) THEN
+                  ALTER TABLE public.w_embeddings ADD COLUMN page_number INT DEFAULT 1;
+              END IF;
+              IF NOT EXISTS (
+                  SELECT 1 
+                  FROM information_schema.columns 
+                  WHERE table_schema = 'public' 
+                  AND table_name = 'w_embeddings' 
+                  AND column_name = 'file_url'
+              ) THEN
+                  ALTER TABLE public.w_embeddings ADD COLUMN file_url TEXT;
+              END IF;
             END IF;
         END $$;
 
@@ -78,7 +82,7 @@ async function runAutoMigrations() {
             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
-        -- Ensure canvas_notes.id is VARCHAR(128) so client node IDs (e.g. pdf_123, sticky_456) can be saved
+
         DO $$
         BEGIN
             IF EXISTS (
@@ -113,8 +117,77 @@ async function runAutoMigrations() {
             END IF;
         END $$;
         CREATE INDEX IF NOT EXISTS idx_learning_playground_sessions_user_created ON public.learning_playground_sessions (user_id, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS public.user_tier_state (
+            user_id UUID PRIMARY KEY,
+            tier_name TEXT NOT NULL DEFAULT 'free',
+            unlimited_until TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS public.daily_usage_counters (
+            id BIGSERIAL PRIMARY KEY,
+            user_id UUID NOT NULL,
+            usage_date DATE NOT NULL,
+            action_type TEXT NOT NULL,
+            used_count INTEGER NOT NULL DEFAULT 0,
+            limit_count INTEGER NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT daily_usage_counters_unique UNIQUE (user_id, usage_date, action_type)
+        );
+        CREATE INDEX IF NOT EXISTS idx_daily_usage_counters_user_date ON public.daily_usage_counters (user_id, usage_date);
+
+        CREATE TABLE IF NOT EXISTS public.spaced_repetition_queue (
+            id BIGSERIAL PRIMARY KEY,
+            user_id UUID NOT NULL,
+            topic_key TEXT NOT NULL,
+            topic_label TEXT NOT NULL,
+            source_quiz_id BIGINT,
+            last_score_percentage INTEGER,
+            next_review_at TIMESTAMPTZ NOT NULL,
+            last_reviewed_at TIMESTAMPTZ,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT spaced_repetition_queue_unique_topic UNIQUE (user_id, topic_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_spaced_repetition_queue_due ON public.spaced_repetition_queue (user_id, next_review_at);
+
+        CREATE TABLE IF NOT EXISTS public.mastery_events (
+            id BIGSERIAL PRIMARY KEY,
+            user_id UUID NOT NULL,
+            topic_key TEXT NOT NULL,
+            topic_label TEXT NOT NULL,
+            score_percentage INTEGER NOT NULL,
+            quiz_id BIGINT,
+            week_start_date DATE NOT NULL,
+            achieved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT mastery_events_unique_weekly_topic UNIQUE (user_id, topic_key, week_start_date)
+        );
+
+        CREATE TABLE IF NOT EXISTS public.weekly_mastery_progress (
+            id BIGSERIAL PRIMARY KEY,
+            user_id UUID NOT NULL,
+            week_start_date DATE NOT NULL,
+            mastered_topics_count INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT weekly_mastery_progress_unique UNIQUE (user_id, week_start_date)
+        );
+
+        CREATE TABLE IF NOT EXISTS public.reward_unlock_events (
+            id BIGSERIAL PRIMARY KEY,
+            user_id UUID NOT NULL,
+            qualification_window_end DATE NOT NULL,
+            reward_granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            unlimited_until TIMESTAMPTZ NOT NULL,
+            reason TEXT NOT NULL DEFAULT 'mastery_4_weeks',
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT reward_unlock_events_unique_window UNIQUE (user_id, qualification_window_end)
+        );
       `);
-      console.log('[DB MIGRATIONS] w_embeddings, canvas_notes & learning_playground_sessions verified');
+      console.log('[DB MIGRATIONS] All application tables & schemas verified');
     } finally {
       client.release();
     }
